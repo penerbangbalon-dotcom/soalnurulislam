@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ujian Online — PKBM Nurul Islam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF9F4; --surface:#fff; --ink:#1E2A22; --ink-soft:#4B5A4F;
+    --line:#DAD3C0; --green:#2F5233; --green-dark:#203823; --gold:#B8901F; --red:#A23E2C;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;font-size:15px;line-height:1.55;}
+  h1,h2{font-family:'Source Serif 4',serif;font-weight:700;margin:0 0 .3em;}
+  .wrap{max-width:640px;margin:0 auto;padding:34px 20px 80px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:22px 24px;margin-bottom:18px;}
+  label{display:block;font-size:12.5px;color:var(--ink-soft);margin:0 0 4px;}
+  input[type=text],input[type=radio]{font-family:inherit;}
+  input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-size:15px;}
+  textarea{width:100%;min-height:90px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-family:inherit;font-size:15px;}
+  .btn{display:inline-flex;padding:11px 20px;border:1px solid var(--green);background:var(--green);color:#fff;border-radius:3px;font-size:14.5px;font-weight:500;cursor:pointer;}
+  .btn:hover{background:var(--green-dark);}
+  .btn:disabled{opacity:.5;}
+  .error{color:var(--red);font-size:13.5px;margin-top:10px;}
+  .top-bar{position:sticky;top:0;background:var(--paper);padding:14px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);margin-bottom:20px;z-index:5;}
+  .timer{font-family:'Source Serif 4',serif;font-weight:700;font-size:20px;}
+  .timer.warn{color:var(--red);}
+  .opsi-line{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);}
+  .opsi-line:last-child{border-bottom:none;}
+  .num-tag{display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;text-align:center;line-height:26px;font-size:12px;margin-right:8px;}
+  .hidden{display:none !important;}
+  .result-box{text-align:center;padding:50px 20px;}
+  .banner-pesan{background:#FFF4CC;border:1px solid #E2B93B;border-radius:3px;padding:12px 16px;margin:0 0 16px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;}
+  .banner-pesan strong{display:block;font-size:12.5px;color:#7A5300;margin-bottom:2px;}
+  .banner-info{background:#E4EEE3;border:1px solid #9DBB9B;border-radius:3px;padding:10px 16px;margin:0 0 16px;font-size:14px;}
+  .overlay-kunci{position:fixed;inset:0;background:rgba(30,42,34,.96);color:#fff;z-index:100;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;}
+  .overlay-kunci h2{color:#fff;}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- LAYAR MASUK -->
+  <div id="layar-masuk">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <img src="logo-pkbm.png" alt="Logo PKBM Nurul Islam" style="width:52px;height:52px;object-fit:contain;">
+      <div>
+        <h1 style="margin:0;">Ujian Online</h1>
+        <p style="color:var(--ink-soft);margin:2px 0 0;">PKBM Nurul Islam</p>
+      </div>
+    </div>
+    <div class="card">
+      <div style="margin-bottom:14px;">
+        <label>Kode Akses Ujian</label>
+        <input type="text" id="input-kode" placeholder="Contoh: 7F3K2A" style="text-transform:uppercase;" />
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>NISN</label>
+        <input type="text" id="input-nisn" placeholder="Masukkan NISN kamu" />
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>PIN (jika diminta guru, mis. tanggal lahir)</label>
+        <input type="text" id="input-pin" placeholder="Kosongkan bila tidak diminta" />
+      </div>
+      <button class="btn" onclick="mulaiUjian()" id="btn-mulai">Mulai Ujian</button>
+      <div class="error" id="masuk-error"></div>
+    </div>
+  </div>
+
+  <!-- LAYAR UJIAN -->
+  <div id="layar-ujian" class="hidden">
+    <div class="top-bar">
+      <div>
+        <strong id="judul-ujian"></strong><br>
+        <span style="color:var(--ink-soft);font-size:13px;" id="nama-siswa-tampil"></span>
+      </div>
+      <div class="timer" id="timer-display">--:--</div>
+    </div>
+    <div id="banner-pesan" class="banner-pesan hidden">
+      <div><strong>Pesan dari pengawas</strong><span id="banner-pesan-teks"></span></div>
+      <button class="btn" style="padding:6px 12px;" onclick="tutupPesan()">Mengerti</button>
+    </div>
+    <div id="banner-info" class="banner-info hidden"></div>
+    <div id="daftar-soal"></div>
+    <button class="btn" style="width:100%;justify-content:center;margin-top:10px;" onclick="submitUjian()">Kumpulkan Jawaban</button>
+    <div class="error" id="submit-error"></div>
+  </div>
+
+  <!-- OVERLAY KUNCI (dari pengawas) -->
+  <div id="overlay-kunci" class="overlay-kunci hidden">
+    <div>
+      <h2>Ujian Dikunci Sementara</h2>
+      <p>Pengawas mengunci ujianmu. Jangan menutup halaman ini &mdash; jawabanmu tetap aman.<br>Tunggu instruksi dari pengawas.</p>
+    </div>
+  </div>
+
+  <!-- LAYAR SELESAI -->
+  <div id="layar-selesai" class="hidden">
+    <div class="card result-box">
+      <h2>Ujian Selesai</h2>
+      <p id="hasil-text" style="color:var(--ink-soft);"></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://oeweivdvovpcgolaxzuc.supabase.co'; // dipakai hanya untuk cek data siswa via function
+
+let sesiData = null;
+let jawabanState = {};
+let timerInterval = null;
+let waktuHabisEpoch = null;
+let pelanggaran = 0;
+let serverOffset = 0;            // selisih jam server - jam HP siswa (supaya timer akurat)
+let hbInterval = null, hbDebounce = null, verJawaban = 0, verTerkirim = 0;
+let pesanTerakhirId = 0, ujianBerakhir = false;
+const HEARTBEAT_MS = 20000;      // detak ke server tiap 20 detik (guru memantau lewat ini)
+const sekarang = () => Date.now() + serverOffset;
+const KATEX_OPT = { delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}], throwOnError:false };
+function rngSeed(seed){ let h=2166136261; for(const c of String(seed)) h=Math.imul(h^c.charCodeAt(0),16777619); let a=h>>>0;
+  return ()=>{ a=(a+0x6d2b79f5)|0; let x=Math.imul(a^(a>>>15),1|a); x=(x+Math.imul(x^(x>>>7),61|x))^x; return ((x^(x>>>14))>>>0)/4294967296; }; }
+function acakArr(arr, seed){ const r=rngSeed(seed), x=arr.slice(); for(let i=x.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+// Catat kalau siswa meninggalkan halaman ujian (pindah tab/aplikasi)
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && sesiData && !document.getElementById('layar-ujian').classList.contains('hidden')){
+    pelanggaran++;
+    try{ localStorage.setItem('ujian_pel_'+sesiData.sesi_id, pelanggaran); }catch(e){}
+    kirimHeartbeat();
+    alert('Peringatan: kamu meninggalkan halaman ujian ('+pelanggaran+'x). Ini dicatat dan dilihat guru.');
+  }
+});
+
+// Kalau siswa masuk lewat link/QR kartu ujian (?kode=XXXXX), kode akses otomatis
+// terisi supaya siswa tinggal mengetik NISN saja.
+(function isiKodeDariUrl(){
+  try{
+    const kode = new URLSearchParams(location.search).get('kode');
+    if(kode) document.getElementById('input-kode').value = kode.toUpperCase();
+  }catch(e){}
+})();
+
+async function mulaiUjian(){
+  const kode_akses = document.getElementById('input-kode').value.trim().toUpperCase();
+  const nisn = document.getElementById('input-nisn').value.trim();
+  const pin = document.getElementById('input-pin').value.trim();
+  const btn = document.getElementById('btn-mulai');
+  const err = document.getElementById('masuk-error');
+  err.textContent = '';
+  if(!kode_akses || !nisn){ err.textContent = 'Kode akses dan NISN wajib diisi'; return; }
+
+  btn.disabled = true; btn.textContent = 'Memuat...';
+  try{
+    const res = await fetch('/api/mulai-ujian', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ kode_akses, nisn, pin })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Gagal memuat ujian');
+    sesiData = data;
+    tampilkanUjian();
+  }catch(e){
+    err.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Mulai Ujian';
+  }
+}
+
+function kunciLocal(sesiId){ return 'ujian_jawaban_' + sesiId; }
+
+function tampilkanUjian(){
+  document.getElementById('layar-masuk').classList.add('hidden');
+  document.getElementById('layar-ujian').classList.remove('hidden');
+  document.getElementById('judul-ujian').textContent = sesiData.judul;
+  document.getElementById('nama-siswa-tampil').textContent = sesiData.nama_siswa;
+
+  // Pulihkan jawaban yang sempat tersimpan di browser ini (kalau tadi refresh/nutup tab)
+  // Jawaban lokal (di HP ini) diutamakan; kalau kosong (mis. ganti HP), pakai cadangan dari server.
+  let lokal = {};
+  try{ const saved = localStorage.getItem(kunciLocal(sesiData.sesi_id)); lokal = saved ? JSON.parse(saved) : {}; }catch(e){ lokal = {}; }
+  jawabanState = { ...(sesiData.jawaban_tersimpan || {}), ...lokal };
+
+  if(sesiData.server_time) serverOffset = sesiData.server_time - Date.now();
+  hitungWaktuHabis();
+  try{ pesanTerakhirId = parseInt(localStorage.getItem('ujian_pesan_'+sesiData.sesi_id)||0) || (sesiData.pesan_id||0); }catch(e){ pesanTerakhirId = sesiData.pesan_id||0; }
+
+  const wrap = document.getElementById('daftar-soal');
+  // Sub judul bagian hanya untuk paket TANPA acak soal (kalau diacak, jenis soal tercampur)
+  const URUT = { pilihan_ganda:0, isian_singkat:1, essay:2 };
+  const BAGIAN = { pilihan_ganda:['Pilihan Ganda','Pilih satu jawaban yang paling benar.'], isian_singkat:['Jawaban Singkat','Isilah dengan jawaban yang singkat dan tepat.'], essay:['Essay','Jawablah dengan jelas dan lengkap.'] };
+  let daftar = sesiData.soal, lastJenis = null, hurufBagian = 0;
+  if(!sesiData.acak){
+    daftar = daftar.slice().sort((a,b)=>(URUT[a.jenis]-URUT[b.jenis]) || (a.nomor-b.nomor));
+    daftar.forEach((s,i)=>{ s.nomor = i+1; });
+  }
+  const bagian = jenis=>{
+    if(sesiData.acak || jenis===lastJenis) return ''; lastJenis = jenis;
+    const [nama, pet] = BAGIAN[jenis] || [jenis,''];
+    return `<h3 style="margin:26px 0 2px;">${String.fromCharCode(65+hurufBagian++)}. ${nama}</h3><p style="margin:0 0 10px;color:var(--ink-soft);font-style:italic;font-size:14px;">${pet}</p>`;
+  };
+  wrap.innerHTML = daftar.map(s=>{
+    let inputHtml = '';
+    const jawabanTersimpan = jawabanState[s.id] || '';
+    if(s.jenis==='pilihan_ganda'){
+      let opsi = [['A',s.opsi_a],['B',s.opsi_b],['C',s.opsi_c],['D',s.opsi_d],['E',s.opsi_e]].filter(o=>o[1]);
+      if(sesiData.acak) opsi = acakArr(opsi, sesiData.sesi_id + s.id); // huruf tampil berurutan, nilai asli tetap dikirim
+      inputHtml = opsi.map(([huruf,teks],ix)=>`
+        <label class="opsi-line">
+          <input type="radio" name="soal-${s.id}" value="${huruf}" ${jawabanTersimpan===huruf?'checked':''} onchange="simpanJawaban('${s.id}','${huruf}')">
+          <span><strong>${String.fromCharCode(65+ix)}.</strong> ${escapeHtml(teks)}</span>
+        </label>`).join('');
+    } else if(s.jenis==='isian_singkat'){
+      inputHtml = `<input type="text" oninput="simpanJawaban('${s.id}', this.value)" value="${escapeHtml(jawabanTersimpan)}" placeholder="Jawaban singkat">`;
+    } else {
+      inputHtml = `<textarea oninput="simpanJawaban('${s.id}', this.value)" placeholder="Tulis jawaban essay di sini">${escapeHtml(jawabanTersimpan)}</textarea>`;
+    }
+    return bagian(s.jenis)+`<div class="card">
+      <div style="margin-bottom:10px;"><span class="num-tag">${s.nomor}</span><strong>${escapeHtml(s.pertanyaan)}</strong></div>
+      ${s.gambar?`<img src="${s.gambar}" style="max-width:100%;margin:6px 0 10px;">`:''}
+      ${inputHtml}
+    </div>`;
+  }).join('');
+
+  try{ pelanggaran = parseInt(localStorage.getItem('ujian_pel_'+sesiData.sesi_id)||0)||0; }catch(e){}
+  if(window.renderMathInElement) renderMathInElement(wrap, KATEX_OPT);
+  timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
+  window.addEventListener('beforeunload', peringatanTutupTab);
+  document.getElementById('overlay-kunci').classList.toggle('hidden', !sesiData.dikunci);
+  hbInterval = setInterval(kirimHeartbeat, HEARTBEAT_MS);
+  verJawaban = 1; verTerkirim = 0; // kirim cadangan jawaban pada detak pertama
+  kirimHeartbeat();
+}
+
+function hitungWaktuHabis(){
+  const mulai = new Date(sesiData.waktu_mulai).getTime();
+  waktuHabisEpoch = mulai + ((sesiData.durasi_menit||0) + (sesiData.tambahan_menit||0))*60*1000;
+}
+
+// ---------- DETAK KE SERVER (monitoring guru) ----------
+function jumlahTerjawab(){ return Object.values(jawabanState).filter(v=>String(v||'').trim()!=='').length; }
+async function kirimHeartbeat(){
+  if(!sesiData || ujianBerakhir) return;
+  const ver = verJawaban;
+  const payload = { sesi_id: sesiData.sesi_id, pelanggaran, terjawab: jumlahTerjawab(), total: sesiData.soal.length };
+  if(ver > verTerkirim) payload.jawaban = jawabanState;
+  try{
+    const res = await fetch('/api/heartbeat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    if(!res.ok) return;
+    const d = await res.json();
+    if(payload.jawaban) verTerkirim = Math.max(verTerkirim, ver);
+    tanganiHeartbeat(d);
+  }catch(e){ /* offline / gangguan sesaat: coba lagi di detak berikutnya, jawaban tetap aman di HP */ }
+}
+function tanganiHeartbeat(d){
+  if(!d || ujianBerakhir) return;
+  if(d.server_time) serverOffset = d.server_time - Date.now();
+
+  if(d.status === 'dihapus'){
+    ujianBerakhir = true; hentikanSemua();
+    try{ localStorage.removeItem(kunciLocal(sesiData.sesi_id)); localStorage.removeItem('ujian_pel_'+sesiData.sesi_id); localStorage.removeItem('ujian_pesan_'+sesiData.sesi_id); }catch(e){}
+    alert('Sesi ujianmu direset oleh guru. Silakan masuk kembali dengan kode akses dan NISN.');
+    location.reload();
+    return;
+  }
+  if(d.status === 'selesai' || d.status === 'dinilai'){
+    ujianBerakhir = true; hentikanSemua();
+    try{ localStorage.removeItem(kunciLocal(sesiData.sesi_id)); }catch(e){}
+    document.getElementById('overlay-kunci').classList.add('hidden');
+    document.getElementById('layar-ujian').classList.add('hidden');
+    document.getElementById('layar-selesai').classList.remove('hidden');
+    let teks = 'Ujianmu telah diakhiri oleh pengawas. Jawaban yang sudah tersimpan sudah dinilai.';
+    if(d.nilai != null) teks += d.perlu_nilai_manual
+      ? ` Nilai sementara: ${d.nilai} (soal essay akan dinilai guru, lalu nilaimu bertambah otomatis).`
+      : ` Nilai kamu: ${d.nilai} (skala 0-100).`;
+    document.getElementById('hasil-text').textContent = teks;
+    return;
+  }
+
+  // Waktu tambahan dari guru
+  const tambah = d.tambahan_menit || 0;
+  if(tambah !== (sesiData.tambahan_menit||0)){
+    const selisih = tambah - (sesiData.tambahan_menit||0);
+    sesiData.tambahan_menit = tambah;
+    hitungWaktuHabis(); updateTimer();
+    if(selisih > 0) tampilkanInfo(`Pengawas menambah waktu ujianmu ${selisih} menit.`);
+  }
+  // Kunci dari guru
+  document.getElementById('overlay-kunci').classList.toggle('hidden', !d.dikunci);
+  // Pesan baru dari guru
+  if(d.pesan_id && d.pesan_id !== pesanTerakhirId && d.pesan){
+    pesanTerakhirId = d.pesan_id;
+    try{ localStorage.setItem('ujian_pesan_'+sesiData.sesi_id, pesanTerakhirId); }catch(e){}
+    document.getElementById('banner-pesan-teks').textContent = d.pesan;
+    document.getElementById('banner-pesan').classList.remove('hidden');
+    window.scrollTo({ top:0, behavior:'smooth' });
+    try{ if(navigator.vibrate) navigator.vibrate(200); }catch(e){}
+  }
+}
+function tutupPesan(){ document.getElementById('banner-pesan').classList.add('hidden'); }
+function tampilkanInfo(teks){
+  const el = document.getElementById('banner-info');
+  el.textContent = teks; el.classList.remove('hidden');
+  setTimeout(()=>el.classList.add('hidden'), 12000);
+}
+function hentikanSemua(){
+  clearInterval(timerInterval); clearInterval(hbInterval); clearTimeout(hbDebounce);
+  window.removeEventListener('beforeunload', peringatanTutupTab);
+}
+
+function peringatanTutupTab(e){
+  e.preventDefault();
+  e.returnValue = '';
+}
+
+function simpanJawaban(soalId, val){
+  jawabanState[soalId] = val;
+  try{ localStorage.setItem(kunciLocal(sesiData.sesi_id), JSON.stringify(jawabanState)); }catch(e){}
+  // Cadangkan ke server ±5 detik setelah berhenti mengetik (bukan tiap ketikan)
+  verJawaban++;
+  clearTimeout(hbDebounce);
+  hbDebounce = setTimeout(kirimHeartbeat, 5000);
+}
+
+function updateTimer(){
+  const sisaMs = waktuHabisEpoch - sekarang();
+  const disp = document.getElementById('timer-display');
+  if(sisaMs <= 0){
+    disp.textContent = '00:00';
+    clearInterval(timerInterval);
+    submitUjian(true);
+    return;
+  }
+  const menit = Math.floor(sisaMs/60000);
+  const detik = Math.floor((sisaMs%60000)/1000);
+  disp.textContent = String(menit).padStart(2,'0') + ':' + String(detik).padStart(2,'0');
+  disp.classList.toggle('warn', sisaMs < 5*60*1000);
+}
+
+async function submitUjian(otomatis){
+  if(!otomatis && !confirm('Kumpulkan jawaban sekarang? Jawaban tidak bisa diubah lagi setelah dikumpulkan.')) return;
+  clearInterval(timerInterval); clearTimeout(hbDebounce);
+  const jawabanArr = sesiData.soal.map(s=>({ soal_id: s.id, jawaban: jawabanState[s.id] || '' }));
+  try{
+    const res = await fetch('/api/submit-ujian', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ sesi_id: sesiData.sesi_id, jawaban: jawabanArr, pelanggaran })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Gagal mengumpulkan jawaban');
+    ujianBerakhir = true; hentikanSemua();
+    try{ localStorage.removeItem(kunciLocal(sesiData.sesi_id)); }catch(e){}
+    document.getElementById('overlay-kunci').classList.add('hidden');
+    document.getElementById('layar-ujian').classList.add('hidden');
+    document.getElementById('layar-selesai').classList.remove('hidden');
+    let teks = 'Jawaban kamu sudah tersimpan. ';
+    if(data.perlu_nilai_manual){
+      teks += `Nilai sementara: ${data.nilai} dari ${data.maks_sementara} (bagian pilihan ganda & isian singkat). Soal essay akan dinilai guru, lalu nilaimu bertambah otomatis (maksimal 100).`;
+    } else {
+      teks += `Nilai kamu: ${data.nilai} (skala 0-100).`;
+    }
+    if(data.jumlah_otomatis > 0) teks += ` Benar ${data.benar} dari ${data.jumlah_otomatis} soal pilihan ganda/isian.`;
+    document.getElementById('hasil-text').textContent = teks;
+  }catch(e){
+    // Kalau sesi ternyata sudah ditutup guru (Sudahi) atau direset, minta status terbaru dari server
+    if(/sudah selesai|tidak ditemukan/i.test(e.message)){ await kirimHeartbeat(); if(ujianBerakhir) return; }
+    document.getElementById('submit-error').textContent = e.message;
+    timerInterval = setInterval(updateTimer, 1000);
+  }
+}
+
+function escapeHtml(str){
+  return (str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

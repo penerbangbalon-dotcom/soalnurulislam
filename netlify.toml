@@ -1,0 +1,14 @@
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = "index.html,ujian.html"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
