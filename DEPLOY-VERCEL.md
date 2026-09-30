@@ -1,53 +1,64 @@
-# Deploy Aplikasi Ujian PKBM ke Vercel
+# DEPLOY VERCEL — APLIKASI UJIAN
 
-## Perbaikan penting
-Versi ini tidak menetapkan `runtime: nodejs22.x` di `vercel.json`. Pada Vercel, folder `/api/*.js` otomatis menggunakan Node.js Runtime bawaan. Pengaturan Node.js major version dilakukan melalui `package.json` (`24.x`) atau Project Settings.
+## 1. Environment Variables
 
-## GitHub
-Upload **isi folder proyek** ke root repository. Struktur harus seperti:
+Di Vercel → Project → Settings → Environment Variables, isi:
 
-- `api/generate-soal.js`
-- `api/kelola-user.js`
-- `api/mulai-ujian.js`
-- `api/submit-ujian.js`
-- `api/heartbeat.js`
-- `api/sudahi-ujian.js`
-- `netlify/functions/...`
-- `netlify/lib/...`
-- `index.html`
-- `ujian.html`
-- `vercel.json`
-- `package.json`
+- `SUPABASE_URL` = URL project Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` = service_role key Supabase
+- `SUPABASE_ANON_KEY` = anon/public key Supabase
+- `GEMINI_API_KEY` = API key Google AI Studio
 
-Jangan letakkan proyek di dalam folder bertingkat seperti `repo/aplikasi-ujian-v7-fixed/api`.
-
-## Vercel
-Import repository GitHub dan gunakan Root Directory `./`.
-Framework Preset boleh `Other`.
-Tidak perlu Build Command khusus.
-
-## Environment Variables
-Tambahkan di Vercel Project Settings > Environment Variables:
-
-- `GEMINI_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Opsional:
-
-- `GEMINI_MODEL`
-- `GEMINI_FALLBACK_MODELS`
+Opsional AI cadangan:
 - `GROQ_API_KEY`
 - `CEREBRAS_API_KEY`
 - `MISTRAL_API_KEY`
 - `OPENROUTER_API_KEY`
-- `AI_PROVIDER_ORDER`
-- `AI_BUDGET_MS`
 
-Set variable untuk Production, Preview, dan Development sesuai kebutuhan.
+Opsional konfigurasi AI:
+- `GEMINI_MODEL=gemini-3.6-flash`
+- `GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-2.5-flash`
+- `AI_PROVIDER_ORDER=gemini,groq,cerebras,mistral,openrouter`
+- `AI_BUDGET_MS=24000`
 
-Setelah mengubah Environment Variables, lakukan Redeploy.
+## 2. Supabase
 
-## Jika masih mendapat error runtime
-Pastikan repository tidak memiliki `now.json` lama atau `vercel.json` lain di subfolder yang dipilih sebagai Root Directory. File konfigurasi yang digunakan harus `vercel.json` di root deployment.
+Pastikan schema/migrasi SQL dari proyek asli sudah dijalankan dan tabel yang dipakai aplikasi tersedia.
+
+## 3. Deploy
+
+Upload folder ini ke GitHub, lalu import repository tersebut ke Vercel.
+
+Framework Preset: Other.
+
+Build Command: kosongkan.
+
+Output Directory: kosongkan.
+
+Vercel otomatis mengenali folder `api/`.
+
+## 4. Setelah deploy
+
+Tes:
+- `https://DOMAIN-VERCEL/api/generate-soal`
+  - membuka URL langsung dengan GET boleh menghasilkan `Method Not Allowed`; itu normal.
+  - pengujian sebenarnya dilakukan dari tombol Generate dengan AI.
+- Login guru.
+- Bank Soal → Generate dengan AI.
+- Coba 5 soal terlebih dahulu.
+
+## 5. Jika AI gagal
+
+Buka Vercel → Deployments → deployment terbaru → Functions/Logs.
+
+Kesalahan umum:
+- `401/403`: API key AI salah/tidak aktif.
+- `404 model`: nama model tidak tersedia; gunakan:
+  `gemini-3.6-flash`
+  atau `gemini-3.5-flash-lite`.
+- `429`: kuota/rate limit; tambahkan provider cadangan.
+- `SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY`: environment variable Supabase belum diisi.
+
+## Penting
+
+Jangan pernah memasukkan `SUPABASE_SERVICE_ROLE_KEY` ke `index.html`, `ujian.html`, atau JavaScript frontend.
