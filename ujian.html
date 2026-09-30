@@ -37,6 +37,14 @@
   .banner-info{background:#E4EEE3;border:1px solid #9DBB9B;border-radius:3px;padding:10px 16px;margin:0 0 16px;font-size:14px;}
   .overlay-kunci{position:fixed;inset:0;background:rgba(30,42,34,.96);color:#fff;z-index:100;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;}
   .overlay-kunci h2{color:#fff;}
+  .overlay-curang{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(120,0,0,.88);animation:kedip .6s infinite alternate;}
+  @keyframes kedip{from{background:rgba(120,0,0,.88);}to{background:rgba(200,20,20,.92);}}
+  .overlay-curang .kotak{background:#fff;border:4px solid #B3261E;border-radius:6px;max-width:440px;width:100%;padding:26px 24px;text-align:center;}
+  .overlay-curang h2{color:#B3261E;font-size:24px;margin:6px 0 10px;}
+  .overlay-curang .ikon{font-size:46px;line-height:1;}
+  .overlay-curang .btn{background:#B3261E;border-color:#B3261E;justify-content:center;width:100%;margin-top:16px;}
+  .badge-pel{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:#B3261E;color:#fff;font-size:12px;font-weight:600;}
+  #daftar-soal .card strong, #daftar-soal .card img{-webkit-user-select:none;user-select:none;}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
@@ -77,7 +85,7 @@
     <div class="top-bar">
       <div>
         <strong id="judul-ujian"></strong><br>
-        <span style="color:var(--ink-soft);font-size:13px;" id="nama-siswa-tampil"></span>
+        <span style="color:var(--ink-soft);font-size:13px;" id="nama-siswa-tampil"></span><span class="badge-pel hidden" id="badge-pel"></span>
       </div>
       <div class="timer" id="timer-display">--:--</div>
     </div>
@@ -89,6 +97,18 @@
     <div id="daftar-soal"></div>
     <button class="btn" style="width:100%;justify-content:center;margin-top:10px;" onclick="submitUjian()">Kumpulkan Jawaban</button>
     <div class="error" id="submit-error"></div>
+  </div>
+
+  <!-- POP UP PERINGATAN KECURANGAN -->
+  <div id="overlay-curang" class="overlay-curang hidden" role="alertdialog" aria-live="assertive">
+    <div class="kotak">
+      <div class="ikon">&#9888;&#65039;</div>
+      <h2>PERINGATAN KECURANGAN!</h2>
+      <p id="curang-teks" style="margin:0 0 6px;font-size:15.5px;"></p>
+      <p id="curang-hitung" style="margin:0;font-weight:600;color:#B3261E;"></p>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--ink-soft);">Tindakan ini tercatat otomatis dan dapat dilihat oleh guru/pengawas.</p>
+      <button class="btn" onclick="tutupPeringatanCurang()">Saya mengerti, kembali mengerjakan</button>
+    </div>
   </div>
 
   <!-- OVERLAY KUNCI (dari pengawas) -->
@@ -126,14 +146,95 @@ const KATEX_OPT = { delimiters:[{left:'$$',right:'$$',display:true},{left:'$',ri
 function rngSeed(seed){ let h=2166136261; for(const c of String(seed)) h=Math.imul(h^c.charCodeAt(0),16777619); let a=h>>>0;
   return ()=>{ a=(a+0x6d2b79f5)|0; let x=Math.imul(a^(a>>>15),1|a); x=(x+Math.imul(x^(x>>>7),61|x))^x; return ((x^(x>>>14))>>>0)/4294967296; }; }
 function acakArr(arr, seed){ const r=rngSeed(seed), x=arr.slice(); for(let i=x.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [x[i],x[j]]=[x[j],x[i]]; } return x; }
-// Catat kalau siswa meninggalkan halaman ujian (pindah tab/aplikasi)
+// ================= ANTI KECURANGAN =================
+// Deteksi: pindah tab/aplikasi, jendela kehilangan fokus (split screen / jendela lain),
+// menempel (paste), menyalin soal, dan pintasan buka DevTools / lihat sumber / cetak.
+// Setiap pelanggaran: pop up + alarm bersuara + getar (HP) + dicatat dan dikirim ke guru lewat heartbeat.
+const ANTI_CURANG = { aktif:true, jedaMs:2000, alarmMaksDetik:12, mulaiDiamDetik:3 };
+let audioCtx = null, alarmTimer = null, alarmStop = null, terakhirPelanggaran = 0, mulaiUjianEpoch = 0;
+
+function siapkanAlarm(){           // dipanggil dari klik "Mulai Ujian" (browser mewajibkan interaksi agar suara boleh bunyi)
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+    if(!audioCtx) audioCtx = new AC();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){}
+}
+function bunyiSirine(){
+  if(!audioCtx) return;
+  try{
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime;
+    [[880,0],[620,0.25]].forEach(([f,d])=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'square'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t+d);
+      g.gain.exponentialRampToValueAtTime(0.35, t+d+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+d+0.23);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t+d); o.stop(t+d+0.25);
+    });
+  }catch(e){}
+}
+function mulaiAlarm(){
+  hentikanAlarm();
+  bunyiSirine();
+  alarmTimer = setInterval(bunyiSirine, 500);
+  alarmStop = setTimeout(hentikanAlarm, ANTI_CURANG.alarmMaksDetik*1000);
+  try{ if(navigator.vibrate) navigator.vibrate([400,150,400,150,400]); }catch(e){}
+}
+function hentikanAlarm(){
+  clearInterval(alarmTimer); clearTimeout(alarmStop); alarmTimer = alarmStop = null;
+  try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){}
+}
+function ujianSedangBerjalan(){
+  return ANTI_CURANG.aktif && sesiData && !ujianBerakhir && !document.getElementById('layar-ujian').classList.contains('hidden');
+}
+function catatPelanggaran(alasan){
+  if(!ujianSedangBerjalan()) return;
+  const now = Date.now();
+  if(now - mulaiUjianEpoch < ANTI_CURANG.mulaiDiamDetik*1000) return;   // abaikan beberapa detik pertama
+  if(now - terakhirPelanggaran < ANTI_CURANG.jedaMs) return;            // satu kejadian sering memicu beberapa event sekaligus
+  terakhirPelanggaran = now;
+  pelanggaran++;
+  try{ localStorage.setItem('ujian_pel_'+sesiData.sesi_id, pelanggaran); }catch(e){}
+  const badge = document.getElementById('badge-pel');
+  badge.textContent = 'Pelanggaran: ' + pelanggaran; badge.classList.remove('hidden');
+  document.getElementById('curang-teks').textContent = alasan;
+  document.getElementById('curang-hitung').textContent = 'Total pelanggaran kamu: ' + pelanggaran + 'x';
+  document.getElementById('overlay-curang').classList.remove('hidden');
+  mulaiAlarm();
+  kirimHeartbeat();
+}
+function tutupPeringatanCurang(){
+  hentikanAlarm();
+  document.getElementById('overlay-curang').classList.add('hidden');
+}
 document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden && sesiData && !document.getElementById('layar-ujian').classList.contains('hidden')){
-    pelanggaran++;
-    try{ localStorage.setItem('ujian_pel_'+sesiData.sesi_id, pelanggaran); }catch(e){}
-    kirimHeartbeat();
-    alert('Peringatan: kamu meninggalkan halaman ujian ('+pelanggaran+'x). Ini dicatat dan dilihat guru.');
-  }
+  if(document.hidden) catatPelanggaran('Kamu terdeteksi meninggalkan halaman ujian (pindah tab atau aplikasi).');
+});
+window.addEventListener('blur', ()=>{
+  // fokus hilang tanpa pindah tab, mis. split screen, jendela/notifikasi melayang, atau klik di luar browser
+  setTimeout(()=>{ if(!document.hidden) catatPelanggaran('Halaman ujian kehilangan fokus (jendela lain terbuka atau layar terbagi).'); }, 300);
+});
+document.addEventListener('paste', e=>{
+  if(!ujianSedangBerjalan()) return;
+  e.preventDefault();
+  catatPelanggaran('Menempel (paste) teks tidak diperbolehkan saat ujian.');
+});
+['copy','cut'].forEach(ev=>document.addEventListener(ev, e=>{
+  if(!ujianSedangBerjalan()) return;
+  const t = e.target && e.target.tagName;
+  if(t==='INPUT' || t==='TEXTAREA') return;    // menyalin/memotong jawaban sendiri di kolom isian tetap boleh
+  e.preventDefault();
+  catatPelanggaran('Menyalin soal tidak diperbolehkan saat ujian.');
+}));
+document.addEventListener('contextmenu', e=>{ if(ujianSedangBerjalan()) e.preventDefault(); });   // klik kanan diblok (tidak dihitung)
+document.addEventListener('keydown', e=>{
+  if(!ujianSedangBerjalan()) return;
+  const k = (e.key||'').toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
+  const dev = k==='f12' || (ctrl && e.shiftKey && ['i','j','c'].includes(k)) || (ctrl && ['u','s','p'].includes(k));
+  if(dev){ e.preventDefault(); catatPelanggaran('Pintasan keyboard terlarang terdeteksi (DevTools / lihat sumber / simpan / cetak).'); }
 });
 
 // Kalau siswa masuk lewat link/QR kartu ujian (?kode=XXXXX), kode akses otomatis
@@ -154,6 +255,7 @@ async function mulaiUjian(){
   err.textContent = '';
   if(!kode_akses || !nisn){ err.textContent = 'Kode akses dan NISN wajib diisi'; return; }
 
+  siapkanAlarm();
   btn.disabled = true; btn.textContent = 'Memuat...';
   try{
     const res = await fetch('/api/mulai-ujian', {
@@ -227,6 +329,8 @@ function tampilkanUjian(){
   }).join('');
 
   try{ pelanggaran = parseInt(localStorage.getItem('ujian_pel_'+sesiData.sesi_id)||0)||0; }catch(e){}
+  mulaiUjianEpoch = Date.now();
+  if(pelanggaran>0){ const b=document.getElementById('badge-pel'); b.textContent='Pelanggaran: '+pelanggaran; b.classList.remove('hidden'); }
   if(window.renderMathInElement) renderMathInElement(wrap, KATEX_OPT);
   timerInterval = setInterval(updateTimer, 1000);
   updateTimer();
@@ -309,6 +413,7 @@ function tampilkanInfo(teks){
   setTimeout(()=>el.classList.add('hidden'), 12000);
 }
 function hentikanSemua(){
+  hentikanAlarm();
   clearInterval(timerInterval); clearInterval(hbInterval); clearTimeout(hbDebounce);
   window.removeEventListener('beforeunload', peringatanTutupTab);
 }
@@ -343,7 +448,12 @@ function updateTimer(){
 }
 
 async function submitUjian(otomatis){
-  if(!otomatis && !confirm('Kumpulkan jawaban sekarang? Jawaban tidak bisa diubah lagi setelah dikumpulkan.')) return;
+  if(!otomatis){
+    terakhirPelanggaran = Date.now() + 3000;   // kotak konfirmasi bawaan browser bisa memicu blur; jangan dihitung
+    const ya = confirm('Kumpulkan jawaban sekarang? Jawaban tidak bisa diubah lagi setelah dikumpulkan.');
+    terakhirPelanggaran = Date.now() + 1500;
+    if(!ya) return;
+  }
   clearInterval(timerInterval); clearTimeout(hbDebounce);
   const jawabanArr = sesiData.soal.map(s=>({ soal_id: s.id, jawaban: jawabanState[s.id] || '' }));
   try{
