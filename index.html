@@ -3723,6 +3723,8 @@ function renderTabelLaporan(){
       : (nilai!=null ? predikatNilai(nilai) : '-');
     const aksiCell = isBelumDibuat
       ? `<button class="btn outline" style="padding:3px 8px;font-size:12px;" onclick="tandaiMapelTidakDiujikan('${p.mapel_id}')">Tandai Tidak Diujikan</button>`
+      : isTidak
+      ? `<button class="btn gold" style="padding:3px 8px;font-size:12px;" onclick="ikutiUjianDariLaporan(${i})">Ikuti Ujian</button>`
       : '';
     return `<tr>
       <td>${escapeHtml(p.mata_pelajaran?.nama||'-')}</td>
@@ -3734,6 +3736,20 @@ function renderTabelLaporan(){
       <td>${aksiCell}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" class="muted">Tidak ada data untuk filter ini.</td></tr>';
+}
+
+// Pintasan dari baris "PERLU MELAPOR KE WALI KELAS": langsung membuka menu Daftar Paket
+// Ujian dengan kolom pencarian sudah terisi nama mapel (+ kelas paket) yang belum diikuti,
+// sehingga kode akses / tombol Aktifkan Online paket tsb langsung terlihat.
+function ikutiUjianDariLaporan(i){
+  const s = barisLaporanTampil[i];
+  if(!s || !s.paket_ujian) return;
+  const p = s.paket_ujian;
+  const kata = [p.mata_pelajaran?.nama, p.kelas].filter(Boolean).join(' ');
+  document.getElementById('daftar-cari').value = kata;
+  showTab('daftar');
+  loadDaftarPaket();
+  window.scrollTo(0, 0);
 }
 
 // Menghitung peringkat siswa dibanding siswa lain di kelas/jenjang yang sama, dalam
