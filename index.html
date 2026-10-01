@@ -2050,9 +2050,9 @@ function renderDraftAI(){
         </div>` : ''}
       <p class="muted" style="margin-top:8px;">Kunci: ${escapeHtml(s.kunci_jawaban||'-')}</p>
     </div>
-  `).join('') + (draftSoalAI.length ? `<div class="toolbar" style="margin-top:14px;"><button class="btn" onclick="simpanDraftAI()">Simpan Semua ke Bank Soal</button></div>` : '');
+  `).join('') + (draftSoalAI.length ? `<div class="toolbar" style="margin-top:14px;"><button class="btn" onclick="simpanDraftAI()">Simpan Semua ke Bank Soal</button> <button class="btn gold" onclick="simpanDraftAI(true)">Simpan &amp; Buat Paket Ujian</button></div>` : '');
 }
-async function simpanDraftAI(){
+async function simpanDraftAI(lanjutPaket){
   if(!draftSoalAI.length) return;
   const rows = draftSoalAI.map(s=>({
     mapel_id: s.mapel_id,
@@ -2065,11 +2065,31 @@ async function simpanDraftAI(){
     poin: 1,
     sumber: 'ai',
   }));
-  const { error } = await supa.from('bank_soal').insert(rows);
+  // Mode "Simpan & Buat Paket Ujian": ambil id soal yang baru tersimpan supaya bisa langsung dicentang di formulir paket.
+  const q = supa.from('bank_soal').insert(rows);
+  const { data: tersimpan, error } = lanjutPaket===true ? await q.select('id') : await q;
   if(error) return alert(error.message);
+  const ctx = ctxGenerateAI;
+  const idBaru = (tersimpan||[]).map(r=>r.id);
   draftSoalAI = [];
   closeModal('modal-ai');
   loadBankSoal();
+  if(lanjutPaket===true) await bukaPaketDariGenerate(idBaru, ctx);
+}
+// Membuka menu Paket Ujian dengan mapel/program/kelas/judul terisi dan SEMUA soal hasil generate sudah tercentang.
+// Guru tinggal memilih Jenis Ujian, Semester, dll, lalu menekan "Simpan Paket Ujian".
+async function bukaPaketDariGenerate(idSoal, ctx){
+  if(!idSoal.length || !ctx) return alert('Soal sudah tersimpan di Bank Soal, tetapi tidak bisa dipilih otomatis. Silakan buat paket lewat menu Paket Ujian.');
+  batalEditPaket();                                   // formulir kembali ke mode "Buat Paket Ujian"
+  document.getElementById('pk-mapel').value = '';     // supaya showTab tidak memuat daftar soal lebih dulu (akan menimpa centang)
+  showTab('paket');
+  document.getElementById('pk-mapel').value = ctx.mapelId;
+  syncPaketProgramKelas();
+  document.getElementById('pk-judul').value = `${ctx.mapel} - ${ctx.topik}`.slice(0,120);
+  preselectSoalIds = idSoal;
+  await loadSoalUntukPaket();
+  window.scrollTo(0, 0);
+  alert(`${idSoal.length} soal baru sudah tersimpan di Bank Soal dan sudah tercentang di formulir Paket Ujian.\n\nLengkapi Judul, Jenis Ujian, Semester & Durasi, lalu klik "Simpan Paket Ujian". Paket tersimpan sebagai draft; aktifkan lewat menu Daftar Paket Ujian.`);
 }
 
 // ---------- PAKET UJIAN ----------
