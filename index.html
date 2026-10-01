@@ -1128,10 +1128,7 @@ function showTab(tab){
 // ---------- MENU BERKELOMPOK (SIDEBAR) ----------
 function toggleGroup(gid){
   const g = document.querySelector(`nav .group[data-group="${gid}"]`); if(!g) return;
-  const buka = !g.classList.contains('open');
-  document.querySelectorAll('nav .group').forEach(x=>x.classList.remove('open'));
-  if(buka) g.classList.add('open');
-  document.querySelectorAll('nav .group').forEach(x=>{ if(x.querySelector('.item.active')) x.classList.add('open'); });
+  g.classList.toggle('open');   // buka/tutup grup ini saja; grup lain tidak diubah
 }
 
 // ---------- UJIAN TERLAKSANA ----------
