@@ -503,6 +503,7 @@
             <button class="btn outline" onclick="renderTabelLaporan()">Terapkan Filter</button>
             <button class="btn gold" onclick="cetakRapor()">🎓 Cetak Rapor</button>
             <button class="btn gold" onclick="cetakPiagam()">🏅 Cetak Piagam</button>
+            <button class="btn gold" onclick="cetakKartuUjianSiswa()">🪪 Cetak Kartu Ujian</button>
           </div>
           <p class="muted" style="margin-top:0;">Baris <b>"Paket ujian belum dibuat"</b> berarti mapel itu belum
             punya paket ujian di kelas siswa ini. Kalau memang mapel tsb tidak diujikan (UTS/UAS), klik
@@ -3750,6 +3751,115 @@ function ikutiUjianDariLaporan(i){
   showTab('daftar');
   loadDaftarPaket();
   window.scrollTo(0, 0);
+}
+
+// ---------- KARTU UJIAN DARI LAPORAN SISWA ----------
+// Mencetak SATU kartu untuk siswa yang sedang dipilih, berisi SEMUA paket ujian di kelas/program
+// siswa yang belum ia ikuti (status paket "siap" = sudah dibuka, "draft" = akan dibuka), lengkap
+// dengan kode akses & QR link ujian. Paket Ulangan Harian tidak ikut (sama seperti Laporan/Rapor),
+// paket ditutup/diarsipkan juga tidak ikut. Mengikuti filter Tahun Ajaran/Semester/Jenis di toolbar.
+function normSemesterTA(semester, ta){
+  if(ta) return { semester: semester||null, tahun_ajaran: ta };
+  const m = String(semester||'').trim().match(/^(Ganjil|Genap)\s+(\d{4}\/\d{4})$/i);
+  if(m) return { semester: m[1][0].toUpperCase()+m[1].slice(1).toLowerCase(), tahun_ajaran: m[2] };
+  return { semester: semester||null, tahun_ajaran: ta||null };
+}
+async function cetakKartuUjianSiswa(){
+  const nisn = document.getElementById('lap-siswa-select').value;
+  if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  const siswa = daftarSiswaLaporan.find(x=>x.nisn===nisn);
+  if(!siswa || !siswa.kelasRomawi || !siswa.programLabel) return alert('Kelas/program siswa ini belum lengkap di database absensi, jadi paket ujiannya tidak bisa ditentukan.');
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
+  win.document.write('<p style="font-family:Arial;padding:20px;">Menyiapkan kartu ujian...</p>');
+  const { data, error } = await supa.from('paket_ujian')
+    .select('id, judul, jenis_ujian, semester, tahun_ajaran, kelas, program, durasi_menit, status, kode_akses, diarsipkan, mata_pelajaran(nama)')
+    .eq('kelas', siswa.kelasRomawi).eq('program', siswa.programLabel)
+    .in('status', ['siap','draft']).eq('diarsipkan', false);
+  if(error){ win.close(); return alert('Gagal memuat paket ujian: '+error.message); }
+  const ta = document.getElementById('lap-filter-ta').value;
+  const smt = document.getElementById('lap-filter-smt').value;
+  const jenis = document.getElementById('lap-filter-jenis').value;
+  // Paket yang sudah punya sesi nyata (sedang dikerjakan / sudah dikumpulkan / dinilai) dianggap sudah diikuti.
+  const sudahIkut = new Set(dataLaporanSiswa
+    .filter(r=>r.paket_ujian_id && r.status!=='tidak_mengerjakan' && r.status!=='belum_dibuat')
+    .map(r=>r.paket_ujian_id));
+  const daftar = (data||[])
+    .filter(p=>p.jenis_ujian!=='Ulangan Harian' && p.kode_akses && !sudahIkut.has(p.id))
+    .map(p=>({ ...p, ...normSemesterTA(p.semester, p.tahun_ajaran) }))
+    .filter(p=>(!ta || p.tahun_ajaran===ta) && (!smt || p.semester===smt) && (!jenis || p.jenis_ujian===jenis))
+    .sort((a,b)=>(a.mata_pelajaran?.nama||'').localeCompare(b.mata_pelajaran?.nama||'','id') || String(a.jenis_ujian).localeCompare(String(b.jenis_ujian)));
+  if(!daftar.length){
+    win.close();
+    return alert('Tidak ada ujian yang belum diikuti siswa ini (cek juga filter Tahun Ajaran/Semester/Jenis Ujian di atas tabel).');
+  }
+  const tanpaPaket = dataLaporanSiswa.filter(r=>r.status==='belum_dibuat').map(r=>r.paket_ujian.mata_pelajaran?.nama).filter(Boolean);
+  const jenjang = siswa.programLabel==='Paket C' ? 'Paket C (Setara SMA/MA)' : 'Paket B (Setara SMP/MTs)';
+  const linkDasar = `${location.origin}/ujian.html`;
+  const baris = daftar.map((p,i)=>{
+    const link = `${linkDasar}?kode=${encodeURIComponent(p.kode_akses)}`;
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(link)}`;
+    const dibuka = p.status==='siap';
+    return `<tr>
+      <td class="c">${i+1}</td>
+      <td><b>${escapeHtml(p.mata_pelajaran?.nama||'-')}</b><br><span class="kecil">${escapeHtml(p.judul||'')}</span></td>
+      <td class="c">${escapeHtml(p.jenis_ujian||'-')}</td>
+      <td class="c">${escapeHtml((p.semester||'-')+' / '+(p.tahun_ajaran||'-'))}</td>
+      <td class="c">${p.durasi_menit||'-'} mnt</td>
+      <td class="c kode">${escapeHtml(p.kode_akses)}<br><span class="kecil ${dibuka?'ok':'blm'}">${dibuka?'Sudah dibuka':'Belum dibuka*'}</span></td>
+      <td class="c"><img src="${qr}" alt="QR"></td>
+    </tr>`;
+  }).join('');
+  const adaDraft = daftar.some(p=>p.status!=='siap');
+  win.document.open();
+  win.document.write(`<html><head><title>Kartu Ujian - ${escapeHtml(siswa.nama)}</title>
+  <style>
+    @page{size:A4 portrait;margin:12mm;}
+    body{font-family:Arial,sans-serif;color:#111;max-width:780px;margin:20px auto;}
+    .kop{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;border-bottom:4px double #000;padding-bottom:6px;text-align:center;line-height:1.25;}
+    .kop img{width:80px;height:auto;flex:none;} .kop .t{flex:1;}
+    .kop .l1{font-size:15px;font-weight:bold;} .kop .l2{font-size:17px;font-weight:bold;} .kop .l3{font-size:28px;font-weight:bold;letter-spacing:1px;}
+    .kop .l4{font-size:13px;font-weight:bold;} .kop .l5{font-size:11px;} .kop .l6{font-size:8px;} .kop .l7{font-size:10px;}
+    h1{font-size:18px;text-align:center;margin:16px 0 12px;letter-spacing:.5px;text-decoration:underline;}
+    table.info{font-size:13.5px;margin-bottom:12px;} table.info td{padding:2px 8px 2px 0;} table.info td:first-child{font-weight:bold;white-space:nowrap;width:90px;}
+    table.jadwal{width:100%;border-collapse:collapse;font-size:12.5px;}
+    table.jadwal th,table.jadwal td{border:1px solid #666;padding:5px 7px;text-align:left;vertical-align:middle;}
+    table.jadwal th{background:#e8eefc;text-align:center;}
+    .c{text-align:center !important;} .kecil{font-size:10.5px;color:#444;} .kode{font-size:15px;font-weight:bold;letter-spacing:1px;font-family:'Courier New',monospace;}
+    .kode .kecil{font-family:Arial;letter-spacing:0;font-weight:normal;} .ok{color:#116a2b;} .blm{color:#b3261e;}
+    table.jadwal img{width:58px;height:58px;display:block;margin:auto;}
+    tr{page-break-inside:avoid;}
+    .cara{font-size:12px;margin-top:14px;line-height:1.5;} .cara ol{margin:4px 0 0 18px;padding:0;}
+    .catatan{font-size:11px;color:#444;margin-top:8px;}
+    .ttd{display:flex;justify-content:space-between;font-size:12.5px;text-align:center;margin-top:22px;page-break-inside:avoid;}
+    @media print{ .btn-cetak{display:none;} body{margin:0;} }
+  </style></head><body>
+  <button class="btn-cetak" onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak</button>
+  ${kopSekolahHTML()}
+  <h1>KARTU PESERTA UJIAN</h1>
+  <table class="info">
+    <tr><td>Nama</td><td>: ${escapeHtml(siswa.nama)}</td></tr>
+    <tr><td>NISN</td><td>: ${escapeHtml(siswa.nisn)}</td></tr>
+    <tr><td>Kelas</td><td>: ${escapeHtml(siswa.kelasRomawi)} &mdash; ${jenjang}</td></tr>
+  </table>
+  <table class="jadwal">
+    <thead><tr><th>No</th><th>Mata Pelajaran</th><th>Jenis</th><th>Semester / T.A.</th><th>Waktu</th><th>Kode Akses</th><th>QR</th></tr></thead>
+    <tbody>${baris}</tbody>
+  </table>
+  ${adaDraft ? '<div class="catatan">* Ujian berstatus &quot;Belum dibuka&quot; baru bisa diikuti setelah guru mengaktifkannya.</div>' : ''}
+  ${tanpaPaket.length ? `<div class="catatan">Mata pelajaran yang paket ujiannya belum dibuat: ${tanpaPaket.map(escapeHtml).join(', ')}.</div>` : ''}
+  <div class="cara"><b>Cara mengikuti ujian online:</b>
+    <ol>
+      <li>Scan QR pada baris mata pelajaran yang akan diujikan, atau buka <b>${escapeHtml(linkDasar)}</b> lalu ketik Kode Akses.</li>
+      <li>Masukkan NISN: <b>${escapeHtml(siswa.nisn)}</b> (dan PIN bila diminta guru), lalu mulai ujian.</li>
+    </ol>
+  </div>
+  <div class="ttd">
+    <div>Peserta,<br><br><br><br>(...........................)</div>
+    <div>Wali Kelas,<br><br><br><br>(...........................)</div>
+  </div>
+  </body></html>`);
+  win.document.close();
 }
 
 // Menghitung peringkat siswa dibanding siswa lain di kelas/jenjang yang sama, dalam
