@@ -507,7 +507,7 @@
           </div>
           <p class="muted" style="margin-top:0;">Laporan hanya menampilkan nilai dari paket ujian yang <b>sudah dikerjakan siswa</b> dan paket
             yang masih <b>aktif tetapi belum dikerjakan</b> (muncul sebagai &quot;Perlu melapor ke wali kelas&quot;). Mata pelajaran yang
-            belum punya paket ujian, serta paket draft, ditutup, atau diarsipkan yang belum dikerjakan siswa, tidak ditampilkan.</p>
+            belum punya paket ujian, serta paket draft atau ditutup yang belum dikerjakan siswa, tidak ditampilkan. Paket yang sudah <b>diarsipkan</b> tidak ikut sama sekali.</p>
           <table>
             <thead><tr><th>Mata Pelajaran</th><th>Jenis</th><th>Judul Ujian</th><th>Semester / T.A.</th><th>Nilai</th><th>Predikat</th><th></th></tr></thead>
             <tbody id="lap-body"></tbody>
@@ -2338,11 +2338,11 @@ async function hapusPaket(id){
   if(jmlHasil>0){
     // Paket yang sudah ada hasilnya TIDAK dihapus sungguhan: diarsipkan (disembunyikan & ditutup)
     // supaya semua nilai tetap utuh di Hasil Ujian, Laporan Siswa, Rapor, dan Arsip Nilai.
-    if(!confirm(`Paket ini sudah punya ${jmlHasil} hasil ujian siswa.\n\nPaket TIDAK akan dihapus permanen. Paket akan diarsipkan: disembunyikan dari daftar dan ditutup untuk siswa, sedangkan SEMUA NILAI tetap tersimpan dan tetap tampil di Hasil Ujian, Laporan Siswa, dan Rapor.\n\nArsipkan paket ini?`)) return;
+    if(!confirm(`Paket ini sudah punya ${jmlHasil} hasil ujian siswa.\n\nPaket TIDAK akan dihapus permanen. Paket akan diarsipkan: disembunyikan dari daftar dan ditutup untuk siswa, sedangkan SEMUA NILAI tetap tersimpan di Hasil Ujian, tetapi TIDAK ditampilkan lagi di Laporan Siswa dan Rapor. Paket bisa dipulihkan atau dihapus permanen dari daftar (centang \"Tampilkan paket yang sudah diarsipkan\").\n\nArsipkan paket ini?`)) return;
     const { error: eArsip } = await supa.from('paket_ujian').update({ diarsipkan:true, diarsipkan_pada:new Date().toISOString(), status:'ditutup' }).eq('id', id);
     if(eArsip) return alert('Gagal mengarsipkan: '+eArsip.message);
     if(editingPaketId === id) batalEditPaket();
-    alert('Paket diarsipkan. Semua nilai siswa tetap tersimpan.');
+    alert('Paket diarsipkan. Nilai siswa tetap tersimpan di Hasil Ujian, tetapi tidak muncul lagi di Laporan Siswa/Rapor.');
     loadDaftarPaket();
     return;
   } else if(!confirm('Hapus paket ujian ini? Semua data hasil ujian siswa untuk paket ini (kalau ada) juga akan ikut terhapus.')) return;
@@ -2394,7 +2394,8 @@ function renderDaftarPaket(){
       <td>${p.diarsipkan ? `
         <button class="btn outline" style="padding:5px 10px;" onclick="cetakPaket('${p.id}')">Cetak</button>
         <button class="btn outline" style="padding:5px 10px;" onclick="cetakWord('${p.id}')">Cetak Word</button>
-        <button class="btn gold" style="padding:5px 10px;" onclick="pulihkanPaket('${p.id}')">Pulihkan</button>` : `
+        <button class="btn gold" style="padding:5px 10px;" onclick="pulihkanPaket('${p.id}')">Pulihkan</button>
+        <button class="btn danger" style="padding:5px 10px;" onclick="hapusPermanenPaket('${p.id}')">Hapus Permanen</button>` : `
         <button class="btn outline" style="padding:5px 10px;" onclick="cetakPaket('${p.id}')">Cetak</button>
         <button class="btn outline" style="padding:5px 10px;" onclick="cetakWord('${p.id}')">Cetak Word</button>
         <button class="btn outline" style="padding:5px 10px;" onclick="editPaket('${p.id}')">Edit</button>
@@ -2406,6 +2407,37 @@ function renderDaftarPaket(){
         <button class="btn danger" style="padding:5px 10px;" onclick="hapusPaket('${p.id}')">Hapus</button>`}
       </td>
     </tr>`).join('');
+}
+// Hapus PERMANEN paket yang sudah diarsipkan. Kalau paket punya hasil ujian siswa, seluruh sesi & jawaban
+// siswa untuk paket itu ikut terhapus dan TIDAK bisa dikembalikan. Soal di Bank Soal tidak ikut terhapus.
+async function hapusPermanenPaket(id){
+  const paket = daftarPaketData.find(p=>p.id===id);
+  if(!paket || !paket.diarsipkan) return alert('Hapus permanen hanya untuk paket yang sudah diarsipkan.');
+  const { count: jmlHasil, error: eCount } = await supa.from('sesi_ujian').select('id', { count:'exact', head:true }).eq('paket_ujian_id', id);
+  if(eCount) return alert('Gagal memeriksa hasil ujian: '+eCount.message);
+  const nama = `"${paket.judul}" (${paket.kelas||'-'} / ${paket.program||'-'})`;
+  if(jmlHasil>0){
+    const ketik = prompt(`HAPUS PERMANEN paket ${nama}?\n\nSebanyak ${jmlHasil} hasil ujian siswa (nilai & jawaban) pada paket ini akan ikut TERHAPUS SELAMANYA dan tidak bisa dikembalikan. Soal di Bank Soal tidak terhapus.\n\nKetik HAPUS (huruf besar) untuk melanjutkan:`);
+    if(ketik===null) return;
+    if(ketik.trim()!=='HAPUS') return alert('Dibatalkan: kata konfirmasi tidak sesuai. Paket tidak dihapus.');
+  } else if(!confirm(`Hapus permanen paket ${nama}? Paket ini belum punya hasil ujian. Tindakan ini tidak bisa dibatalkan.`)) return;
+  // Urutan: jawaban -> sesi -> paket (paket_soal ikut terhapus otomatis oleh database).
+  if(jmlHasil>0){
+    const { data: sesiList, error: eSesi } = await supa.from('sesi_ujian').select('id').eq('paket_ujian_id', id);
+    if(eSesi) return alert('Gagal membaca sesi ujian: '+eSesi.message);
+    const sesiIds = (sesiList||[]).map(x=>x.id);
+    for(let i=0;i<sesiIds.length;i+=100){
+      const { error: eDet } = await supa.from('detail_jawaban').delete().in('sesi_ujian_id', sesiIds.slice(i,i+100));
+      if(eDet) return alert('Gagal menghapus jawaban siswa: '+eDet.message+'\n\nPaket belum dihapus.');
+    }
+    const { error: eDelSesi } = await supa.from('sesi_ujian').delete().eq('paket_ujian_id', id);
+    if(eDelSesi) return alert('Gagal menghapus hasil ujian: '+eDelSesi.message+'\n\nPaket belum dihapus.');
+  }
+  const { error } = await supa.from('paket_ujian').delete().eq('id', id);
+  if(error) return alert('Gagal menghapus paket: '+error.message);
+  if(editingPaketId === id) batalEditPaket();
+  alert('Paket dihapus permanen.');
+  loadDaftarPaket();
 }
 async function pulihkanPaket(id){
   const { error } = await supa.from('paket_ujian').update({ diarsipkan:false, diarsipkan_pada:null }).eq('id', id);
@@ -3584,7 +3616,7 @@ async function tampilkanLaporanSiswa(){
   const siswaInfo = daftarSiswaLaporan.find(s=>s.nisn===nisn);
   const [{ data:sesiData, error:eSesi }, { data:paketRelevan, error:ePaket }] = await Promise.all([
     supa.from('sesi_ujian')
-      .select('id, siswa_nama, siswa_nisn, status, total_skor, waktu_selesai, paket_ujian_id, paket_ujian(judul, jenis_ujian, semester, tahun_ajaran, kelas, program, mapel_id, mata_pelajaran(nama))')
+      .select('id, siswa_nama, siswa_nisn, status, total_skor, waktu_selesai, paket_ujian_id, paket_ujian(judul, jenis_ujian, semester, tahun_ajaran, kelas, program, mapel_id, diarsipkan, mata_pelajaran(nama))')
       .eq('siswa_nisn', nisn)
       .order('waktu_selesai', { ascending:false }),
     // Hanya paket yang AKTIF (status "siap") dan tidak diarsipkan yang dihitung sebagai ujian
@@ -3600,7 +3632,8 @@ async function tampilkanLaporanSiswa(){
 
   // Kalau paket ujiannya sudah dihapus, sesi ikut tidak relevan lagi — abaikan.
   // Ulangan Harian tidak ikut Laporan Siswa/Rapor (ditampilkan di Rekap Nilai Siswa, Leger, dan Transkrip).
-  const sesiValid = (sesiData||[]).filter(s=>s.paket_ujian && s.paket_ujian.jenis_ujian!=='Ulangan Harian');
+  // Paket yang sudah DIARSIPKAN juga tidak ikut (nilainya tetap ada di menu Hasil Ujian & Arsip).
+  const sesiValid = (sesiData||[]).filter(s=>s.paket_ujian && s.paket_ujian.jenis_ujian!=='Ulangan Harian' && !s.paket_ujian.diarsipkan);
   // Paket ujian sesuai kelas & program siswa saat ini yang BELUM ia kerjakan
   // (UTS ataupun UAS) tetap dimasukkan sebagai baris "Tidak Mengerjakan".
   const paketRelevanFormal = (paketRelevan||[]).filter(p=>p.jenis_ujian!=='Ulangan Harian');
@@ -3870,8 +3903,9 @@ async function cetakKartuUjianSiswa(){
 async function hitungPeringkatKelas(kelas, program, ta, smt, nisnTarget){
   if(!kelas || !program || !ta || !smt) return null;
   const { data, error } = await supa.from('sesi_ujian')
-    .select('siswa_nisn, total_skor, paket_ujian!inner(kelas,program,tahun_ajaran,semester)')
+    .select('siswa_nisn, total_skor, paket_ujian!inner(kelas,program,tahun_ajaran,semester,diarsipkan)')
     .eq('status','dinilai').not('total_skor','is',null)
+    .eq('paket_ujian.diarsipkan', false)
     .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program)
     .eq('paket_ujian.tahun_ajaran', ta).eq('paket_ujian.semester', smt)
     .neq('paket_ujian.jenis_ujian', 'Ulangan Harian');
