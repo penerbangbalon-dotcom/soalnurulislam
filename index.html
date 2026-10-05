@@ -493,6 +493,7 @@
             <div><label>Nilai Tertinggi</label><div id="lap-tertinggi"></div></div>
             <div><label>Nilai Terendah</label><div id="lap-terendah"></div></div>
           </div>
+          <div style="margin-top:12px;"><label>Rekap Kehadiran (sesuai filter Tahun Ajaran &amp; Semester)</label><div id="lap-hadir" style="font-size:13.5px;"></div></div>
         </div>
 
         <div class="card">
@@ -3729,6 +3730,7 @@ function renderTabelLaporan(){
   document.getElementById('lap-ratarata').textContent = rata!=null ? rata.toFixed(1) : '-';
   document.getElementById('lap-tertinggi').textContent = nilaiValid.length ? Math.max(...nilaiValid) : '-';
   document.getElementById('lap-terendah').textContent = nilaiValid.length ? Math.min(...nilaiValid) : '-';
+  tampilkanRekapHadirLaporan();
 
   // "Ujian Diikuti" menghitung ujian yang BENAR-BENAR dikerjakan siswa (statusnya
   // bukan "tidak_mengerjakan"/"belum_dibuat", yaitu ada sesi ujian nyata — sedang
@@ -3938,6 +3940,52 @@ function kopSekolahHTML(logoSize){
   </div>`;
 }
 
+// ---------- REKAP KEHADIRAN UNTUK LAPORAN SISWA & RAPOR ----------
+function fmtTglId(iso){ return String(iso||'').split('-').reverse().join('/'); }
+// Urutan sumber: (1) data Hadir/Sakit/Izin/Alpa yang sudah disimpan guru di menu Input Nilai Tambahan
+// (bisa sudah ditambah manual untuk bulan sebelum absensi dipakai), (2) bila belum ada, tarik langsung dari
+// aplikasi absensi. Hadir + Terlambat dihitung hadir. Mengembalikan null bila tidak ada data.
+async function ambilRekapKehadiran(nisn, program, kelas, ta, smt){
+  try{
+    if(ta && smt){
+      const { data } = await supa.from('catatan_siswa_semester').select('hadir,sakit,izin,alpa')
+        .eq('siswa_nisn', nisn).eq('program', program).eq('kelas', kelas).eq('tahun_ajaran', ta).eq('semester', smt).maybeSingle();
+      if(data && data.hadir!=null){
+        const h = Number(data.hadir), sk = Number(data.sakit)||0, iz = Number(data.izin)||0, al = Number(data.alpa)||0, t = h+sk+iz+al;
+        return { hadir:h, sakit:sk, izin:iz, alpa:al, total:t, persen: t ? Math.round(h/t*1000)/10 : null,
+                 ket:'Sumber: data kehadiran semester ini (menu Input Nilai Tambahan).' };
+      }
+    }
+    let awal, akhir;
+    if(ta && smt){ const rg = rentangDefaultAbsensi(ta, smt); awal = rg.awal; akhir = rg.akhir; }
+    else { awal = '2000-01-01'; akhir = new Date().toISOString().slice(0,10); }
+    const mulaiAbs = await tanggalMulaiAbsensi();
+    if(mulaiAbs && mulaiAbs > awal) awal = mulaiAbs;
+    if(awal > akhir) return null;
+    const { data, error } = await supa.rpc('tarik_absensi_nilai', { p_start:awal, p_end:akhir, p_program:program, p_kelas:kelas });
+    if(error) return null;
+    const r = (data||[]).find(x=>x.siswa_nisn===nisn);
+    if(!r) return null;
+    return { hadir:r.hadir, sakit:r.sakit, izin:r.izin, alpa:r.alpa, total:r.total_hari, persen:r.persentase,
+             ket:`Sumber: aplikasi absensi, ${fmtTglId(awal)} s/d ${fmtTglId(akhir)} (${r.total_hari} hari efektif; hari ini belum dihitung).` };
+  }catch(e){ return null; }
+}
+let tokenRekapHadir = 0;
+async function tampilkanRekapHadirLaporan(){
+  const el = document.getElementById('lap-hadir'); if(!el) return;
+  const nisn = document.getElementById('lap-siswa-select').value;
+  const p0 = dataLaporanSiswa[0] && dataLaporanSiswa[0].paket_ujian;
+  if(!nisn || !p0){ el.textContent = ''; return; }
+  const ta = document.getElementById('lap-filter-ta').value, smt = document.getElementById('lap-filter-smt').value;
+  const token = ++tokenRekapHadir;
+  el.innerHTML = '<span class="muted">Memuat data kehadiran...</span>';
+  const k = await ambilRekapKehadiran(nisn, p0.program, p0.kelas, ta, smt);
+  if(token !== tokenRekapHadir) return;
+  el.innerHTML = k
+    ? `<b>Hadir ${k.hadir}</b> &middot; Sakit ${k.sakit} &middot; Izin ${k.izin} &middot; Alpa ${k.alpa}${k.persen!=null?` &middot; <b>${fmtN(k.persen)}%</b> hadir`:''}<br><span class="muted">${esc2(k.ket)}</span>`
+    : '<span class="muted">Belum ada data kehadiran untuk siswa/periode ini.</span>';
+}
+
 async function cetakRapor(){
   const rows = barisLaporanTampil;
   if(!rows.length) return alert('Tidak ada data nilai untuk dicetak (cek filter Tahun Ajaran/Semester).');
@@ -3950,6 +3998,7 @@ async function cetakRapor(){
   const rata = nilaiValid.length ? (nilaiValid.reduce((a,b)=>a+b,0)/nilaiValid.length) : null;
   const adaBelumFinal = rows.some(s=>s.status==='selesai');
   const peringkat = await hitungPeringkatKelas(p0.kelas, p0.program, ta, smt, nisn);
+  const rekapHadir = await ambilRekapKehadiran(nisn, p0.program, p0.kelas, ta, smt);
   const jenisRekap = tentukanJenisUjianRekap(rows);
   const judulRekap = jenisRekap ? `REKAP NILAI ${jenisRekap}` : 'REKAP NILAI UJIAN ONLINE (TRANSKRIP)';
   const periodeRapor = formatPeriode(escapeHtml(smt), escapeHtml(ta), 'Semua Tahun Ajaran &amp; Semester');
@@ -4006,6 +4055,11 @@ async function cetakRapor(){
       <div><b>Predikat:</b> ${rata!=null?predikatNilai(rata):'-'}</div>
       ${peringkat ? `<div><b>Peringkat di Kelas:</b> ke-${peringkat.peringkat} dari ${peringkat.total} siswa</div>` : ''}
     </div>
+    ${rekapHadir ? `<table class="nilai" style="margin-bottom:6px;">
+      <thead><tr><th colspan="5">Rekapitulasi Kehadiran</th></tr>
+      <tr><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpa</th><th>Persentase Kehadiran</th></tr></thead>
+      <tbody><tr><td>${rekapHadir.hadir} hari</td><td>${rekapHadir.sakit} hari</td><td>${rekapHadir.izin} hari</td><td>${rekapHadir.alpa} hari</td><td>${rekapHadir.persen!=null?rekapHadir.persen.toFixed(1)+'%':'-'}</td></tr></tbody></table>
+    <div class="catatan">${escapeHtml(rekapHadir.ket)}</div>` : ''}
     <div class="ttd">
       <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
       <div class="kolom">&nbsp;<br>${blokTtd('Kepala PKBM Nurul Islam', ttdKepala)}</div>
