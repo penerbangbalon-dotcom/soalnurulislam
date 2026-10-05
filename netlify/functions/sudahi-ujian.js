@@ -19,12 +19,30 @@ exports.handler = async function (event) {
   const ids = (Array.isArray(body.sesi_ids) ? body.sesi_ids : []).filter((x) => UUID.test(String(x))).slice(0, 100);
   if (!ids.length) return { statusCode: 400, body: JSON.stringify({ error: 'Tidak ada sesi yang dipilih' }) };
 
+  // pulihkan=true: untuk sesi yang menggantung berstatus "selesai" TANPA satu pun jawaban terhitung
+  // (muncul di menu Perlu Dinilai dengan "0 soal"). Sesi dibuka sebentar lalu dinilai ulang dari cadangan
+  // jawaban di server; waktu selesai aslinya dikembalikan.
+  const pulihkan = body.pulihkan === true;
   const hasil = [];
   const cachePaket = {};
   for (const id of ids) {
+    let waktuAsli = null, dibuka = false;
     try {
-      const [sesi] = await sb(`sesi_ujian?id=eq.${id}&select=*`);
+      let [sesi] = await sb(`sesi_ujian?id=eq.${id}&select=*`);
       if (!sesi) { hasil.push({ id, ok: false, error: 'Sesi tidak ditemukan' }); continue; }
+      if (pulihkan) {
+        if (sesi.status !== 'selesai') { hasil.push({ id, ok: false, error: 'Sesi tidak dalam status selesai' }); continue; }
+        const ada = await sb(`detail_jawaban?sesi_ujian_id=eq.${id}&select=id&limit=1`);
+        if (ada && ada.length) { hasil.push({ id, ok: false, error: 'Sesi ini sudah punya jawaban terhitung — gunakan tombol Nilai Essay' }); continue; }
+        waktuAsli = sesi.waktu_selesai;
+        const buka = await sb(`sesi_ujian?id=eq.${id}&status=eq.selesai`, {
+          method: 'PATCH', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ status: 'berlangsung', waktu_selesai: null, total_skor: null }),
+        });
+        if (!buka || !buka.length) { hasil.push({ id, ok: false, error: 'Sesi sedang diproses pihak lain' }); continue; }
+        dibuka = true;
+        sesi = buka[0];
+      }
       if (sesi.status !== 'berlangsung') { hasil.push({ id, ok: false, error: 'Sesi sudah selesai' }); continue; }
       if (!cachePaket[sesi.paket_ujian_id]) {
         const [p] = await sb(`paket_ujian?id=eq.${sesi.paket_ujian_id}&select=durasi_menit,bobot_pg,bobot_isian,bobot_essay`);
@@ -37,9 +55,16 @@ exports.handler = async function (event) {
         jawabanTersimpan: sesi.jawaban_sementara,
         pelanggaran: sesi.pelanggaran,
       });
-      if (r.status === 200) hasil.push({ id, ok: true, nilai: r.body.nilai });
-      else hasil.push({ id, ok: false, error: r.body.error || 'Gagal' });
+      if (r.status === 200) {
+        if (pulihkan && waktuAsli) await sb(`sesi_ujian?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ waktu_selesai: waktuAsli }) });
+        const adaCadangan = !!(sesi.jawaban_sementara && Object.keys(sesi.jawaban_sementara).length);
+        hasil.push({ id, ok: true, nilai: r.body.nilai, tanpa_cadangan: pulihkan && !adaCadangan });
+      } else {
+        if (pulihkan && dibuka) await sb(`sesi_ujian?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'selesai', waktu_selesai: waktuAsli }) }).catch(() => {});
+        hasil.push({ id, ok: false, error: r.body.error || 'Gagal' });
+      }
     } catch (err) {
+      if (pulihkan && dibuka) await sb(`sesi_ujian?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'selesai', waktu_selesai: waktuAsli }) }).catch(() => {});
       hasil.push({ id, ok: false, error: err.message });
     }
   }

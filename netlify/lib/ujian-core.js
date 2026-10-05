@@ -8,6 +8,10 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ld2VpdmR2b3ZwY2dvbGF4enVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NjY3MDgsImV4cCI6MjEwNTM0MjcwOH0.bJyrKD7pnCcVizWbsBD5e0LrFl_8LdwU_5JRmyqkfV0';
 
+// Batas pelanggaran (pindah tab/aplikasi, paste, dsb). Mencapai angka ini = ujian otomatis diakhiri dan dinilai.
+// 0 = fitur dimatikan. Samakan dengan ANTI_CURANG.batasPelanggaran di ujian.html.
+const BATAS_PELANGGARAN = Number.isFinite(parseInt(process.env.BATAS_PELANGGARAN, 10)) ? parseInt(process.env.BATAS_PELANGGARAN, 10) : 3;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function adaKonfigurasi() {
@@ -165,4 +169,4 @@ async function nilaiDanSimpanSesi({ sesi, paketInfo, jawabanRaw, jawabanTersimpa
   }
 }
 
-module.exports = { UUID, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi };
+module.exports = { UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi };

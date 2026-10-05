@@ -21,12 +21,6 @@ create table if not exists pengaturan_nilai (
   kkm_mapel jsonb not null default '{}'::jsonb,
   updated_at timestamptz default now()
 );
--- Jika tabel sudah ada dengan kolom lebih sedikit (versi lama), lengkapi kolomnya.
-alter table pengaturan_nilai add column if not exists bobot jsonb not null default '{"uh":30,"uts":30,"uas":40,"tugas":0,"praktik":0}'::jsonb;
-alter table pengaturan_nilai add column if not exists mode text not null default 'sebagian';
-alter table pengaturan_nilai add column if not exists kkm numeric not null default 70;
-alter table pengaturan_nilai add column if not exists kkm_mapel jsonb not null default '{}'::jsonb;
-alter table pengaturan_nilai add column if not exists updated_at timestamptz default now();
 insert into pengaturan_nilai (id) values ('umum') on conflict (id) do nothing;
 alter table pengaturan_nilai enable row level security;
 drop policy if exists "guru login bisa akses pengaturan nilai" on pengaturan_nilai;
@@ -76,6 +70,3 @@ alter table catatan_siswa_semester enable row level security;
 drop policy if exists "guru login bisa akses catatan siswa semester" on catatan_siswa_semester;
 create policy "guru login bisa akses catatan siswa semester" on catatan_siswa_semester for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-
--- Muat ulang cache skema API Supabase agar kolom baru langsung dikenali
-notify pgrst, 'reload schema';

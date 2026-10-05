@@ -39,12 +39,15 @@ exports.handler = async function (event) {
     const [paketInfo] = await sb(`paket_ujian?id=eq.${sesi.paket_ujian_id}&select=durasi_menit,bobot_pg,bobot_isian,bobot_essay`);
     const totalMenit = (paketInfo?.durasi_menit || 90) + (Number(sesi.tambahan_menit) || 0) + 3;
     const batas = new Date(sesi.waktu_mulai).getTime() + totalMenit * 60000;
-    if (Date.now() > batas) {
-      await sb(`sesi_ujian?id=eq.${sesi_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'selesai', waktu_selesai: new Date().toISOString(), total_skor: 0 }) });
-      return { statusCode: 403, body: JSON.stringify({ error: 'Waktu ujian sudah habis, jawaban tidak dapat disimpan.' }) };
-    }
-
     const pel = Math.max(parseInt(pelanggaran) || 0, Number(sesi.pelanggaran) || 0);
+    if (Date.now() > batas) {
+      // Waktu habis. Dulu sesi ditandai "selesai" dengan nilai 0 TANPA menilai apa pun, sehingga menggantung
+      // di menu Perlu Dinilai. Sekarang yang dinilai adalah salinan jawaban di server (jawaban_sementara,
+      // dikirim lewat heartbeat selama ujian), bukan kiriman terlambat ini.
+      const hasil = await nilaiDanSimpanSesi({ sesi, paketInfo, jawabanRaw: null, jawabanTersimpan: sesi.jawaban_sementara, pelanggaran: pel });
+      if (hasil.status === 200) return { statusCode: 200, body: JSON.stringify({ ...hasil.body, terlambat: true }) };
+      return { statusCode: hasil.status, body: JSON.stringify(hasil.body) };
+    }
     const hasil = await nilaiDanSimpanSesi({ sesi, paketInfo, jawabanRaw, pelanggaran: pel });
     return { statusCode: hasil.status, body: JSON.stringify(hasil.body) };
   } catch (err) {

@@ -107,7 +107,7 @@
       <p id="curang-teks" style="margin:0 0 6px;font-size:15.5px;"></p>
       <p id="curang-hitung" style="margin:0;font-weight:600;color:#B3261E;"></p>
       <p style="margin:10px 0 0;font-size:13px;color:var(--ink-soft);">Tindakan ini tercatat otomatis dan dapat dilihat oleh guru/pengawas.</p>
-      <button class="btn" onclick="tutupPeringatanCurang()">Saya mengerti, kembali mengerjakan</button>
+      <button class="btn" id="btn-curang-tutup" onclick="tutupPeringatanCurang()">Saya mengerti, kembali mengerjakan</button>
     </div>
   </div>
 
@@ -150,7 +150,10 @@ function acakArr(arr, seed){ const r=rngSeed(seed), x=arr.slice(); for(let i=x.l
 // Deteksi: pindah tab/aplikasi, jendela kehilangan fokus (split screen / jendela lain),
 // menempel (paste), menyalin soal, dan pintasan buka DevTools / lihat sumber / cetak.
 // Setiap pelanggaran: pop up + alarm bersuara + getar (HP) + dicatat dan dikirim ke guru lewat heartbeat.
-const ANTI_CURANG = { aktif:true, jedaMs:2000, alarmMaksDetik:12, mulaiDiamDetik:3 };
+// batasPelanggaran: setelah sekian pelanggaran ujian DIAKHIRI OTOMATIS dan nilai langsung dihitung (0 = nonaktif).
+// Samakan dengan BATAS_PELANGGARAN di server (netlify/lib/ujian-core.js, default 3).
+const ANTI_CURANG = { aktif:true, jedaMs:2000, alarmMaksDetik:12, mulaiDiamDetik:3, batasPelanggaran:3 };
+let sedangDiakhiri = false, percobaanAkhiri = 0;
 let audioCtx = null, alarmTimer = null, alarmStop = null, terakhirPelanggaran = 0, mulaiUjianEpoch = 0;
 
 function siapkanAlarm(){           // dipanggil dari klik "Mulai Ujian" (browser mewajibkan interaksi agar suara boleh bunyi)
@@ -188,7 +191,7 @@ function hentikanAlarm(){
   try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){}
 }
 function ujianSedangBerjalan(){
-  return ANTI_CURANG.aktif && sesiData && !ujianBerakhir && !document.getElementById('layar-ujian').classList.contains('hidden');
+  return ANTI_CURANG.aktif && sesiData && !ujianBerakhir && !sedangDiakhiri && !document.getElementById('layar-ujian').classList.contains('hidden');
 }
 function catatPelanggaran(alasan){
   if(!ujianSedangBerjalan()) return;
@@ -199,12 +202,27 @@ function catatPelanggaran(alasan){
   pelanggaran++;
   try{ localStorage.setItem('ujian_pel_'+sesiData.sesi_id, pelanggaran); }catch(e){}
   const badge = document.getElementById('badge-pel');
-  badge.textContent = 'Pelanggaran: ' + pelanggaran; badge.classList.remove('hidden');
+  const batas = ANTI_CURANG.batasPelanggaran;
+  badge.textContent = 'Pelanggaran: ' + pelanggaran + (batas>0 ? '/' + batas : ''); badge.classList.remove('hidden');
   document.getElementById('curang-teks').textContent = alasan;
-  document.getElementById('curang-hitung').textContent = 'Total pelanggaran kamu: ' + pelanggaran + 'x';
+  const tercapai = batas > 0 && pelanggaran >= batas;
+  document.getElementById('curang-hitung').textContent = batas > 0
+    ? `Pelanggaran ${pelanggaran} dari ${batas}. ` + (tercapai
+        ? 'Ujianmu diakhiri otomatis dan nilai langsung dihitung dari jawaban yang sudah kamu isi.'
+        : `Pada pelanggaran ke-${batas}, ujianmu diakhiri otomatis.`)
+    : 'Total pelanggaran kamu: ' + pelanggaran + 'x';
   document.getElementById('overlay-curang').classList.remove('hidden');
+  document.getElementById('btn-curang-tutup').classList.toggle('hidden', tercapai);
   mulaiAlarm();
-  kirimHeartbeat();
+  if(tercapai){ akhiriKarenaPelanggaran(); }
+  else kirimHeartbeat();
+}
+// Batas pelanggaran tercapai: kumpulkan jawaban otomatis. Kalau gagal (sinyal buruk) dicoba lagi; server juga
+// menutup sesi ini sendiri lewat detak berikutnya, jadi nilai tetap terakumulasi.
+function akhiriKarenaPelanggaran(){
+  sedangDiakhiri = true; percobaanAkhiri = 0;
+  clearTimeout(hbDebounce);
+  submitUjian(true, 'pelanggaran');
 }
 function tutupPeringatanCurang(){
   hentikanAlarm();
@@ -376,9 +394,12 @@ function tanganiHeartbeat(d){
     ujianBerakhir = true; hentikanSemua();
     try{ localStorage.removeItem(kunciLocal(sesiData.sesi_id)); }catch(e){}
     document.getElementById('overlay-kunci').classList.add('hidden');
+    document.getElementById('overlay-curang').classList.add('hidden');
     document.getElementById('layar-ujian').classList.add('hidden');
     document.getElementById('layar-selesai').classList.remove('hidden');
-    let teks = 'Ujianmu telah diakhiri oleh pengawas. Jawaban yang sudah tersimpan sudah dinilai.';
+    let teks = d.alasan === 'pelanggaran'
+      ? 'Ujianmu diakhiri otomatis karena melanggar aturan ujian. Jawaban yang sudah tersimpan sudah dinilai.'
+      : 'Ujianmu telah diakhiri oleh pengawas. Jawaban yang sudah tersimpan sudah dinilai.';
     if(d.nilai != null) teks += d.perlu_nilai_manual
       ? ` Nilai sementara: ${d.nilai} (soal essay akan dinilai guru, lalu nilaimu bertambah otomatis).`
       : ` Nilai kamu: ${d.nilai} (skala 0-100).`;
@@ -447,7 +468,7 @@ function updateTimer(){
   disp.classList.toggle('warn', sisaMs < 5*60*1000);
 }
 
-async function submitUjian(otomatis){
+async function submitUjian(otomatis, alasanAkhir){
   if(!otomatis){
     terakhirPelanggaran = Date.now() + 3000;   // kotak konfirmasi bawaan browser bisa memicu blur; jangan dihitung
     const ya = confirm('Kumpulkan jawaban sekarang? Jawaban tidak bisa diubah lagi setelah dikumpulkan.');
@@ -466,9 +487,12 @@ async function submitUjian(otomatis){
     ujianBerakhir = true; hentikanSemua();
     try{ localStorage.removeItem(kunciLocal(sesiData.sesi_id)); }catch(e){}
     document.getElementById('overlay-kunci').classList.add('hidden');
+    document.getElementById('overlay-curang').classList.add('hidden');
     document.getElementById('layar-ujian').classList.add('hidden');
     document.getElementById('layar-selesai').classList.remove('hidden');
-    let teks = 'Jawaban kamu sudah tersimpan. ';
+    let teks = alasanAkhir === 'pelanggaran'
+      ? `Ujianmu diakhiri otomatis karena kamu melanggar aturan sebanyak ${pelanggaran} kali. Jawaban yang sudah kamu isi tetap dinilai. `
+      : (data.terlambat ? 'Waktu ujian sudah habis; yang dinilai adalah jawaban yang sudah tersimpan sebelum waktu habis. ' : 'Jawaban kamu sudah tersimpan. ');
     if(data.perlu_nilai_manual){
       teks += `Nilai sementara: ${data.nilai} dari ${data.maks_sementara} (bagian pilihan ganda & isian singkat). Soal essay akan dinilai guru, lalu nilaimu bertambah otomatis (maksimal 100).`;
     } else {
@@ -479,6 +503,13 @@ async function submitUjian(otomatis){
   }catch(e){
     // Kalau sesi ternyata sudah ditutup guru (Sudahi) atau direset, minta status terbaru dari server
     if(/sudah selesai|tidak ditemukan/i.test(e.message)){ await kirimHeartbeat(); if(ujianBerakhir) return; }
+    if(alasanAkhir === 'pelanggaran'){
+      percobaanAkhiri++;
+      document.getElementById('curang-hitung').textContent = 'Menyimpan jawabanmu... (' + (e.message||'koneksi bermasalah') + '). Jangan tutup halaman ini.';
+      if(percobaanAkhiri < 10) setTimeout(()=>submitUjian(true, 'pelanggaran'), 4000);
+      else document.getElementById('curang-hitung').textContent = 'Gagal menyimpan otomatis. Hubungi pengawas; jawabanmu tetap tersimpan di server.';
+      return;
+    }
     document.getElementById('submit-error').textContent = e.message;
     timerInterval = setInterval(updateTimer, 1000);
   }

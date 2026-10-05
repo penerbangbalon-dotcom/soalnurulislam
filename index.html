@@ -312,6 +312,9 @@
         otomatis tergabung dengan Hasil Ujian Online &amp; Laporan Siswa — tidak ada rekap terpisah.</p>
       <div class="card">
         <div class="grid3">
+          <div class="field"><label>Kelas</label>
+            <select id="manual-kelas-select" onchange="isiPaketManualPerKelas(false)"><option value="">Semua Kelas</option></select>
+          </div>
           <div class="field"><label>Paket Ujian</label>
             <select id="manual-paket-select" onchange="pilihPaketManual()"><option value="">Pilih paket ujian...</option></select>
           </div>
@@ -1243,6 +1246,7 @@ function renderPending(){
   const body = document.getElementById('pd-body');
   document.getElementById('pd-info').innerHTML = rows.length
     ? `<b>${rows.length}</b> siswa menunggu penilaian essay pada <b>${new Set(rows.map(x=>x.paket_ujian_id)).size}</b> ujian.`
+      + (rows.some(x=>x.essayBelum===0) ? ` <span style="color:#b3261e;">${rows.filter(x=>x.essayBelum===0).length} sesi macet: tidak ada essay untuk dinilai, nilainya belum dihitung.</span> <button class="btn outline" style="padding:3px 10px;" onclick="pulihkanSesi(null)">Hitung Nilai Sesi Macet</button>` : '')
     : '';
   if(!rows.length){ body.innerHTML = `<tr><td colspan="6" class="muted">${pendingData.length?'Tidak ada yang cocok dengan filter.':'Tidak ada essay yang perlu dinilai. Semua sudah beres.'}</td></tr>`; return; }
   const grup = new Map();
@@ -1258,10 +1262,34 @@ function renderPending(){
         <td>${x.waktu_selesai?new Date(x.waktu_selesai).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}</td>
         <td>${x.essayBelum==null?'-':x.essayBelum+' soal'}</td>
         <td>${x.total_skor ?? '-'} <span class="muted">(sementara)</span></td>
-        <td><button class="btn gold" style="padding:4px 10px;" onclick="nilaiManual('${x.id}')">Nilai Essay</button></td></tr>`;
+        <td>${x.essayBelum===0
+          ? `<button class="btn" style="padding:4px 10px;" onclick="pulihkanSesi('${x.id}')">Hitung Nilai</button>`
+          : `<button class="btn gold" style="padding:4px 10px;" onclick="nilaiManual('${x.id}')">Nilai Essay</button>`}</td></tr>`;
     });
   });
   body.innerHTML = html;
+}
+// Sesi yang menggantung berstatus "selesai" tanpa jawaban terhitung (essay 0 soal): nilai dihitung ulang
+// dari cadangan jawaban di server lewat /api/sudahi-ujian (mode pulihkan).
+async function pulihkanSesi(id){
+  const ids = id ? [id] : pendingData.filter(x=>x.essayBelum===0).map(x=>x.id);
+  if(!ids.length) return;
+  if(!confirm(`Hitung nilai ${ids.length} sesi macet?\n\nJawaban siswa diambil dari cadangan di server (dikirim selama ujian), lalu dinilai otomatis. Waktu selesai aslinya tidak berubah.`)) return;
+  try{
+    const { data:{ session } } = await supa.auth.getSession();
+    const res = await fetch('/api/sudahi-ujian', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}` },
+      body: JSON.stringify({ sesi_ids: ids, pulihkan: true })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || `Gagal (${res.status})`);
+    const h = data.hasil || [], ok = h.filter(x=>x.ok), gagal = h.filter(x=>!x.ok), kosong = ok.filter(x=>x.tanpa_cadangan);
+    alert(`${ok.length} sesi berhasil dihitung.`
+      + (kosong.length ? `\n${kosong.length} di antaranya tidak punya cadangan jawaban, jadi bernilai 0.` : '')
+      + (gagal.length ? `\n${gagal.length} gagal: ${gagal.map(g=>g.error).join('; ')}` : ''));
+    loadPerluDinilai();
+  }catch(e){ alert('Gagal menghitung nilai: '+e.message); }
 }
 function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
 
@@ -2658,13 +2686,37 @@ async function ambilSemuaSiswaAbsensi(){
 // "Laporan Siswa", Rapor, dan Piagam tanpa perlu mengubah tab-tab tersebut.
 let manualPaketAktif = null, manualSoalList = [], manualRoster = [], manualSesiMap = new Map(), manualDetailMap = new Map();
 
+let manualPaketList = [];
 async function loadManualPaketOptions(){
   const { data } = await supa.from('paket_ujian').select('id, judul, kelas, program').eq('diarsipkan', false).order('created_at', { ascending:false });
+  manualPaketList = data || [];
+  // Pilihan kelas hanya berisi kelas yang memang punya paket ujian
+  const selK = document.getElementById('manual-kelas-select');
+  const prevK = selK.value;
+  const ada = ['VII','VIII','IX','X','XI','XII'].filter(k=>manualPaketList.some(p=>p.kelas===k));
+  selK.innerHTML = '<option value="">Semua Kelas</option>' + ada.map(k=>{
+    const pr = (manualPaketList.find(p=>p.kelas===k)||{}).program;
+    return `<option value="${k}">Kelas ${k}${pr?` (${escapeHtml(pr)})`:''}</option>`;
+  }).join('');
+  selK.value = ada.includes(prevK) ? prevK : '';
+  isiPaketManualPerKelas(true);
+}
+// Mengisi daftar Paket Ujian sesuai kelas yang dipilih. muatUlang=true saat data baru dimuat dari server.
+function isiPaketManualPerKelas(muatUlang){
+  const kelas = document.getElementById('manual-kelas-select').value;
   const sel = document.getElementById('manual-paket-select');
   const prev = sel.value;
+  const daftar = manualPaketList.filter(p=>!kelas || p.kelas===kelas);
   sel.innerHTML = '<option value="">Pilih paket ujian...</option>' +
-    (data||[]).map(p=>`<option value="${p.id}">${escapeHtml(p.judul)}${p.kelas?` (Kelas ${p.kelas})`:''}</option>`).join('');
-  if((data||[]).some(p=>p.id===prev)){ sel.value = prev; pilihPaketManual(); } else { document.getElementById('manual-grid-wrap').classList.add('hidden'); }
+    daftar.map(p=>`<option value="${p.id}">${escapeHtml(p.judul)}${p.kelas?` (Kelas ${p.kelas})`:''}</option>`).join('');
+  if(daftar.some(p=>p.id===prev)){
+    sel.value = prev;
+    if(muatUlang) pilihPaketManual();
+  } else {
+    sel.value = '';
+    manualPaketAktif = null;
+    document.getElementById('manual-grid-wrap').classList.add('hidden');
+  }
 }
 
 async function pilihPaketManual(){

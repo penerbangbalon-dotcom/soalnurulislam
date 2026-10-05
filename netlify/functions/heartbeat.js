@@ -8,7 +8,7 @@
 //     sesi sudah diakhiri/direset.
 // Sesi diidentifikasi lewat sesi_id (UUID acak yang hanya diketahui siswa yang bersangkutan).
 
-const { UUID, adaKonfigurasi, sb } = require('../lib/ujian-core');
+const { UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, nilaiDanSimpanSesi } = require('../lib/ujian-core');
 
 const MAKS_UKURAN_JAWABAN = 300000; // ~300 KB per sesi, jaga-jaga penyalahgunaan
 
@@ -34,7 +34,7 @@ exports.handler = async function (event) {
   if (!UUID.test(String(sesi_id))) return { statusCode: 400, body: JSON.stringify({ error: 'sesi_id tidak valid' }) };
 
   try {
-    const list = await sb(`sesi_ujian?id=eq.${sesi_id}&select=id,status,total_skor,pelanggaran,tambahan_menit,dikunci,pesan_guru,pesan_id`);
+    const list = await sb(`sesi_ujian?id=eq.${sesi_id}&select=id,paket_ujian_id,status,total_skor,pelanggaran,tambahan_menit,dikunci,pesan_guru,pesan_id`);
     const sesi = list && list[0];
     const server_time = Date.now();
 
@@ -51,6 +51,30 @@ exports.handler = async function (event) {
 
     const patch = { terakhir_aktif: new Date().toISOString() };
     const pel = Math.min(Math.max(parseInt(pelanggaran) || 0, Number(sesi.pelanggaran) || 0), 999);
+
+    // Batas pelanggaran tercapai -> ujian diakhiri OTOMATIS di server (tidak bergantung pada HP siswa).
+    // Jawaban yang sudah tersimpan (cadangan + kiriman detak ini) langsung dinilai dan nilai terakumulasi.
+    if (BATAS_PELANGGARAN > 0 && pel >= BATAS_PELANGGARAN) {
+      try {
+        const [penuh] = await sb(`sesi_ujian?id=eq.${sesi_id}&select=*`);
+        const [paketInfo] = await sb(`paket_ujian?id=eq.${sesi.paket_ujian_id}&select=durasi_menit,bobot_pg,bobot_isian,bobot_essay`);
+        const kirim = bersihkanJawaban(jawaban);
+        const gabungan = Object.assign({}, (penuh && penuh.jawaban_sementara) || {}, kirim || {});
+        const r = await nilaiDanSimpanSesi({ sesi: penuh, paketInfo: paketInfo || {}, jawabanRaw: null, jawabanTersimpan: gabungan, pelanggaran: pel });
+        if (r.status === 200) {
+          return { statusCode: 200, body: JSON.stringify({
+            status: r.body.perlu_nilai_manual ? 'selesai' : 'dinilai',
+            nilai: r.body.nilai, perlu_nilai_manual: !!r.body.perlu_nilai_manual,
+            alasan: 'pelanggaran', pelanggaran: pel, server_time,
+          }) };
+        }
+        // Sudah ditutup proses lain (siswa mengumpulkan / guru menyudahi) -> laporkan status terbarunya
+        const [akhir] = await sb(`sesi_ujian?id=eq.${sesi_id}&select=status,total_skor`);
+        if (akhir && akhir.status !== 'berlangsung') {
+          return { statusCode: 200, body: JSON.stringify({ status: akhir.status, nilai: akhir.total_skor, perlu_nilai_manual: akhir.status === 'selesai', alasan: 'pelanggaran', pelanggaran: pel, server_time }) };
+        }
+      } catch (e) { /* gagal sesaat: lanjut mode biasa, dicoba lagi pada detak berikutnya */ }
+    }
     if (pel !== (Number(sesi.pelanggaran) || 0)) patch.pelanggaran = pel;
     if (Number.isFinite(Number(terjawab))) patch.progres = Math.max(0, Math.min(parseInt(terjawab) || 0, 1000));
     if (Number.isFinite(Number(total))) patch.total_soal = Math.max(0, Math.min(parseInt(total) || 0, 1000));
