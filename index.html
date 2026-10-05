@@ -539,6 +539,7 @@
             <option value="">Semua Semester</option><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select>
           <button class="btn outline" onclick="loadRekapNilai()">↻ Muat Ulang Data</button>
           <button class="btn gold" onclick="unduhRekapNilaiSiswa()">⬇ Unduh Excel</button>
+          <button class="btn" onclick="cetakRaporSemester()">🖨 Cetak Rapor Semester</button>
         </div>
         <p class="muted" id="rn-info-bobot" style="margin:10px 0 0;"></p>
       </div>
@@ -4414,6 +4415,103 @@ function renderRekapNilai(){
   const kunciBlok = [...new Set(rows.map(r=>r.ta+'##'+r.smt))];
   const baris = kunciBlok.map(k=>{ const [t,sm] = k.split('##'); const c = catatanMap.get(`${nisn}##${t}##${sm}`); return c ? `<div><b>${esc2(labelSmt(sm))} ${esc2(t)}:</b> ${esc2(teksCatatan(c))}</div>` : ''; }).join('');
   document.getElementById('rn-catatan').innerHTML = baris || '<span class="muted">Belum ada data sikap & kehadiran (isi di menu Input Nilai Tambahan).</span>';
+}
+// ---------- CETAK RAPOR SEMESTER (satu siswa, satu semester) ----------
+// Peringkat memakai rata-rata Nilai Akhir (NA) semua siswa pada kelas/jenjang/semester yang sama.
+function peringkatRaporSemester(nisn, ta, smt, kelas, program){
+  const set = new Set(nilaiArsip.filter(r=>r.ta===ta && r.smt===smt && r.kelas===kelas && r.program===program).map(r=>r.siswa_nisn));
+  const daftar = [];
+  set.forEach(n=>{
+    const nas = susunNilaiSiswa(n, ta, smt).filter(r=>r.kelas===kelas && r.program===program).map(r=>r.na).filter(x=>x!=null);
+    if(nas.length) daftar.push({ nisn:n, rata:rataRata(nas) });
+  });
+  daftar.sort((a,b)=>b.rata-a.rata);
+  const idx = daftar.findIndex(x=>x.nisn===nisn);
+  return idx<0 ? null : { peringkat: daftar.slice(0,idx).filter(x=>x.rata>daftar[idx].rata).length + 1, total: daftar.length };
+}
+async function cetakRaporSemester(){
+  const nisn = document.getElementById('rn-siswa').value;
+  if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
+  if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
+  if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
+  const rows = susunNilaiSiswa(nisn, ta, smt);
+  if(!rows.length) return alert('Belum ada nilai final untuk siswa ini pada semester tersebut.');
+  const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
+  const nama = s ? s.nama : nisn;
+  const kelas = rows[0].kelas, program = rows[0].program;
+  const adaTugas = rows.some(r=>r.tugas!=null), adaPraktik = rows.some(r=>r.praktik!=null);
+  const nas = rows.map(r=>r.na).filter(x=>x!=null);
+  const rata = nas.length ? rataRata(nas) : null;
+  const belumTuntas = rows.filter(r=>r.tuntas===false).length;
+  const peringkat = peringkatRaporSemester(nisn, ta, smt, kelas, program);
+  const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
+  const [hadirRek, ttdKepala, ttdWali] = await Promise.all([
+    ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', kelas)
+  ]);
+  const cel = v => v==null ? '-' : fmtN(v);
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  win.document.write(`
+    <html><head><title>Rapor - ${esc2(nama)}</title>
+    <style>
+      body{font-family:Georgia,'Times New Roman',serif;max-width:780px;margin:30px auto;color:#111;}
+      .kop{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;border-bottom:4px double #000;padding-bottom:6px;font-family:Arial,sans-serif;text-align:center;line-height:1.25;}
+      .kop img{width:96px;height:auto;flex:none;}
+      .kop .t{flex:1;}
+      .kop .l1{font-size:17px;font-weight:bold;} .kop .l2{font-size:19px;font-weight:bold;} .kop .l3{font-size:32px;font-weight:bold;letter-spacing:1px;}
+      .kop .l4{font-size:15px;font-weight:bold;} .kop .l5{font-size:12px;} .kop .l6{font-size:8.5px;} .kop .l7{font-size:11px;}
+      h1{font-size:19px;text-align:center;margin:18px 0 2px;letter-spacing:.5px;}
+      .sub{text-align:center;font-size:13px;margin-bottom:14px;color:#333;}
+      table.info{width:100%;font-size:13.5px;margin-bottom:12px;}
+      table.info .k{font-weight:bold;white-space:nowrap;width:110px;}
+      table.nilai{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;}
+      table.nilai th,table.nilai td{border:1px solid #999;padding:5px 7px;text-align:left;}
+      table.nilai th{background:#f0ede2;}
+      table.nilai td.c,table.nilai th.c{text-align:center;}
+      .ringkasan{display:flex;gap:22px;font-size:13px;margin:8px 0 12px;border-top:1px solid #999;border-bottom:1px solid #999;padding:7px 0;flex-wrap:wrap;}
+      .kotak{border:1px solid #999;padding:7px 10px;font-size:13px;margin-bottom:10px;}
+      .catatan{font-size:11px;color:#555;margin-bottom:8px;}
+      .ttd{display:flex;justify-content:space-between;margin-top:36px;font-size:13px;text-align:center;page-break-inside:avoid;}
+      .ttd .kolom{width:230px;}
+      .ttd .garis{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-weight:bold;}
+      @media print{ button{display:none;} body{margin:12mm auto;} }
+    </style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
+    ${kopSekolahHTML()}
+    <h1>LAPORAN HASIL BELAJAR (RAPOR)</h1>
+    <div class="sub">${esc2(labelSmt(smt))} &mdash; Tahun Ajaran ${esc2(ta)}</div>
+    <table class="info">
+      <tr><td class="k">Nama Siswa</td><td>: ${esc2(nama)}</td><td class="k">Jenjang</td><td>: ${program==='Paket C'?'Paket C (Setara SMA/MA)':'Paket B (Setara SMP/MTs)'}</td></tr>
+      <tr><td class="k">NISN</td><td>: ${esc2(nisn)}</td><td class="k">Kelas</td><td>: ${esc2(kelas)}</td></tr>
+    </table>
+    <table class="nilai">
+      <thead><tr><th class="c">No</th><th>Mata Pelajaran</th><th class="c">UH</th><th class="c">UTS</th><th class="c">UAS</th>${adaTugas?'<th class="c">Tugas</th>':''}${adaPraktik?'<th class="c">Praktik</th>':''}<th class="c">Nilai Akhir</th><th>Predikat</th><th class="c">KKM</th><th>Ket.</th></tr></thead>
+      <tbody>
+      ${rows.map((r,i)=>`<tr${r.tuntas===false?' style="color:#b3261e;"':''}><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.uh)}</td><td class="c">${cel(r.uts)}</td><td class="c">${cel(r.uas)}</td>${adaTugas?`<td class="c">${cel(r.tugas)}</td>`:''}${adaPraktik?`<td class="c">${cel(r.praktik)}</td>`:''}<td class="c"><b>${cel(r.na)}</b></td><td>${r.na==null?'-':esc2(predikatNilai(r.na))}</td><td class="c">${fmtN(r.kkm)}</td><td>${ketTuntas(r.tuntas)}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="ringkasan">
+      <div><b>Jumlah Mapel:</b> ${rows.length}</div>
+      <div><b>Rata-rata Nilai Akhir:</b> ${cel(rata)}${rata!=null?' ('+esc2(predikatNilai(rata))+')':''}</div>
+      ${peringkat ? `<div><b>Peringkat di Kelas:</b> ke-${peringkat.peringkat} dari ${peringkat.total} siswa</div>` : ''}
+      <div><b>Belum tuntas KKM:</b> ${belumTuntas} mapel</div>
+    </div>
+    <table class="nilai" style="max-width:520px;">
+      <thead><tr><th colspan="5">Kehadiran</th></tr><tr><th class="c">Hadir</th><th class="c">Sakit</th><th class="c">Izin</th><th class="c">Alpa</th><th class="c">Persentase</th></tr></thead>
+      <tbody>${hadirRek
+        ? `<tr><td class="c">${hadirRek.hadir} hari</td><td class="c">${hadirRek.sakit} hari</td><td class="c">${hadirRek.izin} hari</td><td class="c">${hadirRek.alpa} hari</td><td class="c">${hadirRek.persen!=null?hadirRek.persen.toFixed(1)+'%':'-'}</td></tr>`
+        : '<tr><td colspan="5" class="c">Data kehadiran belum tersedia</td></tr>'}</tbody>
+    </table>
+    <div class="kotak"><b>Sikap:</b> ${cat && cat.sikap ? esc2(cat.sikap)+' ('+esc2(NAMA_SIKAP[cat.sikap])+')' : '-'}<br>
+      <b>Catatan Wali Kelas:</b> ${cat && cat.catatan ? esc2(cat.catatan) : '-'}</div>
+    <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${rows.some(r=>r.na==null)?' Tanda "-" berarti nilai belum final.':''}</div>
+    <div class="ttd">
+      <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
+      <div class="kolom">&nbsp;<br>${blokTtd('Kepala PKBM Nurul Islam', ttdKepala)}</div>
+    </div>
+    </body></html>`);
+  win.document.close();
 }
 function unduhRekapNilaiSiswa(){
   const nisn = document.getElementById('rn-siswa').value;
