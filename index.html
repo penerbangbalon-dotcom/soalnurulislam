@@ -4454,10 +4454,10 @@ function tampilkanLeger(){
       return `<td style="${ix===0?'border-left:1px solid var(--line);':''}${merah?'color:#b3261e;background:#FBEEEC;':''}">${k==='na'?`<b>${cel(v)}</b>`:cel(v)}</td>`;
     }).join('')).join('')}
     <td><b>${cel(s.jumlah)}</b></td><td><b>${cel(s.rata)}</b></td><td>${s.peringkat||'-'}</td>
-    <td>${s.catatan&&s.catatan.sikap?esc2(s.catatan.sikap):'-'}</td><td>${s.catatan?s.catatan.sakit:'-'}</td><td>${s.catatan?s.catatan.izin:'-'}</td><td>${s.catatan?s.catatan.alpa:'-'}</td>
+    <td>${s.catatan&&s.catatan.sikap?esc2(s.catatan.sikap):'-'}</td><td>${s.catatan&&s.catatan.hadir!=null?s.catatan.hadir:'-'}</td><td>${s.catatan?s.catatan.sakit:'-'}</td><td>${s.catatan?s.catatan.izin:'-'}</td><td>${s.catatan?s.catatan.alpa:'-'}</td>
     <td>${s.belumTuntas?`<span style="color:#b3261e;font-weight:600;">${s.belumTuntas}</span>`:'0'}</td></tr>`).join('');
   tabel.innerHTML = `<table style="min-width:max-content;">
-    <thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th rowspan="2">NISN</th>${th1}<th rowspan="2">Jumlah NA</th><th rowspan="2">Rata-rata</th><th rowspan="2">Rank</th><th rowspan="2">Sikap</th><th rowspan="2">S</th><th rowspan="2">I</th><th rowspan="2">A</th><th rowspan="2">&lt; KKM</th></tr>
+    <thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th rowspan="2">NISN</th>${th1}<th rowspan="2">Jumlah NA</th><th rowspan="2">Rata-rata</th><th rowspan="2">Rank</th><th rowspan="2">Sikap</th><th rowspan="2">H</th><th rowspan="2">S</th><th rowspan="2">I</th><th rowspan="2">A</th><th rowspan="2">&lt; KKM</th></tr>
     <tr>${th2}</tr></thead><tbody>${body}</tbody></table>`;
 }
 function unduhLeger(){
@@ -4471,27 +4471,27 @@ function unduhLeger(){
     [teksBobotNilai()], []
   ];
   const h1 = ['No','Nama Siswa','NISN']; L.mapel.forEach(m=>{ h1.push(m); for(let i=1;i<nk;i++) h1.push(''); });
-  h1.push('Jumlah NA','Rata-rata','Peringkat','Sikap','Sakit','Izin','Alpa','Jml < KKM');
-  const h2 = ['','','']; L.mapel.forEach(()=>L.kolom.forEach(k=>h2.push(SINGKAT_KOMP[k]||'NA'))); for(let i=0;i<8;i++) h2.push('');
-  const hK = ['','KKM','']; L.mapel.forEach((m,j)=>L.kolom.forEach(k=>hK.push(k==='na' ? L.kkmMapel[j] : ''))); for(let i=0;i<8;i++) hK.push('');
+  h1.push('Jumlah NA','Rata-rata','Peringkat','Sikap','Hadir','Sakit','Izin','Alpa','Jml < KKM');
+  const h2 = ['','','']; L.mapel.forEach(()=>L.kolom.forEach(k=>h2.push(SINGKAT_KOMP[k]||'NA'))); for(let i=0;i<9;i++) h2.push('');
+  const hK = ['','KKM','']; L.mapel.forEach((m,j)=>L.kolom.forEach(k=>hK.push(k==='na' ? L.kkmMapel[j] : ''))); for(let i=0;i<9;i++) hK.push('');
   const data = L.baris.map((s,i)=>{
     const r = [i+1, s.nama, s.nisn];
     s.nilai.forEach(n=>L.kolom.forEach(k=>r.push(bulat1(k==='na' ? n.na : n[k]))));
-    r.push(bulat1(s.jumlah), bulat1(s.rata), s.peringkat||'', s.catatan&&s.catatan.sikap||'', s.catatan?s.catatan.sakit:'', s.catatan?s.catatan.izin:'', s.catatan?s.catatan.alpa:'', s.belumTuntas);
+    r.push(bulat1(s.jumlah), bulat1(s.rata), s.peringkat||'', s.catatan&&s.catatan.sikap||'', s.catatan&&s.catatan.hadir!=null?s.catatan.hadir:'', s.catatan?s.catatan.sakit:'', s.catatan?s.catatan.izin:'', s.catatan?s.catatan.alpa:'', s.belumTuntas);
     return r;
   });
   const foot = ['','Rata-rata Kelas',''];
   L.mapel.forEach((m,j)=>L.kolom.forEach(k=>foot.push(bulat1(rataRata(L.baris.map(s=>k==='na' ? s.nilai[j].na : s.nilai[j][k]))))));
-  foot.push('', bulat1(rataRata(L.baris.map(s=>s.rata))), '', '', '', '', '', '');
+  foot.push('', bulat1(rataRata(L.baris.map(s=>s.rata))), '', '', '', '', '', '', '');
   const aoa = [...judul, h1, h2, hK, ...data, foot];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const r0 = judul.length;
   const merges = [];
   [0,1,2].forEach(c=>merges.push({ s:{r:r0,c}, e:{r:r0+2,c} }));
   for(let j=0;j<nM;j++) merges.push({ s:{r:r0,c:3+j*nk}, e:{r:r0,c:2+(j+1)*nk} });
-  for(let o=0;o<8;o++) merges.push({ s:{r:r0,c:3+nM*nk+o}, e:{r:r0+2,c:3+nM*nk+o} });
+  for(let o=0;o<9;o++) merges.push({ s:{r:r0,c:3+nM*nk+o}, e:{r:r0+2,c:3+nM*nk+o} });
   ws['!merges'] = merges;
-  ws['!cols'] = [{wch:5},{wch:30},{wch:14}, ...Array(nM*nk).fill({wch:7}), {wch:11},{wch:11},{wch:10},{wch:7},{wch:7},{wch:7},{wch:7},{wch:10}];
+  ws['!cols'] = [{wch:5},{wch:30},{wch:14}, ...Array(nM*nk).fill({wch:7}), {wch:11},{wch:11},{wch:10},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:10}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leger');
   // Sheet daftar remedial: semua nilai di bawah KKM
@@ -4508,7 +4508,7 @@ function unduhLeger(){
     ['TGS / PRK','Nilai Tugas / Praktik yang diinput guru (menu Input Nilai Tambahan). Kolom hanya muncul bila dipakai.'],
     ['NA','Nilai Akhir = gabungan komponen sesuai bobot. '+teksBobotNilai()],
     ['KKM','Kriteria Ketuntasan Minimal per mata pelajaran (baris KKM di bawah judul mapel). NA di bawah KKM = belum tuntas.'],
-    ['Sikap','A = Sangat Baik, B = Baik, C = Cukup, D = Kurang. S/I/A = jumlah Sakit/Izin/Alpa semester ini.'],
+    ['Sikap','A = Sangat Baik, B = Baik, C = Cukup, D = Kurang. H/S/I/A = jumlah Hadir/Sakit/Izin/Alpa semester ini.'],
     ['Sel kosong','Belum ada nilai final (belum ujian, atau essay belum selesai dikoreksi).'],
     ['Peringkat','Berdasarkan rata-rata Nilai Akhir dalam kelas (nilai sama = peringkat sama).'],
     ['Catatan','Leger ini acuan pengisian rapor; periksa kembali sebelum dipakai resmi.']
