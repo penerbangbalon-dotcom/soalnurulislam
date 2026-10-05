@@ -4702,7 +4702,14 @@ async function muatInputNilai(){
           <td><input type="text" inputmode="decimal" id="in-p-${i}" value="${m.praktik!=null?m.praktik:''}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   } else {
-    tabel.innerHTML = `<div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Sikap</th><th style="width:80px;">Sakit</th><th style="width:80px;">Izin</th><th style="width:80px;">Alpa</th><th>Catatan wali kelas</th></tr></thead><tbody>` +
+    const rg = rentangDefaultAbsensi(c.ta, c.smt);
+    tabel.innerHTML = `<div class="card"><div class="grid3">
+        <div class="field"><label>Absensi dari tanggal</label><input type="date" id="in-abs-awal" value="${rg.awal}" /></div>
+        <div class="field"><label>Sampai tanggal</label><input type="date" id="in-abs-akhir" value="${rg.akhir}" /></div>
+        <div class="field"><label>&nbsp;</label><button class="btn gold" id="in-abs-btn" onclick="tarikAbsensiKeInput()">📥 Tarik Data Absensi</button></div>
+      </div>
+      <p class="muted" id="in-abs-info" style="margin:6px 0 0;">Mengisi kolom Sakit, Izin, dan Alpa dari aplikasi absensi (hari efektif = hari aktif sekolah tanpa hari libur, hari ini belum dihitung). Hasilnya bisa diedit sebelum menekan Simpan.</p></div>
+      <div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Sikap</th><th style="width:80px;">Sakit</th><th style="width:80px;">Izin</th><th style="width:80px;">Alpa</th><th>Catatan wali kelas</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
         const k = catatanMap.get(`${s.nisn}##${c.ta}##${c.smt}`) || {};
         const sikap = k.sikap||'';
@@ -4714,6 +4721,41 @@ async function muatInputNilai(){
           <td><input type="text" id="in-c-${i}" value="${esc2(k.catatan||'')}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   }
+}
+// Rentang tanggal bawaan untuk menarik absensi: Ganjil = Jul-Des tahun mulai, Genap = Jan-Jun tahun berikutnya.
+function rentangDefaultAbsensi(ta, smt){
+  const y = parseInt(String(ta||'').split('/')[0], 10) || tahunAjaranSekarang();
+  return smt==='Genap' ? { awal:`${y+1}-01-01`, akhir:`${y+1}-06-30` } : { awal:`${y}-07-01`, akhir:`${y}-12-31` };
+}
+// Tarik rekap Sakit/Izin/Alpa dari aplikasi absensi (fungsi database tarik_absensi_nilai) ke kolom isian.
+// Tidak menyimpan apa pun: guru memeriksa/mengedit dulu, lalu menekan Simpan.
+async function tarikAbsensiKeInput(){
+  const c = ctxInput(); if(!c) return;
+  if(c.mode!=='sikap' || !inRoster.length) return alert('Klik "Muat Siswa" dulu.');
+  const awal = document.getElementById('in-abs-awal').value, akhir = document.getElementById('in-abs-akhir').value;
+  if(!awal || !akhir || awal>akhir) return alert('Isi rentang tanggal absensi dengan benar.');
+  const adaIsian = inRoster.some((s,i)=>['in-s-','in-i-','in-a-'].some(p=>document.getElementById(p+i).value!==''));
+  if(adaIsian && !confirm('Kolom Sakit/Izin/Alpa yang sudah terisi akan ditimpa hasil absensi (belum tersimpan sampai Anda menekan Simpan). Lanjutkan?')) return;
+  const btn = document.getElementById('in-abs-btn'); btn.disabled = true;
+  try{
+    const { data, error } = await supa.rpc('tarik_absensi_nilai', { p_start:awal, p_end:akhir, p_program:c.program, p_kelas:c.kelas });
+    if(error) throw error;
+    const peta = new Map((data||[]).map(r=>[r.siswa_nisn, r]));
+    let terisi = 0; const tanpa = [];
+    inRoster.forEach((s,i)=>{
+      const r = peta.get(s.nisn);
+      if(!r){ tanpa.push(s.nama); return; }
+      document.getElementById('in-s-'+i).value = r.sakit;
+      document.getElementById('in-i-'+i).value = r.izin;
+      document.getElementById('in-a-'+i).value = r.alpa;
+      terisi++;
+    });
+    const hari = (data&&data[0]) ? data[0].total_hari : 0;
+    document.getElementById('in-abs-info').innerHTML = `Terisi <b>${terisi}</b> siswa dari <b>${hari}</b> hari efektif (${esc2(awal)} s/d ${esc2(akhir)}). Hadir dan terlambat dihitung hadir; hari tanpa catatan dihitung Alpa.`
+      + (tanpa.length ? ` <span style="color:#b3261e;">Tidak ditemukan di data absensi: ${tanpa.map(esc2).join(', ')}.</span>` : '')
+      + ' <b>Belum tersimpan — periksa lalu klik Simpan.</b>';
+  }catch(e){ alert('Gagal menarik data absensi: '+(e.message||e)); }
+  finally{ btn.disabled = false; }
 }
 async function simpanInputNilai(){
   const c = ctxInput(); if(!c) return;
