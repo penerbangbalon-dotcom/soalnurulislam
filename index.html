@@ -4304,7 +4304,7 @@ function teksCatatan(c){
   if(!c) return '';
   const bagian = [];
   if(c.sikap) bagian.push(`Sikap: ${c.sikap} (${NAMA_SIKAP[c.sikap]})`);
-  bagian.push(`Sakit ${c.sakit||0} · Izin ${c.izin||0} · Alpa ${c.alpa||0}`);
+  bagian.push((c.hadir!=null ? `Hadir ${c.hadir} · ` : '') + `Sakit ${c.sakit||0} · Izin ${c.izin||0} · Alpa ${c.alpa||0}`);
   if(c.catatan) bagian.push(`Catatan: ${c.catatan}`);
   return bagian.join(' — ');
 }
@@ -4703,24 +4703,33 @@ async function muatInputNilai(){
       }).join('') + '</tbody></table></div>';
   } else {
     const rg = rentangDefaultAbsensi(c.ta, c.smt);
+    const mulaiAbs = await tanggalMulaiAbsensi();
+    if(mulaiAbs && mulaiAbs > rg.awal && mulaiAbs <= rg.akhir) rg.awal = mulaiAbs;
     tabel.innerHTML = `<div class="card"><div class="grid3">
         <div class="field"><label>Absensi dari tanggal</label><input type="date" id="in-abs-awal" value="${rg.awal}" /></div>
         <div class="field"><label>Sampai tanggal</label><input type="date" id="in-abs-akhir" value="${rg.akhir}" /></div>
         <div class="field"><label>&nbsp;</label><button class="btn gold" id="in-abs-btn" onclick="tarikAbsensiKeInput()">📥 Tarik Data Absensi</button></div>
       </div>
-      <p class="muted" id="in-abs-info" style="margin:6px 0 0;">Mengisi kolom Sakit, Izin, dan Alpa dari aplikasi absensi (hari efektif = hari aktif sekolah tanpa hari libur, hari ini belum dihitung). Hasilnya bisa diedit sebelum menekan Simpan.</p></div>
-      <div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Sikap</th><th style="width:80px;">Sakit</th><th style="width:80px;">Izin</th><th style="width:80px;">Alpa</th><th>Catatan wali kelas</th></tr></thead><tbody>` +
+      <p class="muted" id="in-abs-info" style="margin:6px 0 0;">Mengisi kolom Hadir, Sakit, Izin, dan Alpa dari aplikasi absensi (hari efektif = hari aktif sekolah tanpa hari libur, hari ini belum dihitung). Hasilnya bisa diedit sebelum menekan Simpan.</p></div>
+      <div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Sikap</th><th style="width:70px;">Hadir</th><th style="width:80px;">Sakit</th><th style="width:80px;">Izin</th><th style="width:80px;">Alpa</th><th>Catatan wali kelas</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
         const k = catatanMap.get(`${s.nisn}##${c.ta}##${c.smt}`) || {};
         const sikap = k.sikap||'';
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
           <td><select id="in-sk-${i}"><option value="">—</option>${['A','B','C','D'].map(x=>`<option value="${x}"${sikap===x?' selected':''}>${x} (${NAMA_SIKAP[x]})</option>`).join('')}</select></td>
+          <td><input type="number" min="0" id="in-h-${i}" value="${k.hadir!=null?k.hadir:''}" /></td>
           <td><input type="number" min="0" id="in-s-${i}" value="${k.sakit!=null?k.sakit:''}" /></td>
           <td><input type="number" min="0" id="in-i-${i}" value="${k.izin!=null?k.izin:''}" /></td>
           <td><input type="number" min="0" id="in-a-${i}" value="${k.alpa!=null?k.alpa:''}" /></td>
           <td><input type="text" id="in-c-${i}" value="${esc2(k.catatan||'')}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   }
+}
+// Tanggal pertama ada data di aplikasi absensi. Hari sebelum tanggal ini tidak punya catatan sama sekali,
+// jadi kalau ikut dihitung semuanya akan tampak Alpa.
+async function tanggalMulaiAbsensi(){
+  try{ const { data, error } = await supa.rpc('tanggal_mulai_absensi'); return error ? null : (data||null); }
+  catch(e){ return null; }
 }
 // Rentang tanggal bawaan untuk menarik absensi: Ganjil = Jul-Des tahun mulai, Genap = Jan-Jun tahun berikutnya.
 function rentangDefaultAbsensi(ta, smt){
@@ -4734,8 +4743,8 @@ async function tarikAbsensiKeInput(){
   if(c.mode!=='sikap' || !inRoster.length) return alert('Klik "Muat Siswa" dulu.');
   const awal = document.getElementById('in-abs-awal').value, akhir = document.getElementById('in-abs-akhir').value;
   if(!awal || !akhir || awal>akhir) return alert('Isi rentang tanggal absensi dengan benar.');
-  const adaIsian = inRoster.some((s,i)=>['in-s-','in-i-','in-a-'].some(p=>document.getElementById(p+i).value!==''));
-  if(adaIsian && !confirm('Kolom Sakit/Izin/Alpa yang sudah terisi akan ditimpa hasil absensi (belum tersimpan sampai Anda menekan Simpan). Lanjutkan?')) return;
+  const adaIsian = inRoster.some((s,i)=>['in-h-','in-s-','in-i-','in-a-'].some(p=>document.getElementById(p+i).value!==''));
+  if(adaIsian && !confirm('Kolom Hadir/Sakit/Izin/Alpa yang sudah terisi akan ditimpa hasil absensi (belum tersimpan sampai Anda menekan Simpan). Lanjutkan?')) return;
   const btn = document.getElementById('in-abs-btn'); btn.disabled = true;
   try{
     const { data, error } = await supa.rpc('tarik_absensi_nilai', { p_start:awal, p_end:akhir, p_program:c.program, p_kelas:c.kelas });
@@ -4745,6 +4754,7 @@ async function tarikAbsensiKeInput(){
     inRoster.forEach((s,i)=>{
       const r = peta.get(s.nisn);
       if(!r){ tanpa.push(s.nama); return; }
+      document.getElementById('in-h-'+i).value = r.hadir;
       document.getElementById('in-s-'+i).value = r.sakit;
       document.getElementById('in-i-'+i).value = r.izin;
       document.getElementById('in-a-'+i).value = r.alpa;
@@ -4785,12 +4795,12 @@ async function simpanInputNilai(){
       for(let i=0;i<inRoster.length;i++){
         const s = inRoster[i];
         const sikap = document.getElementById('in-sk-'+i).value || null;
-        const ang = id => { const n = angkaAtauNull(document.getElementById(id).value); if(Number.isNaN(n) || (n!=null && (n<0 || !Number.isInteger(n)))) throw new Error(`Jumlah sakit/izin/alpa untuk ${s.nama} harus bilangan bulat 0 atau lebih.`); return n; };
-        const sakit = ang('in-s-'+i), izin = ang('in-i-'+i), alpa = ang('in-a-'+i);
+        const ang = id => { const n = angkaAtauNull(document.getElementById(id).value); if(Number.isNaN(n) || (n!=null && (n<0 || !Number.isInteger(n)))) throw new Error(`Jumlah hadir/sakit/izin/alpa untuk ${s.nama} harus bilangan bulat 0 atau lebih.`); return n; };
+        const hadir = ang('in-h-'+i), sakit = ang('in-s-'+i), izin = ang('in-i-'+i), alpa = ang('in-a-'+i);
         const cat = document.getElementById('in-c-'+i).value.trim() || null;
         const ada = catatanMap.get(`${s.nisn}##${c.ta}##${c.smt}`);
-        if(!sikap && sakit==null && izin==null && alpa==null && !cat){ if(ada) hapus.push(ada.id); }
-        else upsert.push({ siswa_nisn:s.nisn, siswa_nama:s.nama, program:c.program, kelas:c.kelas, tahun_ajaran:c.ta, semester:c.smt, sikap, sakit:sakit||0, izin:izin||0, alpa:alpa||0, catatan:cat, updated_at:new Date().toISOString() });
+        if(!sikap && hadir==null && sakit==null && izin==null && alpa==null && !cat){ if(ada) hapus.push(ada.id); }
+        else upsert.push({ siswa_nisn:s.nisn, siswa_nama:s.nama, program:c.program, kelas:c.kelas, tahun_ajaran:c.ta, semester:c.smt, sikap, hadir, sakit:sakit||0, izin:izin||0, alpa:alpa||0, catatan:cat, updated_at:new Date().toISOString() });
       }
       if(upsert.length){
         const { error } = await supa.from('catatan_siswa_semester').upsert(upsert, { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester' });
