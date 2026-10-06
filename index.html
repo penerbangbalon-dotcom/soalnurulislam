@@ -60,8 +60,8 @@
   .ringkas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
   .ringkas .kotak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 16px;min-width:110px;}
   .ringkas .kotak b{display:block;font-size:20px;font-family:'Source Serif 4',serif;}
-  nav.sidebar .logout{margin-top:auto;padding:11px 22px;font-size:13px;color:#DCE6F5;cursor:pointer;}
-  nav.sidebar .logout:hover{color:#fff;}
+  nav.sidebar .logout{margin:0 22px 14px;padding:8px 14px;font-size:13px;font-weight:600;color:#fff;background:#C0432E;border:1px solid #E0715D;border-radius:6px;text-align:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:background .15s;}
+  nav.sidebar .logout:hover{background:#A23E2C;color:#fff;}
 
   main{flex:1;padding:34px 42px;max-width:1100px;}
   .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px;}
@@ -166,6 +166,7 @@
         <small>PKBM Nurul Islam</small>
       </div>
     </div>
+    <div class="logout" onclick="logout()" role="button" tabindex="0">&#x21AA; Keluar</div>
     <div class="group open has-active" data-group="soal">
       <div class="ghead" onclick="toggleGroup('soal')"><span>Bank Soal</span><span class="chev">&#9656;</span></div>
       <div class="subs">
@@ -211,7 +212,6 @@
         <div class="item" data-tab="user" onclick="showTab('user')">Manajemen User</div>
       </div>
     </div>
-    <div class="logout" onclick="logout()">Keluar</div>
   </nav>
 
   <main>
