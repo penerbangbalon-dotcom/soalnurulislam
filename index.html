@@ -97,6 +97,19 @@
   .badge.manual{background:#DCE6F5;color:var(--green-dark);}
   .badge.draft{background:#FDEBD3;color:#8A4E39;}
   .badge.siap{background:#DFEEDC;color:var(--green-dark);}
+  .bu-scroll{overflow-x:auto;}
+  .bu-tabel th,.bu-tabel td{white-space:nowrap;}
+  .bu-tabel th.mapel{white-space:normal;min-width:120px;text-align:center;font-size:12px;vertical-align:bottom;}
+  .bu-tabel td.c{text-align:center;}
+  .bu-tabel td:first-child,.bu-tabel th:first-child{position:sticky;left:0;z-index:1;background:#fff;}
+  .bu-tabel th:first-child{background:#EEF3FA;}
+  .bu-tabel tr.bu-perlu td{background:#FFF6F5;}
+  .bu-tabel tr.bu-foot td{font-weight:600;background:#F7F9FC;border-top:2px solid var(--ink);}
+  .bu-ok{color:#1F5A25;font-weight:600;}
+  .bu-belum{color:#b3261e;font-weight:600;}
+  .bu-jalan{color:#7A5300;font-weight:600;}
+  .bu-macet{color:#8A2E1E;font-weight:700;}
+  .bu-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px;}
   .muted{color:var(--ink-soft);font-size:13px;}
   .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--paper);}
   .login-box{width:340px;background:var(--surface);border:1px solid var(--line);padding:32px;border-radius:var(--radius);}
@@ -171,6 +184,7 @@
         <div class="item" data-tab="monitor" onclick="showTab('monitor')">Monitoring Ujian</div>
         <div class="item" data-tab="manual" onclick="showTab('manual')">Ujian Cetak &amp; Nilai Manual</div>
         <div class="item" data-tab="hasil" onclick="showTab('hasil')">Hasil Ujian Online</div>
+        <div class="item" data-tab="belumujian" onclick="showTab('belumujian')">Belum Mengikuti Ujian</div>
       </div>
     </div>
     <div class="item top" data-tab="pending" onclick="showTab('pending')"><span>Perlu Dinilai</span><span class="nbadge hidden" id="badge-pending">0</span></div>
@@ -414,6 +428,73 @@
           <tbody id="hasil-body"></tbody>
         </table>
       </div>
+    </section>
+
+    <!-- ===== TAB: BELUM MENGIKUTI UJIAN ===== -->
+    <section id="tab-belumujian" class="hidden">
+      <h2>Belum Mengikuti Ujian</h2>
+      <p class="muted">Satu layar untuk melihat siapa saja yang belum mengikuti ujian, dari semua paket sekaligus. Setiap kelas ditampilkan
+        sebagai tabel: baris = siswa, kolom = mata pelajaran. Data diambil dari paket ujian, sesi ujian, dan daftar siswa aktif.</p>
+      <div class="card">
+        <div class="grid3">
+          <div class="field"><label>Program</label>
+            <select id="bu-program" onchange="renderBelumUjian()">
+              <option value="">Semua Program</option>
+              <option value="Paket B">Paket B</option>
+              <option value="Paket C">Paket C</option>
+            </select>
+          </div>
+          <div class="field"><label>Kelas</label>
+            <select id="bu-kelas" onchange="renderBelumUjian()">
+              <option value="">Semua Kelas</option>
+              <option value="VII">Kelas VII</option>
+              <option value="VIII">Kelas VIII</option>
+              <option value="IX">Kelas IX</option>
+              <option value="X">Kelas X</option>
+              <option value="XI">Kelas XI</option>
+              <option value="XII">Kelas XII</option>
+            </select>
+          </div>
+          <div class="field"><label>Tahun Ajaran</label>
+            <select id="bu-ta" onchange="renderBelumUjian()"><option value="">Semua tahun ajaran</option></select>
+          </div>
+        </div>
+        <div class="grid3" style="margin-top:12px;">
+          <div class="field"><label>Semester</label>
+            <select id="bu-smt" onchange="renderBelumUjian()">
+              <option value="">Semua semester</option>
+              <option value="Ganjil">Ganjil</option>
+              <option value="Genap">Genap</option>
+            </select>
+          </div>
+          <div class="field"><label>Jenis Ujian</label>
+            <select id="bu-jenis" onchange="renderBelumUjian()">
+              <option value="formal">UTS &amp; UAS</option>
+              <option value="UTS">UTS saja</option>
+              <option value="UAS">UAS saja</option>
+              <option value="Ulangan Harian">Ulangan Harian saja</option>
+              <option value="">Semua jenis</option>
+            </select>
+          </div>
+          <div class="field"><label>Status Paket</label>
+            <select id="bu-status" onchange="renderBelumUjian()">
+              <option value="siap">Hanya paket yang sedang dibuka</option>
+              <option value="semua">Paket dibuka + sudah ditutup</option>
+            </select>
+          </div>
+        </div>
+        <div class="toolbar" style="margin:14px 0 0;">
+          <input type="text" id="bu-cari" placeholder="Cari nama / NISN..." oninput="renderBelumUjian()" style="min-width:220px;" />
+          <label style="display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer;">
+            <input type="checkbox" id="bu-hanya" onchange="renderBelumUjian()" /> Hanya siswa yang belum ujian atau sesinya macet
+          </label>
+          <button class="btn outline" onclick="loadBelumUjian()">↻ Muat Ulang</button>
+          <button class="btn outline" onclick="eksporBelumUjian()">Ekspor Excel</button>
+          <button class="btn outline" onclick="cetakBelumUjian()">Cetak Daftar</button>
+        </div>
+      </div>
+      <div id="bu-stat" class="muted" style="margin-bottom:12px;"></div>
+      <div id="bu-hasil"></div>
     </section>
 
     <!-- ===== TAB: UJIAN TERLAKSANA ===== -->
@@ -1104,7 +1185,7 @@ async function hapusUser(userId, email){
 // ---------- NAV ----------
 function showTab(tab){
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user'].forEach(t=>{
+  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1118,6 +1199,7 @@ function showTab(tab){
   if(tab==='monitor') loadMonitorPaketOptions();
   if(tab==='manual') loadManualPaketOptions();
   if(tab==='hasil') loadHasilPaketOptions();
+  if(tab==='belumujian') loadBelumUjian();
   if(tab==='laporan') loadDaftarSiswaLaporan();
   if(tab==='rekapnilai') loadRekapNilai();
   if(tab==='leger') loadLeger();
@@ -3608,6 +3690,213 @@ function eksporArsipNilai(){
   ws['!cols'] = [22,16,32,26,8,8,10,10,12,8,20,26].map(w=>({ wch:w }));
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Arsip Nilai');
   XLSX.writeFile(wb, `arsip-nilai-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ---------- BELUM MENGIKUTI UJIAN (REKAP LINTAS PAKET & SISWA) ----------
+// Menjawab satu pertanyaan: "siapa saja yang belum mengikuti ujian apa?" untuk semua paket sekaligus.
+// Hanya MEMBACA data (paket_ujian, sesi_ujian, students) — tidak mengubah database.
+// Status tiap sel: ikut (ada sesi selesai/dinilai) | jalan (sesi berlangsung, masih dalam batas
+// waktu) | macet (sesi berlangsung tapi sudah lewat durasi + toleransi) | belum (tidak ada sesi).
+const BU_URUT_KELAS = ['VII','VIII','IX','X','XI','XII'];
+const BU_TOLERANSI_MENIT = 15;
+let bu = { siswa:[], paket:[], sesi:new Map(), grup:[], awal:true };
+
+async function loadBelumUjian(){
+  const stat = document.getElementById('bu-stat');
+  stat.textContent = 'Memuat data...';
+  document.getElementById('bu-hasil').innerHTML = '';
+  try{
+    const [siswa, rPaket, rSesi] = await Promise.all([
+      ambilSemuaSiswaAbsensi(),
+      ambilSemuaBaris(()=>supa.from('paket_ujian')
+        .select('id, judul, jenis_ujian, kelas, program, semester, tahun_ajaran, durasi_menit, status, mata_pelajaran(nama)')
+        .eq('diarsipkan', false).in('status', ['siap','ditutup']).order('id')),
+      ambilSemuaBaris(()=>supa.from('sesi_ujian')
+        .select('id, paket_ujian_id, siswa_nisn, status, total_skor, waktu_mulai').order('id'))
+    ]);
+    if(rPaket.error) throw rPaket.error;
+    if(rSesi.error) throw rSesi.error;
+    bu.siswa = siswa.filter(s=>s.kelasRomawi && s.programLabel).sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+    bu.paket = (rPaket.data||[]).map(p=>({ ...p, ...normSemesterTA(p.semester, p.tahun_ajaran) }));
+    bu.sesi = new Map((rSesi.data||[]).map(s=>[s.paket_ujian_id+'|'+s.siswa_nisn, s]));
+  }catch(e){
+    stat.innerHTML = '<span style="color:#b3261e;">Gagal memuat data: '+escapeHtml(e.message||String(e))+'</span>';
+    return;
+  }
+  // Pilihan Tahun Ajaran diambil dari paket yang ada; pertama kali dibuka otomatis memakai yang terbaru.
+  const taList = [...new Set(bu.paket.map(p=>p.tahun_ajaran).filter(Boolean))].sort().reverse();
+  const selTa = document.getElementById('bu-ta');
+  const prev = selTa.value;
+  selTa.innerHTML = '<option value="">Semua tahun ajaran</option>' + taList.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if(bu.awal){ selTa.value = taList[0] || ''; bu.awal = false; }
+  else if(taList.includes(prev)) selTa.value = prev;
+  renderBelumUjian();
+}
+
+function statusSelBU(p, nisn){
+  const s = bu.sesi.get(p.id+'|'+nisn);
+  if(!s) return { k:'belum' };
+  if(s.status==='berlangsung'){
+    const batas = new Date(s.waktu_mulai).getTime() + ((Number(p.durasi_menit)||90) + BU_TOLERANSI_MENIT)*60000;
+    return { k: Date.now()>batas ? 'macet' : 'jalan', s };
+  }
+  return { k:'ikut', s };
+}
+function fmtSkorBU(v){ return v==null ? '-' : Number(v).toFixed(1).replace(/\.0$/,''); }
+function namaPaketBU(p){ return `${p.mata_pelajaran?.nama||p.judul||'-'} (${p.jenis_ujian})`; }
+
+function renderBelumUjian(){
+  const val = id => document.getElementById(id).value;
+  const f = { program:val('bu-program'), kelas:val('bu-kelas'), ta:val('bu-ta'), smt:val('bu-smt'), jenis:val('bu-jenis'),
+    status:val('bu-status'), cari:val('bu-cari').trim().toLowerCase(), hanya:document.getElementById('bu-hanya').checked };
+  const statusOk = f.status==='semua' ? ['siap','ditutup'] : ['siap'];
+  const paketF = bu.paket.filter(p=>
+    statusOk.includes(p.status) && p.kelas && p.program &&
+    (!f.program || p.program===f.program) && (!f.kelas || p.kelas===f.kelas) &&
+    (!f.ta || p.tahun_ajaran===f.ta) && (!f.smt || p.semester===f.smt) &&
+    (f.jenis==='formal' ? p.jenis_ujian!=='Ulangan Harian' : (!f.jenis || p.jenis_ujian===f.jenis)));
+
+  const peta = new Map();
+  paketF.forEach(p=>{
+    const k = p.program+'|'+p.kelas;
+    if(!peta.has(k)) peta.set(k, { program:p.program, kelas:p.kelas, paket:[] });
+    peta.get(k).paket.push(p);
+  });
+  const grup = [...peta.values()].sort((a,b)=> a.program.localeCompare(b.program) || BU_URUT_KELAS.indexOf(a.kelas)-BU_URUT_KELAS.indexOf(b.kelas));
+
+  grup.forEach(g=>{
+    g.paket.sort((a,b)=>(a.mata_pelajaran?.nama||'').localeCompare(b.mata_pelajaran?.nama||'','id') || String(a.jenis_ujian).localeCompare(String(b.jenis_ujian)));
+    const semua = bu.siswa.filter(s=>s.kelasRomawi===g.kelas && s.programLabel===g.program);
+    g.totalSiswa = semua.length;
+    g.kolom = g.paket.map(()=>({ belum:0, macet:0, jalan:0, ikut:0 }));
+    g.rows = semua.map(s=>{
+      const sel = g.paket.map((p,i)=>{ const st = statusSelBU(p, s.nisn); g.kolom[i][st.k]++; return st; });
+      return { s, sel, belum: sel.filter(x=>x.k==='belum').length, macet: sel.filter(x=>x.k==='macet').length };
+    });
+    g.siswaPerlu = g.rows.filter(r=>r.belum||r.macet).length;
+    g.tampil = g.rows.filter(r=>(!f.hanya || r.belum || r.macet) &&
+      (!f.cari || r.s.nama.toLowerCase().includes(f.cari) || String(r.s.nisn).toLowerCase().includes(f.cari)));
+  });
+  bu.grup = grup;
+
+  const out = document.getElementById('bu-hasil');
+  const stat = document.getElementById('bu-stat');
+  if(!grup.length){
+    stat.textContent = '';
+    out.innerHTML = '<div class="card muted">Tidak ada paket ujian yang sesuai filter. Coba ubah Tahun Ajaran, Semester, Jenis Ujian, atau Status Paket.</div>';
+    return;
+  }
+  const totSiswa = grup.reduce((n,g)=>n+g.totalSiswa,0);
+  const totPerlu = grup.reduce((n,g)=>n+g.siswaPerlu,0);
+  const totMacet = grup.reduce((n,g)=>n+g.kolom.reduce((m,k)=>m+k.macet,0),0);
+  stat.innerHTML = `<b>${totSiswa}</b> siswa &bull; <b>${paketF.length}</b> paket ujian &bull; `+
+    (totPerlu ? `<span style="color:#b3261e;font-weight:600;">${totPerlu} siswa belum lengkap</span>` : '<span style="color:#1F5A25;font-weight:600;">semua siswa sudah mengikuti ujian</span>')+
+    (totMacet ? ` &bull; <span style="color:#8A2E1E;">${totMacet} sesi macet (nilai bisa dihitung di menu Perlu Dinilai)</span>` : '');
+
+  const selHtml = st=>{
+    if(st.k==='ikut'){
+      const sementara = st.s.status==='selesai';
+      return `<span class="bu-ok" ${sementara?'title="Sudah dikumpulkan; nilai sementara (essay belum dinilai)"':''}>✔ ${fmtSkorBU(st.s.total_skor)}${sementara?'*':''}</span>`;
+    }
+    if(st.k==='jalan') return '<span class="bu-jalan">⏳ Mengerjakan</span>';
+    if(st.k==='macet') return '<span class="bu-macet" title="Sesi masih berstatus berlangsung padahal waktunya sudah lewat">⚠ Macet</span>';
+    return '<span class="bu-belum">✖ Belum</span>';
+  };
+
+  out.innerHTML = grup.map(g=>{
+    const chips = g.paket.map((p,i)=>({p, k:g.kolom[i]})).filter(x=>x.k.belum||x.k.macet)
+      .sort((a,b)=>(b.k.belum+b.k.macet)-(a.k.belum+a.k.macet))
+      .map(x=>`<span class="badge draft">${escapeHtml(namaPaketBU(x.p))}: ${x.k.belum} belum${x.k.macet?`, ${x.k.macet} macet`:''}</span>`).join('');
+    const thead = `<tr><th style="min-width:190px;">Siswa</th><th>NISN</th>${g.paket.map(p=>`<th class="mapel">
+        <div>${escapeHtml(p.mata_pelajaran?.nama||p.judul||'-')}</div>
+        <div class="muted" style="font-weight:400;">${escapeHtml(p.jenis_ujian)}${p.semester?' · '+escapeHtml(p.semester):''}${p.status==='ditutup'?' · <span style="color:#8A2E1E;">ditutup</span>':''}</div>
+        <a href="#" class="muted" style="font-size:11px;font-weight:400;" data-id="${escapeHtml(p.id)}" onclick="bukaPaketDariBU(this.dataset.id);return false;">Buka paket</a>
+      </th>`).join('')}<th>Belum</th><th></th></tr>`;
+    const body = g.tampil.map(r=>`<tr class="${(r.belum||r.macet)?'bu-perlu':''}">
+        <td>${escapeHtml(r.s.nama)}</td><td>${escapeHtml(r.s.nisn)}</td>
+        ${r.sel.map(st=>`<td class="c">${selHtml(st)}</td>`).join('')}
+        <td class="c">${r.belum ? `<b class="bu-belum">${r.belum}</b>` : '<span class="muted">0</span>'}</td>
+        <td><button class="btn outline" style="padding:3px 8px;font-size:12px;" data-nisn="${escapeHtml(r.s.nisn)}" onclick="lihatLaporanDariBU(this.dataset.nisn)">Laporan</button></td>
+      </tr>`).join('') || `<tr><td colspan="${g.paket.length+4}" class="muted">${g.totalSiswa ? 'Tidak ada siswa yang cocok dengan filter/pencarian.' : 'Belum ada siswa aktif di kelas ini pada database absensi.'}</td></tr>`;
+    const foot = g.totalSiswa ? `<tr class="bu-foot"><td>Belum ujian (dari ${g.totalSiswa} siswa)</td><td></td>
+        ${g.kolom.map(k=>`<td class="c ${k.belum?'bu-belum':''}">${k.belum}${k.macet?` <span class="bu-macet" title="sesi macet">+${k.macet}⚠</span>`:''}</td>`).join('')}<td></td><td></td></tr>` : '';
+    return `<div class="card">
+      <h3 style="margin:0 0 4px;">${escapeHtml(g.program)} &mdash; Kelas ${escapeHtml(g.kelas)}</h3>
+      <div class="muted">${g.totalSiswa} siswa aktif &bull; ${g.paket.length} paket ujian &bull; ${g.siswaPerlu ? `<span style="color:#b3261e;font-weight:600;">${g.siswaPerlu} siswa belum lengkap</span>` : '<span style="color:#1F5A25;font-weight:600;">semua sudah ikut</span>'}</div>
+      ${chips ? `<div class="bu-chips">${chips}</div>` : '<div style="height:10px;"></div>'}
+      <div class="bu-scroll"><table class="bu-tabel"><thead>${thead}</thead><tbody>${body}${foot}</tbody></table></div>
+    </div>`;
+  }).join('') + '<p class="muted" style="font-size:12px;">✔ = sudah mengikuti (angka = nilai; tanda * = nilai sementara karena essay belum dinilai) &bull; ⏳ = sedang mengerjakan &bull; ⚠ Macet = sesi masih "berlangsung" padahal waktu ujian sudah lewat &bull; ✖ = belum ada sesi sama sekali.</p>';
+}
+
+// Pintasan: buka Laporan Siswa untuk siswa tsb (dari sana bisa Cetak Kartu Ujian).
+async function lihatLaporanDariBU(nisn){
+  showTab('laporan');
+  await loadDaftarSiswaLaporan();
+  document.getElementById('lap-siswa-select').value = nisn;
+  await tampilkanLaporanSiswa();
+  window.scrollTo(0, 0);
+}
+// Pintasan: buka Daftar Paket dengan pencarian terisi (sama seperti tombol "Ikuti Ujian" di Laporan Siswa).
+function bukaPaketDariBU(id){
+  const p = bu.paket.find(x=>x.id===id); if(!p) return;
+  document.getElementById('daftar-cari').value = [p.mata_pelajaran?.nama, p.kelas].filter(Boolean).join(' ');
+  showTab('daftar');
+  loadDaftarPaket();
+  window.scrollTo(0, 0);
+}
+
+function eksporBelumUjian(){
+  if(!bu.grup.length) return alert('Tidak ada data untuk diekspor.');
+  const label = { ikut:'Sudah', jalan:'Sedang mengerjakan', macet:'Sesi macet', belum:'Belum' };
+  const wb = XLSX.utils.book_new();
+  const daftar = [['Nama','NISN','Program','Kelas','Mata Pelajaran','Jenis','Semester','Tahun Ajaran','Status']];
+  bu.grup.forEach(g=>g.tampil.forEach(r=>r.sel.forEach((st,i)=>{
+    if(st.k!=='belum' && st.k!=='macet') return;
+    const p = g.paket[i];
+    daftar.push([r.s.nama, r.s.nisn, g.program, g.kelas, p.mata_pelajaran?.nama||p.judul||'', p.jenis_ujian, p.semester||'', p.tahun_ajaran||'', st.k==='macet'?'Sesi macet':'Belum ujian']);
+  })));
+  if(daftar.length>1){
+    const ws = XLSX.utils.aoa_to_sheet(daftar);
+    ws['!cols'] = [26,16,10,8,28,10,10,12,14].map(w=>({ wch:w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Daftar Belum Ujian');
+  }
+  bu.grup.forEach(g=>{
+    const hdr = ['Nama','NISN', ...g.paket.map(namaPaketBU), 'Jumlah Belum'];
+    const rows = g.tampil.map(r=>[r.s.nama, r.s.nisn, ...r.sel.map(st=> st.k==='ikut' && st.s.total_skor!=null ? Number(st.s.total_skor) : label[st.k]), r.belum]);
+    const ws = XLSX.utils.aoa_to_sheet([hdr, ...rows]);
+    ws['!cols'] = [26,16, ...g.paket.map(()=>14), 12].map(w=>({ wch:w }));
+    XLSX.utils.book_append_sheet(wb, ws, (g.program.replace('Paket ','')+' '+g.kelas).slice(0,31));
+  });
+  XLSX.writeFile(wb, `belum-ujian-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function cetakBelumUjian(){
+  if(!bu.grup.some(g=>g.tampil.some(r=>r.belum||r.macet))) return alert('Tidak ada siswa yang belum mengikuti ujian pada filter ini.');
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
+  const teksPilihan = id => { const s = document.getElementById(id); return s.options[s.selectedIndex].text; };
+  const periode = [teksPilihan('bu-ta'), teksPilihan('bu-smt'), teksPilihan('bu-jenis')].join(' | ');
+  const tabel = bu.grup.map(g=>{
+    const rows = g.tampil.filter(r=>r.belum||r.macet);
+    if(!rows.length) return '';
+    return `<h3>${escapeHtml(g.program)} &mdash; Kelas ${escapeHtml(g.kelas)} <span class="kecil">(${g.siswaPerlu} dari ${g.totalSiswa} siswa belum lengkap)</span></h3>
+      <table><thead><tr><th style="width:30px;">No</th><th style="width:28%;">Nama</th><th style="width:110px;">NISN</th><th>Belum mengikuti</th></tr></thead><tbody>
+      ${rows.map((r,n)=>`<tr><td class="c">${n+1}</td><td>${escapeHtml(r.s.nama)}</td><td>${escapeHtml(r.s.nisn)}</td>
+        <td>${r.sel.map((st,i)=> st.k==='belum' ? escapeHtml(namaPaketBU(g.paket[i])) : st.k==='macet' ? escapeHtml(namaPaketBU(g.paket[i]))+' <i>(sesi macet)</i>' : '').filter(Boolean).join('; ')}</td></tr>`).join('')}
+      </tbody></table>`;
+  }).join('');
+  win.document.write(`<html><head><meta charset="utf-8"><title>Daftar Siswa Belum Mengikuti Ujian</title>
+    <style>@page{size:A4;margin:1.5cm;} body{font-family:Arial,sans-serif;font-size:11pt;color:#000;}
+    h2{margin:0 0 2px;} h3{margin:18px 0 6px;} .kecil{font-weight:normal;font-size:10pt;color:#555;}
+    table{width:100%;border-collapse:collapse;} th,td{border:1px solid #444;padding:5px 7px;text-align:left;vertical-align:top;font-size:10.5pt;}
+    th{background:#eee;} td.c{text-align:center;} tr{page-break-inside:avoid;}</style></head><body>
+    <h2>Daftar Siswa Belum Mengikuti Ujian</h2>
+    <div class="kecil">PKBM Nurul Islam &bull; ${escapeHtml(periode)} &bull; Dicetak ${fmtTglSekarang()}</div>
+    ${tabel}</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(), 400);
 }
 
 // ---------- LAPORAN SISWA (REKAP NILAI, RAPOR & PIAGAM) ----------

@@ -12,3 +12,11 @@
 4. Rekap kehadiran (H/S/I/A) di Input Nilai Tambahan, Leger, Laporan Siswa, Rapor Semester (index.html).
    Membutuhkan kolom `hadir` di tabel catatan_siswa_semester dan fungsi database
    `tarik_absensi_nilai` / `tanggal_mulai_absensi` (sudah dibuat di Supabase).
+5. **Menu baru "Belum Mengikuti Ujian"** (index.html, grup Pelaksanaan Ujian)
+   - Tabel per kelas: baris = siswa, kolom = mata pelajaran; sel berisi ✔ nilai / ✖ belum / ⏳ mengerjakan / ⚠ macet.
+   - Filter Program, Kelas, Tahun Ajaran, Semester, Jenis Ujian, Status Paket; pencarian nama/NISN;
+     opsi "hanya siswa yang belum ujian atau sesinya macet".
+   - Ringkasan jumlah belum per mapel (chip + baris total), Ekspor Excel, Cetak Daftar.
+   - Tombol "Laporan" per siswa (dari sana bisa Cetak Kartu Ujian) dan "Buka paket" per mapel.
+   - Hanya membaca data; tidak ada perubahan database / migrasi SQL.
+
