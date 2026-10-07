@@ -1,5 +1,12 @@
 # Perubahan terbaru
 
+## v12.3 — Nilai remedial masuk ke Laporan Siswa, Rapor & Piagam
+Tanpa migrasi SQL baru (cukup v14 & v15 yang sudah ada). Hanya mengubah index.html.
+- Laporan Siswa sebelumnya sengaja menyaring semua sesi paket Remedial, sehingga nilai remedial tidak tampil. Kini nilai remedial terbaik diterapkan ke baris UH/UTS/UAS yang sesuai (mapel, kelas, program, semester, tahun ajaran sama), memakai aturan Pengaturan Nilai (maks KKM / tertinggi / rata-rata / nonaktif) seperti di Leger & Transkrip.
+- Nilai yang sudah direlai ditandai **R** (tooltip: nilai sebelum remedial). Rata-rata, Rapor, dan Piagam otomatis memakai nilai setelah remedial. Catatan "R = nilai setelah remedial" muncul di cetakan Rapor.
+- Siswa yang tidak mengerjakan ujian lalu mengikuti remedial (susulan) kini barisnya terisi nilai remedial.
+- Catatan: peringkat kelas & rata-rata "Semua siswa" masih dihitung dari nilai ujian asli.
+
 ## v12.2 — Perbaikan batas 1000 baris Supabase (tanpa migrasi SQL)
 Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipotong tanpa pesan kesalahan. Sebagian besar menu (Bank Soal, Rekap/Leger/Transkrip, Arsip Nilai) sudah membaca halaman demi halaman. Perbaikan v12.2 menutup sisa kueri yang belum:
 1. **Analisis Butir Soal** dan **Nilai Manual (Ujian Cetak)**: detail jawaban dibaca per 100 sesi + per halaman (sebelumnya 100 siswa x 40 soal = 4000 baris, hanya 1000 yang terbaca).

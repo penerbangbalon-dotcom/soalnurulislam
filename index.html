@@ -5009,9 +5009,10 @@ async function tampilkanLaporanSiswa(){
     return;
   }
   const siswaInfo = daftarSiswaLaporan.find(s=>s.nisn===nisn);
+  await pastikanPengNilaiTermuat();   // aturan remedial + KKM dipakai untuk menerapkan nilai remedial ke baris laporan
   const [{ data:sesiData, error:eSesi }, { data:paketRelevan, error:ePaket }] = await Promise.all([
     supa.from('sesi_ujian')
-      .select('id, siswa_nama, siswa_nisn, status, total_skor, waktu_selesai, paket_ujian_id, paket_ujian(judul, jenis_ujian, semester, tahun_ajaran, kelas, program, mapel_id, diarsipkan, mata_pelajaran(nama))')
+      .select('id, siswa_nama, siswa_nisn, status, total_skor, waktu_selesai, paket_ujian_id, paket_ujian(judul, jenis_ujian, semester, tahun_ajaran, kelas, program, mapel_id, diarsipkan, remedial_komponen, mata_pelajaran(nama))')
       .eq('siswa_nisn', nisn)
       .order('waktu_selesai', { ascending:false }),
     // Hanya paket yang AKTIF (status "siap") dan tidak diarsipkan yang dihitung sebagai ujian
@@ -5055,9 +5056,35 @@ async function tampilkanLaporanSiswa(){
     if(cocok) return { semester: cocok[1][0].toUpperCase()+cocok[1].slice(1).toLowerCase(), tahun_ajaran: cocok[2] };
     return { semester: semester||null, tahun_ajaran: tahun_ajaran||null };
   };
+  // Nilai remedial online (terbaik per mapel+komponen) diterapkan ke baris UH/UTS/UAS yang sesuai,
+  // memakai aturan Pengaturan Nilai (maks KKM / tertinggi / rata-rata / nonaktif) yang sama dengan Leger & Transkrip.
+  const kunciRem = (p, komp)=>{
+    const n = pisahkanSemesterTA(p.semester, p.tahun_ajaran);
+    return [p.mapel_id, p.kelas, p.program, n.semester, n.tahun_ajaran, komp].join('||');
+  };
+  const remTerbaik = new Map();
+  (sesiData||[]).filter(s=>s.paket_ujian && s.paket_ujian.jenis_ujian==='Remedial' && s.status==='dinilai' && s.total_skor!=null
+      && ['uh','uts','uas'].includes(s.paket_ujian.remedial_komponen)).forEach(s=>{
+    const k = kunciRem(s.paket_ujian, s.paket_ujian.remedial_komponen), v = Number(s.total_skor);
+    if(!remTerbaik.has(k) || v>remTerbaik.get(k)) remTerbaik.set(k, v);
+  });
   dataLaporanSiswa = [...sesiValid, ...virtualRows].map(s=>{
     const norm = pisahkanSemesterTA(s.paket_ujian.semester, s.paket_ujian.tahun_ajaran);
-    return { ...s, paket_ujian: { ...s.paket_ujian, semester: norm.semester, tahun_ajaran: norm.tahun_ajaran } };
+    const baris = { ...s, paket_ujian: { ...s.paket_ujian, semester: norm.semester, tahun_ajaran: norm.tahun_ajaran } };
+    const komp = komponenNilai(s.paket_ujian.jenis_ujian);
+    const rem = komp ? remTerbaik.get(kunciRem(s.paket_ujian, komp)) : null;
+    if(rem!=null){
+      const kkm = ambilKKM(s.paket_ujian.program, s.paket_ujian.kelas, s.paket_ujian.mata_pelajaran && s.paket_ujian.mata_pelajaran.nama);
+      const adaAsli = s.status==='dinilai' && s.total_skor!=null;       // belum mengerjakan = ujian susulan (asli kosong)
+      const asli = adaAsli ? Number(s.total_skor) : null;
+      const eff = terapkanRemedial(asli, rem, kkm);
+      if(eff!=null){
+        baris.remedial = { asli, rem, kkm };
+        baris.status = 'dinilai';
+        baris.total_skor = Math.round(eff*10)/10;
+      }
+    }
+    return baris;
   });
 
   const kosong = document.getElementById('lap-kosong');
@@ -5151,7 +5178,7 @@ function renderTabelLaporan(){
       ? '0 <span class="muted">(TIDAK/BELUM MENGERJAKAN)</span>'
       : isBelumDibuat
       ? '0 <span class="muted">(TIDAK/BELUM MENGERJAKAN)</span>'
-      : `${nilai!=null ? nilai : '-'}${belum?' <span class="muted">(belum final)</span>':''}`;
+      : `${nilai!=null ? nilai : '-'}${s.remedial ? ` <sup title="Nilai setelah remedial. Nilai sebelum remedial: ${s.remedial.asli==null?'belum ada':fmtN(s.remedial.asli)}; nilai remedial: ${fmtN(s.remedial.rem)}" style="color:#b36b00;font-weight:700;">R</sup>` : ''}${belum?' <span class="muted">(belum final)</span>':''}`;
     const predikatCell = isTidak
       ? '<span style="color:#b3261e;font-weight:600;">PERLU MELAPOR KE WALI KELAS</span>'
       : isBelumDibuat
@@ -5447,13 +5474,14 @@ async function cetakRapor(){
         ${rows.map((s,i)=>{
           const p = s.paket_ujian; const isTidak = s.status==='tidak_mengerjakan';
           const nilai = s.total_skor!=null ? Number(s.total_skor) : null;
-          const nilaiCell = isTidak ? '0 <i>(Tidak Mengerjakan)</i>' : `${nilai!=null?nilai:'-'}${s.status!=='dinilai'?' *':''}`;
+          const nilaiCell = isTidak ? '0 <i>(Tidak Mengerjakan)</i>' : `${nilai!=null?nilai:'-'}${s.remedial?' <sup>R</sup>':''}${s.status!=='dinilai'?' *':''}`;
           const predikatCell = isTidak ? 'PERLU MELAPOR KE WALI KELAS' : (nilai!=null?predikatNilai(nilai):'-');
           return `<tr><td>${i+1}</td><td>${escapeHtml(p.mata_pelajaran?.nama||'-')}</td><td>${p.jenis_ujian}</td><td>${nilaiCell}</td><td>${predikatCell}</td></tr>`;
         }).join('')}
       </tbody>
     </table>
     ${adaBelumFinal ? '<div class="catatan">* nilai essay pada ujian ini belum selesai dinilai guru, masih bersifat sementara.</div>' : ''}
+    ${rows.some(s=>s.remedial) ? '<div class="catatan"><sup>R</sup> nilai setelah remedial.</div>' : ''}
     <div class="ringkasan">
       <div><b>Jumlah Mata Pelajaran/Ujian:</b> ${rows.length}</div>
       <div><b>Rata-rata Nilai:</b> ${rata!=null?rata.toFixed(1):'-'}</div>
@@ -5777,6 +5805,24 @@ function saringPickerSiswa(p){
 //   mode 'kkm'       -> nilai jadi maksimal KKM (min(remedial, KKM)); tidak pernah menurunkan nilai asli
 //   mode 'tertinggi' -> nilai = yang lebih tinggi antara asli dan remedial
 //   mode 'rata'      -> nilai = rata-rata asli & remedial (bila lebih tinggi dari asli)
+let pengNilaiTermuat = false;
+// Laporan Siswa bisa dibuka sebelum menu nilai lain; pastikan KKM & aturan remedial sudah terbaca dari database.
+async function pastikanPengNilaiTermuat(){
+  if(pengNilaiTermuat || dataNilaiSiap) return;
+  try{
+    const { data } = await supa.from('pengaturan_nilai').select('*').eq('id','umum').maybeSingle();
+    if(data){
+      pengNilai = {
+        bobot: { ...DEF_PENG.bobot, ...(data.bobot||{}) },
+        mode: data.mode || 'sebagian',
+        kkm: data.kkm!=null ? Number(data.kkm) : 70,
+        kkm_mapel: data.kkm_mapel || {},
+        remedial: { mode:'kkm', ...(data.remedial||{}) }
+      };
+    }
+    pengNilaiTermuat = true;
+  }catch(e){ /* pakai bawaan */ }
+}
 function terapkanRemedial(asli, rem, kkm){
   const mode = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
   if(mode==='nonaktif' || rem==null || kkm==null) return null;
