@@ -184,6 +184,7 @@
         <div class="item" data-tab="paket" onclick="showTab('paket')">Buat Paket Ujian</div>
         <div class="item" data-tab="daftar" onclick="showTab('daftar')">Daftar &amp; Cetak</div>
         <div class="item" data-tab="terlaksana" onclick="showTab('terlaksana')">Ujian Terlaksana</div>
+        <div class="item" data-tab="paketremedial" onclick="showTab('paketremedial')">Paket Remedial</div>
       </div>
     </div>
     <div class="group" data-group="laksana">
@@ -284,8 +285,11 @@
       <div class="card">
         <div class="grid3">
           <div class="field"><label>Judul Paket</label><input type="text" id="pk-judul" placeholder="UTS Matematika Ganjil 2026" /></div>
-          <div class="field"><label>Jenis Ujian</label><select id="pk-jenis"><option>UTS</option><option>UAS</option><option>Ulangan Harian</option></select></div>
+          <div class="field"><label>Jenis Ujian</label><select id="pk-jenis" onchange="toggleRemKompPaket();loadSoalUntukPaket()"><option>UTS</option><option>UAS</option><option>Ulangan Harian</option><option>Remedial</option></select></div>
           <div class="field"><label>Mata Pelajaran</label><select id="pk-mapel" onchange="syncPaketProgramKelas();loadSoalUntukPaket()"></select></div>
+        </div>
+        <div class="grid3 hidden" id="pk-rem-wrap">
+          <div class="field"><label>Komponen yang Diremedial</label><select id="pk-rem-komp"><option value="uh">Ulangan Harian (UH)</option><option value="uts" selected>UTS</option><option value="uas">UAS</option></select></div>
         </div>
         <div class="grid3">
           <div class="field"><label>Program</label><select id="pk-program"><option>Paket B</option><option>Paket C</option></select></div>
@@ -523,7 +527,7 @@
       <p class="muted">Daftar mata pelajaran yang sudah diujikan (sudah ada siswa yang mengerjakan), lengkap dengan jenis ujian, kelas, tanggal pelaksanaan, dan ringkasan pengerjaan. Untuk melihat nilai per siswa, klik &ldquo;Lihat Hasil&rdquo;.</p>
       <div class="toolbar">
         <input type="text" id="tl-cari" placeholder="Cari judul / mapel / kelas / semester..." style="max-width:300px;flex:1;min-width:200px;" oninput="renderTerlaksana()" />
-        <select id="tl-jenis" onchange="renderTerlaksana()"><option value="">Semua Jenis</option><option value="UTS">UTS</option><option value="UAS">UAS</option><option value="Ulangan Harian">Ulangan Harian (UH)</option></select>
+        <select id="tl-jenis" onchange="renderTerlaksana()"><option value="">Semua Jenis</option><option value="UTS">UTS</option><option value="UAS">UAS</option><option value="Ulangan Harian">Ulangan Harian (UH)</option><option value="Remedial">Remedial</option></select>
         <select id="tl-program" onchange="renderTerlaksana()"><option value="">Semua Program</option><option>Paket B</option><option>Paket C</option></select>
         <select id="tl-kelas" onchange="renderTerlaksana()"><option value="">Semua Kelas</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select>
         <select id="tl-semester" onchange="renderTerlaksana()"><option value="">Semua Semester</option><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select>
@@ -700,6 +704,47 @@
       </div>
       <div id="lg-info" class="muted" style="margin-bottom:10px;"></div>
       <div id="lg-tabel" style="overflow:auto;max-height:70vh;"></div>
+    </section>
+
+    <!-- ===== TAB: PAKET REMEDIAL ===== -->
+    <section id="tab-paketremedial" class="hidden">
+      <h2>Paket Remedial</h2>
+      <p class="muted">Paket soal khusus remedial. Siswa yang nilainya di bawah KKM menekan tab <b>"Ikuti Remedial"</b> di halaman ujian siswa (cukup NISN, tanpa kode akses) dan otomatis mendapat paket yang <b>sesuai mata pelajaran, kelas, semester, dan komponen</b> (UH / UTS / UAS) yang perlu diremedial.
+        Soal remedial selalu <b>berbeda</b> dari ujian asli: soal yang sudah dipakai di paket mana pun tidak akan diambil, dan soal bertanda <i>Khusus Remedial</i> di Bank Soal diprioritaskan. Bila ada beberapa paket, siswa yang masih di bawah KKM mendapat paket berikutnya yang belum pernah ia kerjakan.
+        Nilai remedial online langsung masuk ke Leger, Transkrip, Rapor, dan daftar Perlu Remedial mengikuti aturan di Pengaturan Nilai.</p>
+      <div class="card">
+        <h3 style="margin-top:0;">Buat Paket Remedial</h3>
+        <div class="grid3">
+          <div class="field"><label>Jenjang</label><select id="pr-program" onchange="prIsiKelas()"><option>Paket B</option><option>Paket C</option></select></div>
+          <div class="field"><label>Kelas</label><select id="pr-kelas" onchange="prIsiMapel()"></select></div>
+          <div class="field"><label>Mata Pelajaran</label><select id="pr-mapel" onchange="prHitung()"></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Komponen yang Diremedial</label><select id="pr-komp" onchange="prHitung()"><option value="uh">Ulangan Harian (UH)</option><option value="uts" selected>UTS</option><option value="uas">UAS</option></select></div>
+          <div class="field"><label>Tahun Ajaran</label><select id="pr-ta" onchange="prHitung()"></select></div>
+          <div class="field"><label>Semester</label><select id="pr-smt" onchange="prHitung()"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Durasi (menit)</label><input type="number" id="pr-durasi" value="60" /></div>
+          <div class="field"><label>Acak urutan soal</label><select id="pr-acak"><option value="true">Ya</option><option value="false">Tidak</option></select></div>
+          <div class="field"><label>Dibuka sampai (opsional)</label><input type="datetime-local" id="pr-batas" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Judul Paket</label><input type="text" id="pr-judul" oninput="prJudulManual=true" /></div>
+          <div class="field"><label>Status awal</label><select id="pr-status"><option value="draft">Draft (periksa dulu, buka nanti)</option><option value="siap">Langsung dibuka untuk siswa</option></select></div>
+          <div></div>
+        </div>
+        <div id="pr-info" style="margin:6px 0 10px;"></div>
+        <div id="pr-jumlah"></div>
+        <label class="checkline"><input type="checkbox" id="pr-gabung" checked onchange="prHitung()"><span>Bila soal khusus remedial kurang, lengkapi dengan soal yang belum pernah dipakai di paket mana pun</span></label>
+        <label class="checkline"><input type="checkbox" id="pr-acakpilih"><span>Pilih soal secara acak (bukan urut dari Bank Soal)</span></label>
+        <div class="toolbar" style="margin-top:10px;"><button class="btn gold" id="pr-buat" onclick="buatPaketRemedial()">Buat Paket Remedial</button></div>
+      </div>
+      <div class="card" style="overflow-x:auto;">
+        <div class="toolbar" style="justify-content:space-between;"><h3 style="margin:0;">Daftar Paket Remedial</h3><button class="btn outline" onclick="loadPaketRemedial()">&#8635; Muat Ulang</button></div>
+        <table><thead><tr><th>Paket</th><th>Kelas / Semester</th><th>Komponen</th><th>Soal</th><th>Belum tuntas</th><th>Sudah mengerjakan</th><th>Hasil</th><th>Status</th><th>Aksi</th></tr></thead>
+        <tbody id="pr-body"><tr><td colspan="9" class="muted">Memuat...</td></tr></tbody></table>
+      </div>
     </section>
 
     <!-- ===== TAB: PERLU REMEDIAL ===== -->
@@ -1123,6 +1168,7 @@
     <div class="field"><label>Kunci Jawaban</label><input type="text" id="ts-kunci" placeholder="Contoh: A, atau jawaban isian" /></div>
     <div class="field"><label>Pembahasan (opsional, tampil di kunci jawaban cetak)</label><textarea id="ts-pembahasan"></textarea></div>
     <div class="field"><label>Poin</label><input type="number" id="ts-poin" value="1" /></div>
+    <div class="field"><label class="chk"><input type="checkbox" id="ts-remedial"> Khusus Remedial (dicadangkan untuk Paket Remedial, tidak dipakai di UTS/UAS/UH)</label></div>
     <div class="toolbar" style="justify-content:flex-end;">
       <button class="btn outline" onclick="closeModal('modal-tambah-soal')">Batal</button>
       <button class="btn" onclick="simpanSoalManual()">Simpan</button>
@@ -1237,6 +1283,7 @@
       <div class="field"><label>Mata Pelajaran</label><select id="ai-mapel" onchange="syncAiProgramKelas()"></select></div>
       <div class="field"><label>Jenjang / Kelas</label><input type="text" id="ai-program" readonly style="background:#f2f1ea;" /></div>
     </div>
+    <div class="field"><label class="chk"><input type="checkbox" id="ai-remedial"> Simpan sebagai soal <b>Khusus Remedial</b> (untuk Paket Remedial)</label></div>
     <div class="field"><label>Topik / Materi</label><input type="text" id="ai-topik" placeholder="Contoh: Pecahan, Sistem Pencernaan, Teks Deskripsi" /></div>
     <div class="field"><label>Jenis Soal (bisa pilih lebih dari satu, digabung dalam 1 lembar)</label>
       <div class="jenis-komposisi">
@@ -1615,7 +1662,7 @@ function showTab(tab){
   if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa') && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
+  ['bank','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1624,6 +1671,7 @@ function showTab(tab){
     if(aktif) g.classList.add('open');
   });
   if(tab==='terlaksana') loadTerlaksana();
+  if(tab==='paketremedial') loadPaketRemedial();
   if(tab==='pending') loadPerluDinilai();
   if(tab!=='monitor') hentikanMonitor();
   if(tab==='monitor') loadMonitorPaketOptions();
@@ -2066,7 +2114,7 @@ async function loadBankSoal(){
   };
   let { data, error } = await ambilSemuaBaris(bangun);
   const { peta: terpakai } = error ? { peta:new Map() } : await petaSoalTerpakai();
-  if(!error) tampilBannerBelumTerpakai((data||[]).filter(s=>!terpakai.has(s.id)).length);
+  if(!error) tampilBannerBelumTerpakai((data||[]).filter(s=>!terpakai.has(s.id) && !s.khusus_remedial).length);
   if(!error && filterPakai) data = data.filter(s => filterPakai==='sudah' ? terpakai.has(s.id) : !terpakai.has(s.id));
   const body = document.getElementById('bank-soal-body');
   const empty = document.getElementById('bank-soal-empty');
@@ -2094,7 +2142,7 @@ function renderBankSoal(){
       <td>${labelJenis(s.jenis)}</td>
       <td style="max-width:340px;">${escapeHtml(s.pertanyaan).slice(0,140)}${s.pertanyaan.length>140?'…':''}</td>
       <td>${escapeHtml(s.topik || '-')}</td>
-      <td><span class="badge ${s.sumber==='ai'?'ai':'manual'}">${s.sumber==='ai'?'AI':'Manual'}</span>${terpakai.has(s.id)?`<br><span class="badge" style="background:#e8eef7;color:#2b4a7a;margin-top:4px;display:inline-block;" title="${escapeHtml(terpakai.get(s.id).join(', '))}">Dipakai di ${terpakai.get(s.id).length} paket</span>`:''}</td>
+      <td><span class="badge ${s.sumber==='ai'?'ai':'manual'}">${s.sumber==='ai'?'AI':'Manual'}</span>${s.khusus_remedial?'<br><span class="badge" style="background:#fbe9d0;color:#8a4b00;margin-top:4px;display:inline-block;">Khusus Remedial</span>':''}${terpakai.has(s.id)?`<br><span class="badge" style="background:#e8eef7;color:#2b4a7a;margin-top:4px;display:inline-block;" title="${escapeHtml(terpakai.get(s.id).join(', '))}">Dipakai di ${terpakai.get(s.id).length} paket</span>`:''}</td>
       <td>
         <button class="btn outline" style="padding:4px 10px;" onclick="bukaEditSoal('${s.id}')">Edit</button>
         <button class="btn danger" style="padding:4px 10px;" onclick="hapusSoal('${s.id}')">Hapus</button>
@@ -2443,11 +2491,13 @@ function acakArr(arr, seed){ const r=rngSeed(seed), x=arr.slice(); for(let i=x.l
 
 // ---------- TAMBAH / EDIT SOAL MANUAL ----------
 let editingSoalId = null;
+let soalKhususAwal = false;
 function openTambahSoal(){
   editingSoalId = null; gambarSoal = null; setGambarPreview();
   document.getElementById('ts-modal-title').textContent = 'Tambah Soal Manual';
   ['ts-topik','ts-pertanyaan','ts-a','ts-b','ts-c','ts-d','ts-e','ts-kunci','ts-pembahasan'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ts-poin').value = 1;
+  document.getElementById('ts-remedial').checked = false; soalKhususAwal = false;
   document.getElementById('ts-jenis').value = 'pilihan_ganda';
   document.getElementById('ts-tingkat').value = 'sedang';
   if(currentMapelList.length) document.getElementById('ts-mapel').value = currentMapelList[0].id;
@@ -2471,6 +2521,7 @@ async function bukaEditSoal(id){
   document.getElementById('ts-e').value = s.opsi_e || '';
   document.getElementById('ts-kunci').value = s.kunci_jawaban || '';
   document.getElementById('ts-poin').value = s.poin || 1;
+  soalKhususAwal = !!s.khusus_remedial; document.getElementById('ts-remedial').checked = soalKhususAwal;
   document.getElementById('ts-pembahasan').value = s.pembahasan || '';
   gambarSoal = s.gambar || null; setGambarPreview();
   document.getElementById('modal-tambah-soal').classList.remove('hidden');
@@ -2500,6 +2551,9 @@ async function simpanSoalManual(){
     pembahasan: document.getElementById('ts-pembahasan').value.trim() || null,
     gambar: gambarSoal,
   };
+  // Kolom khusus_remedial hanya dikirim bila perlu, supaya tetap jalan sebelum migrasi-v15 dijalankan.
+  const cekRem = document.getElementById('ts-remedial').checked;
+  if(cekRem) row.khusus_remedial = true; else if(editingSoalId && soalKhususAwal) row.khusus_remedial = false;
   let error;
   if(editingSoalId){
     ({ error } = await supa.from('bank_soal').update(row).eq('id', editingSoalId));
@@ -2683,6 +2737,7 @@ async function simpanDraftAI(lanjutPaket){
     kunci_jawaban: s.kunci_jawaban || '',
     poin: 1,
     sumber: 'ai',
+    ...(document.getElementById('ai-remedial') && document.getElementById('ai-remedial').checked ? { khusus_remedial: true } : {}),
   }));
   // Mode "Simpan & Buat Paket Ujian": ambil id soal yang baru tersimpan supaya bisa langsung dicentang di formulir paket.
   const q = supa.from('bank_soal').insert(rows);
@@ -2766,6 +2821,10 @@ async function loadSoalUntukPaket(){
   if(error){ wrap.innerHTML = error.message; return; }
   const urut = { pilihan_ganda:0, isian_singkat:1, essay:2 };
   let semuaSoal = (data||[]).slice();
+  // Soal "Khusus Remedial" dicadangkan untuk Paket Remedial: tidak ditawarkan di paket UTS/UAS/UH.
+  const jenisPaketIni = document.getElementById('pk-jenis').value;
+  const nKhusus = semuaSoal.filter(s=>s.khusus_remedial && !preselectSoalIds.includes(s.id)).length;
+  if(jenisPaketIni!=='Remedial') semuaSoal = semuaSoal.filter(s=>!s.khusus_remedial || preselectSoalIds.includes(s.id));
   // Soal yang sudah dipakai di paket LAIN disembunyikan (soal milik paket yang sedang diedit tetap tampil).
   let jumlahTersembunyi = 0;
   const infoEl = document.getElementById('pk-info-terpakai');
@@ -2777,7 +2836,7 @@ async function loadSoalUntukPaket(){
       return !sembunyi;
     });
   }
-  if(infoEl) infoEl.textContent = jumlahTersembunyi ? `${jumlahTersembunyi} soal disembunyikan karena sudah dipakai di paket lain. Tersedia ${semuaSoal.length} soal yang belum dipakai.` : '';
+  if(infoEl) infoEl.textContent = (jumlahTersembunyi ? `${jumlahTersembunyi} soal disembunyikan karena sudah dipakai di paket lain. Tersedia ${semuaSoal.length} soal yang belum dipakai.` : '') + (jenisPaketIni!=='Remedial' && nKhusus ? ` ${nKhusus} soal "Khusus Remedial" disembunyikan (dicadangkan untuk Paket Remedial).` : '');
   const soal = semuaSoal.sort((a,b)=>(urut[a.jenis]-urut[b.jenis]));
   const cnt = {};
   wrap.innerHTML = soal.map(s=>{
@@ -2864,6 +2923,7 @@ async function simpanPaketUjian(){
     durasi_menit: parseInt(document.getElementById('pk-durasi').value) || 90,
     acak_soal: document.getElementById('pk-acak').value === 'true',
   };
+  if(dataPaket.jenis_ujian==='Remedial') dataPaket.remedial_komponen = document.getElementById('pk-rem-komp').value;
 
   // Paket yang sudah dikerjakan siswa: susunan soal & bobot dikunci supaya nilai tersimpan tidak berubah.
   let kunciSoalPaket = false;
@@ -2920,6 +2980,8 @@ async function editPaket(id){
 
   document.getElementById('pk-judul').value = paket.judul || '';
   document.getElementById('pk-jenis').value = paket.jenis_ujian || 'UTS';
+  if(paket.remedial_komponen) document.getElementById('pk-rem-komp').value = paket.remedial_komponen;
+  toggleRemKompPaket();
   document.getElementById('pk-mapel').value = paket.mapel_id || '';
   document.getElementById('pk-program').value = paket.program || 'Paket B';
   document.getElementById('pk-kelas').value = paket.kelas || '';
@@ -2938,8 +3000,12 @@ async function editPaket(id){
   await loadSoalUntukPaket();
   showTab('paket');
 }
+function toggleRemKompPaket(){
+  const el = document.getElementById('pk-rem-wrap'); if(el) el.classList.toggle('hidden', document.getElementById('pk-jenis').value!=='Remedial');
+}
 function batalEditPaket(){
   editingPaketId = null;
+  toggleRemKompPaket();
   preselectSoalIds = [];
   document.getElementById('pk-judul').value = '';
   document.getElementById('pk-kelas').value = '';
@@ -2997,15 +3063,20 @@ function poOpsiTahun(){
   const mulai = tahunAjaranSekarang();
   return Array.from({length:5}, (_,i)=>`${mulai+i}/${mulai+i+1}`);
 }
+async function ambilBankUntukOtomatis(){
+  let r = await ambilSemuaBaris(()=>supa.from('bank_soal').select('id, mapel_id, jenis, poin, khusus_remedial').order('created_at').order('id'));
+  if(r.error && /khusus_remedial/i.test(r.error.message||'')) r = await ambilSemuaBaris(()=>supa.from('bank_soal').select('id, mapel_id, jenis, poin').order('created_at').order('id'));
+  return r;
+}
 async function bukaPaketOtomatis(){
   const [bank, tp] = await Promise.all([
-    ambilSemuaBaris(()=>supa.from('bank_soal').select('id, mapel_id, jenis, poin').order('created_at').order('id')),
+    ambilBankUntukOtomatis(),
     petaSoalTerpakai()
   ]);
   if(bank.error) return alert('Gagal membaca Bank Soal: '+bank.error.message);
   if(tp.error) return alert('Gagal memeriksa soal yang sudah terpakai: '+tp.error.message);
   const idMapel = new Set(currentMapelList.map(m=>m.id));
-  poSoalBelum = (bank.data||[]).filter(s=>!tp.peta.has(s.id) && idMapel.has(s.mapel_id));
+  poSoalBelum = (bank.data||[]).filter(s=>!s.khusus_remedial && !tp.peta.has(s.id) && idMapel.has(s.mapel_id));
   if(!poSoalBelum.length) return alert('Semua soal di Bank Soal sudah terpakai di paket ujian (atau belum ada soal). Tambahkan soal baru dulu.');
   const hitung = new Map(); poSoalBelum.forEach(s=>hitung.set(s.mapel_id, (hitung.get(s.mapel_id)||0)+1));
   const mapelAda = currentMapelList.filter(m=>hitung.has(m.id));
@@ -3118,6 +3189,201 @@ async function buatPaketOtomatis(){
   }
 }
 
+// ---------- PAKET REMEDIAL (v15) ----------
+// Paket remedial = paket_ujian dengan jenis_ujian 'Remedial' + remedial_komponen (uh/uts/uas).
+// Siswa mendapat paketnya otomatis dari halaman ujian (api/remedial-siswa); nilainya masuk lewat arsip_nilai
+// (kolom remedial_komponen) ke Leger / Transkrip / Rapor sebagai nilai remedial.
+let prFormSiap = false, prSiap = false, prJudulManual = false, prSoalMapel = [], prToken = 0, prDaftar = [];
+function prV(id){ return document.getElementById(id).value; }
+function jenisPaketTeks(p){
+  if(!p) return '-';
+  if(p.jenis_ujian==='Remedial') return 'Remedial' + (p.remedial_komponen ? ' ' + ({uh:'UH',uts:'UTS',uas:'UAS'}[p.remedial_komponen]||p.remedial_komponen) : '');
+  return p.jenis_ujian;
+}
+function prTeksKomp(k){ return ({uh:'Ulangan Harian (UH)',uts:'UTS',uas:'UAS'})[k] || k; }
+function prInitForm(){
+  prFormSiap = true;
+  const ta = new Set([...opsiTahunAjaranNilai(), ...poOpsiTahun()]);
+  document.getElementById('pr-ta').innerHTML = [...ta].sort().map(t=>`<option>${esc2(t)}</option>`).join('');
+  document.getElementById('pr-ta').value = taBerjalan();
+  document.getElementById('pr-smt').value = semesterBerjalan();
+  prJudulManual = false;
+  prIsiKelas();
+}
+function prIsiKelas(){
+  const pr = prV('pr-program');
+  document.getElementById('pr-kelas').innerHTML = (KELAS_PER_PROGRAM[pr]||[]).map(k=>`<option>${k}</option>`).join('');
+  prIsiMapel();
+}
+function prIsiMapel(){
+  const pr = prV('pr-program'), kl = prV('pr-kelas');
+  const list = currentMapelList.filter(m=>m.program===pr && m.kelas===kl && !m.tidak_diujikan).sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+  document.getElementById('pr-mapel').innerHTML = '<option value="">— pilih mata pelajaran —</option>' + list.map(m=>`<option value="${m.id}">${esc2(m.nama)}</option>`).join('');
+  prJudulManual = false;
+  prHitung();
+}
+// Siswa yang masih di bawah KKM (setelah remedial yang sudah ada) untuk satu mapel & komponen
+function prPeserta(m, ta, smt, komp){
+  const out = [];
+  if(!prSiap || !m) return out;
+  daftarSiswaNilai.forEach(s=>{
+    if(s.nonaktif) return;
+    susunNilaiSiswa(s.nisn, ta, smt).forEach(r=>{
+      if(r.mapel!==m.nama || r.program!==m.program || r.kelas!==m.kelas) return;
+      if(r[komp]!=null && r.kkm!=null && r[komp]<r.kkm) out.push({ nama:s.nama, nisn:s.nisn, nilai:r[komp], kkm:r.kkm });
+    });
+  });
+  return out.sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+}
+function prUpdateJudul(){
+  if(prJudulManual) return;
+  const m = currentMapelList.find(x=>x.id===prV('pr-mapel'));
+  document.getElementById('pr-judul').value = m ? `Remedial ${({uh:'UH',uts:'UTS',uas:'UAS'})[prV('pr-komp')]} ${m.nama} ${prV('pr-smt')} ${prV('pr-ta')}` : '';
+}
+async function prHitung(){
+  const token = ++prToken;
+  const info = document.getElementById('pr-info'), box = document.getElementById('pr-jumlah');
+  const m = currentMapelList.find(x=>x.id===prV('pr-mapel'));
+  prUpdateJudul();
+  if(!m){ info.innerHTML = '<span class="muted">Pilih jenjang, kelas, dan mata pelajaran.</span>'; box.innerHTML = ''; return; }
+  const ta = prV('pr-ta'), smt = prV('pr-smt'), komp = prV('pr-komp');
+  let bank = await ambilSemuaBaris(()=>supa.from('bank_soal').select('id, jenis, poin, khusus_remedial').eq('mapel_id', m.id).order('created_at').order('id'));
+  if(bank.error && /khusus_remedial/i.test(bank.error.message||'')) bank = await ambilSemuaBaris(()=>supa.from('bank_soal').select('id, jenis, poin').eq('mapel_id', m.id).order('created_at').order('id'));
+  const tp = await petaSoalTerpakai();
+  if(token!==prToken) return;
+  if(bank.error || tp.error){ info.innerHTML = `<span style="color:#b3261e;">Gagal memuat soal: ${esc2((bank.error||tp.error).message)}</span>`; return; }
+  const peserta = prPeserta(m, ta, smt, komp);
+  prSoalMapel = (bank.data||[]).filter(x=>!tp.peta.has(x.id));
+  const gabung = document.getElementById('pr-gabung').checked;
+  const cnt = {}; URUT_JENIS_SOAL.forEach(j=>cnt[j] = { khusus:0, umum:0 });
+  prSoalMapel.forEach(x=>{ if(cnt[x.jenis]) cnt[x.jenis][x.khusus_remedial ? 'khusus' : 'umum']++; });
+  const nama = peserta.slice(0,8).map(x=>`${esc2(x.nama)} (${fmtN(x.nilai)})`).join(', ') + (peserta.length>8 ? `, +${peserta.length-8} lainnya` : '');
+  info.innerHTML = `<b>${peserta.length}</b> siswa Kelas ${esc2(m.kelas)} masih di bawah KKM pada <b>${esc2(prTeksKomp(komp))} ${esc2(m.nama)}</b> (${esc2(labelSmt(smt))} ${esc2(ta)})` +
+    (peserta.length ? `: ${nama}.` : '. ' + (prSiap ? 'Belum ada siswa yang berhak, atau nilainya belum masuk.' : 'Data nilai belum termuat.'));
+  const batasCap = { pilihan_ganda:20, isian_singkat:5, essay:3 };
+  const baris = URUT_JENIS_SOAL.filter(j=>cnt[j].khusus + (gabung ? cnt[j].umum : 0) > 0).map(j=>{
+    const avail = cnt[j].khusus + (gabung ? cnt[j].umum : 0);
+    const def = cnt[j].khusus>0 ? cnt[j].khusus : Math.min(avail, batasCap[j]);
+    return `<div class="toolbar" style="margin:6px 0;gap:8px;"><b style="min-width:200px;">${NAMA_JENIS[j]} <span class="muted">(khusus remedial ${cnt[j].khusus}${gabung ? ', belum terpakai ' + cnt[j].umum : ''})</span></b>
+      Ambil <input type="number" id="pr-n-${j}" min="0" max="${avail}" value="${def}" style="width:80px;"> soal</div>`;
+  });
+  box.innerHTML = baris.length ? baris.join('') :
+    '<p style="color:#b3261e;margin:6px 0;">Belum ada soal yang bisa dipakai untuk mapel ini. Soal yang sudah ada di paket mana pun tidak diambil supaya remedial berbeda dari ujian asli. Tambahkan soal baru di Bank Soal (centang <b>Khusus Remedial</b>), atau <b>Generate dengan AI</b> lalu centang "Simpan sebagai soal Khusus Remedial".</p>';
+}
+async function buatPaketRemedial(){
+  const m = currentMapelList.find(x=>x.id===prV('pr-mapel'));
+  if(!m) return alert('Pilih mata pelajaran dulu.');
+  const judul = prV('pr-judul').trim();
+  if(!judul) return alert('Judul paket wajib diisi.');
+  const komp = prV('pr-komp'), ta = prV('pr-ta'), smt = prV('pr-smt');
+  const gabung = document.getElementById('pr-gabung').checked, acakPilih = document.getElementById('pr-acakpilih').checked;
+  const btn = document.getElementById('pr-buat');
+  btn.disabled = true; btn.textContent = 'Membuat paket...';
+  let paketId = null;
+  try{
+    // Baca ulang soal terpakai tepat sebelum membuat paket: soal yang sudah ada di paket mana pun tidak boleh dipakai lagi.
+    const { peta, error: eCek } = await petaSoalTerpakai();
+    if(eCek) throw new Error('Gagal memeriksa soal yang sudah terpakai: '+eCek.message);
+    const pool = prSoalMapel.filter(x=>!peta.has(x.id));
+    const pilih = [];
+    URUT_JENIS_SOAL.forEach(j=>{
+      const inp = document.getElementById('pr-n-'+j); if(!inp) return;
+      const n = Math.max(0, parseInt(inp.value)||0); if(!n) return;
+      let khusus = pool.filter(x=>x.jenis===j && x.khusus_remedial), umum = gabung ? pool.filter(x=>x.jenis===j && !x.khusus_remedial) : [];
+      if(acakPilih){ khusus = acakArr(khusus, Math.random()); umum = acakArr(umum, Math.random()); }
+      pilih.push(...[...khusus, ...umum].slice(0, n));
+    });
+    if(!pilih.length) throw new Error('Belum ada soal yang dipilih. Isi jumlah soal minimal 1 (soal harus belum terpakai di paket lain).');
+    const batasVal = prV('pr-batas');
+    const dataPaket = { judul, jenis_ujian:'Remedial', remedial_komponen:komp, mapel_id:m.id, kelas:m.kelas||'', program:m.program, semester:smt, tahun_ajaran:ta,
+      durasi_menit: parseInt(prV('pr-durasi'))||60, acak_soal: prV('pr-acak')==='true', status: prV('pr-status'), kode_akses: generateKode() };
+    if(batasVal) dataPaket.remedial_batas = new Date(batasVal).toISOString();
+    const { data: paket, error: eP } = await supa.from('paket_ujian').insert(dataPaket).select().single();
+    if(eP) throw new Error(/remedial_komponen|remedial_batas|jenis_ujian_check/i.test(eP.message) ? 'Database belum siap untuk Paket Remedial. Jalankan migrasi-v15-paket-remedial.sql di Supabase SQL Editor dulu. ('+eP.message+')' : eP.message);
+    paketId = paket.id;
+    const rows = pilih.map((x,i)=>({ paket_ujian_id:paket.id, soal_id:x.id, nomor:i+1, poin: parseFloat(x.poin)||1 }));
+    const { error: eS } = await supa.from('paket_soal').insert(rows);
+    if(eS){ await supa.from('paket_ujian').delete().eq('id', paket.id); paketId = null; throw new Error(eS.message); }
+    prJudulManual = false;
+    alert(`Paket remedial dibuat: ${pilih.length} soal (status: ${dataPaket.status==='siap' ? 'dibuka untuk siswa' : 'draft, klik Buka bila sudah siap'}).`);
+    await loadPaketRemedial();
+  }catch(err){
+    alert('Gagal: '+err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Buat Paket Remedial';
+  }
+}
+async function loadPaketRemedial(){
+  const body = document.getElementById('pr-body');
+  body.innerHTML = '<tr><td colspan="9" class="muted">Memuat...</td></tr>';
+  const [rp, okNilai] = await Promise.all([
+    supa.from('paket_ujian').select('*, mata_pelajaran(nama)').eq('jenis_ujian','Remedial').eq('diarsipkan', false).order('created_at', { ascending:false }),
+    siapkanDataNilai()
+  ]);
+  prSiap = !!okNilai;
+  if(!prFormSiap) prInitForm(); else prHitung();
+  if(rp.error){ body.innerHTML = `<tr><td colspan="9">${esc2(rp.error.message)}</td></tr>`; return; }
+  prDaftar = rp.data || [];
+  if(!prDaftar.length){ body.innerHTML = '<tr><td colspan="9" class="muted">Belum ada paket remedial. Buat di formulir di atas.</td></tr>'; return; }
+  const ids = prDaftar.map(x=>x.id);
+  const [sesi, rel] = await Promise.all([
+    ambilSemuaBaris(()=>supa.from('sesi_ujian').select('paket_ujian_id, status, total_skor').in('paket_ujian_id', ids).order('id')),
+    ambilSemuaBaris(()=>supa.from('paket_soal').select('paket_ujian_id').in('paket_ujian_id', ids).order('id'))
+  ]);
+  const perSesi = new Map(), perSoal = new Map();
+  (sesi.data||[]).forEach(x=>{ if(!perSesi.has(x.paket_ujian_id)) perSesi.set(x.paket_ujian_id, []); perSesi.get(x.paket_ujian_id).push(x); });
+  (rel.data||[]).forEach(x=>perSoal.set(x.paket_ujian_id, (perSoal.get(x.paket_ujian_id)||0)+1));
+  body.innerHTML = prDaftar.map(x=>{
+    const mapel = x.mata_pelajaran && x.mata_pelajaran.nama || '-';
+    const n = normSmtTa(x);
+    const m = { nama:mapel, program:x.program, kelas:x.kelas };
+    const belum = prPeserta(m, n.ta, n.smt, x.remedial_komponen).length;
+    const ss = perSesi.get(x.id) || [];
+    const selesai = ss.filter(r=>r.status==='dinilai' && r.total_skor!=null);
+    const kkm = ambilKKM(x.program, x.kelas, mapel);
+    const lulus = selesai.filter(r=>Number(r.total_skor)>=kkm).length;
+    const rata = selesai.length ? selesai.reduce((a,r)=>a+Number(r.total_skor),0)/selesai.length : null;
+    const berlangsung = ss.filter(r=>r.status==='berlangsung').length, menunggu = ss.filter(r=>r.status==='selesai').length;
+    const aksiStatus = x.status==='draft' ? `<button class="btn gold" style="padding:5px 10px;" onclick="prUbahStatus('${x.id}','siap')">Buka</button>`
+      : x.status==='siap' ? `<button class="btn danger" style="padding:5px 10px;" onclick="prUbahStatus('${x.id}','ditutup')">Tutup</button>`
+      : `<button class="btn gold" style="padding:5px 10px;" onclick="prUbahStatus('${x.id}','siap')">Buka Lagi</button>`;
+    return `<tr>
+      <td>${esc2(x.judul)}<br><span class="muted">${esc2(mapel)} &bull; kode cadangan <code>${esc2(x.kode_akses||'-')}</code>${x.remedial_batas ? ' &bull; sampai '+esc2(new Date(x.remedial_batas).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})) : ''}</span></td>
+      <td>${esc2(x.program||'-')} ${esc2(x.kelas||'-')}<br><span class="muted">${esc2(labelSmt(n.smt))} ${esc2(n.ta||'')}</span></td>
+      <td>${esc2(prTeksKomp(x.remedial_komponen||''))}</td>
+      <td>${perSoal.get(x.id)||0}</td>
+      <td><b>${belum}</b> siswa</td>
+      <td>${ss.length} siswa${berlangsung ? `<br><span class="muted">${berlangsung} sedang mengerjakan</span>` : ''}${menunggu ? `<br><span class="muted" style="color:#b36b00;">${menunggu} menunggu dinilai</span>` : ''}</td>
+      <td>${selesai.length ? `${lulus} dari ${selesai.length} tuntas<br><span class="muted">rata-rata ${fmtN(rata)}</span>` : '<span class="muted">-</span>'}</td>
+      <td><span class="badge ${x.status==='siap'?'siap':'draft'}">${esc2(x.status==='siap'?'dibuka':x.status)}</span></td>
+      <td style="white-space:nowrap;">${aksiStatus}
+        <button class="btn outline" style="padding:5px 10px;" onclick="editPaket('${x.id}')">Edit Soal</button>
+        <button class="btn outline" style="padding:5px 10px;" onclick="cetakPaket('${x.id}')">Cetak</button>
+        <button class="btn danger" style="padding:5px 10px;" onclick="prHapus('${x.id}')">Hapus</button></td></tr>`;
+  }).join('');
+}
+async function prUbahStatus(id, status){
+  if(!confirm(status==='siap' ? 'Buka paket remedial ini? Siswa yang berhak langsung bisa mengikutinya lewat tombol "Ikuti Remedial".' : 'Tutup paket remedial ini? Siswa tidak bisa memulai remedial dari paket ini lagi.')) return;
+  const { error } = await supa.from('paket_ujian').update({ status }).eq('id', id);
+  if(error) return alert(error.message);
+  loadPaketRemedial();
+}
+async function prHapus(id){ await hapusPaket(id); loadPaketRemedial(); }
+// Dipanggil dari daftar Perlu Remedial: buka formulir Paket Remedial dengan isian sudah terisi.
+async function bukaBuatPaketRemedial(program, kelas, mapel, komp, ta, smt){
+  showTab('paketremedial');
+  await loadPaketRemedial();
+  document.getElementById('pr-program').value = program; prIsiKelas();
+  document.getElementById('pr-kelas').value = kelas; prIsiMapel();
+  const m = currentMapelList.find(x=>x.nama===mapel && x.program===program && x.kelas===kelas);
+  if(m) document.getElementById('pr-mapel').value = m.id;
+  document.getElementById('pr-komp').value = komp;
+  if(![...document.getElementById('pr-ta').options].some(o=>o.value===ta)) document.getElementById('pr-ta').insertAdjacentHTML('beforeend', `<option>${esc2(ta)}</option>`);
+  document.getElementById('pr-ta').value = ta; document.getElementById('pr-smt').value = smt;
+  prJudulManual = false; prHitung();
+  window.scrollTo(0, 0);
+}
+
 // ---------- DAFTAR & CETAK ----------
 async function loadDaftarPaket(){
   const tampilArsip = !!(document.getElementById('daftar-tampil-arsip')||{}).checked;
@@ -3143,7 +3409,7 @@ function renderDaftarPaket(){
   body.innerHTML = data.map(p=>`
     <tr>
       <td>${escapeHtml(p.judul)}<br><span class="muted">${escapeHtml(p.mata_pelajaran?.nama||'')}</span></td>
-      <td>${p.jenis_ujian}</td>
+      <td>${escapeHtml(jenisPaketTeks(p))}</td>
       <td>${p.kelas||'-'} / ${p.program||'-'}</td>
       <td><span class="badge ${p.status==='siap'?'siap':'draft'}">${p.diarsipkan?'diarsipkan':p.status}</span></td>
       <td><code>${p.kode_akses}</code></td>
@@ -4475,6 +4741,7 @@ function renderBelumUjian(){
     statusOk.includes(p.status) && p.kelas && p.program &&
     (!f.program || p.program===f.program) && (!f.kelas || p.kelas===f.kelas) &&
     (!f.ta || p.tahun_ajaran===f.ta) && (!f.smt || p.semester===f.smt) &&
+    p.jenis_ujian!=='Remedial' &&
     (f.jenis==='formal' ? p.jenis_ujian!=='Ulangan Harian' : (!f.jenis || p.jenis_ujian===f.jenis)));
 
   const peta = new Map();
@@ -4703,7 +4970,7 @@ async function tampilkanLaporanKelas(){
     .in('siswa_nisn', daftar.map(s=>s.nisn));
   if(error){ kosong.textContent = 'Gagal memuat: '+error.message; return; }
   const per = new Map();
-  (data||[]).filter(r=>r.waktu_selesai && r.paket_ujian && !r.paket_ujian.diarsipkan && r.paket_ujian.jenis_ujian!=='Ulangan Harian')
+  (data||[]).filter(r=>r.waktu_selesai && r.paket_ujian && !r.paket_ujian.diarsipkan && r.paket_ujian.jenis_ujian!=='Ulangan Harian' && r.paket_ujian.jenis_ujian!=='Remedial')
     .forEach(r=>{ const a = per.get(r.siswa_nisn) || []; a.push(Number(r.total_skor)||0); per.set(r.siswa_nisn, a); });
   kosong.classList.add('hidden'); box.classList.remove('hidden');
   box.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin-bottom:2px;">Semua siswa Kelas ${escapeHtml(kelas)}</h3>
@@ -4737,7 +5004,7 @@ async function tampilkanLaporanSiswa(){
     (siswaInfo && siswaInfo.kelasRomawi && siswaInfo.programLabel)
       ? supa.from('paket_ujian').select('id, judul, jenis_ujian, semester, tahun_ajaran, kelas, program, mapel_id, mata_pelajaran(nama)')
           .eq('kelas', siswaInfo.kelasRomawi).eq('program', siswaInfo.programLabel)
-          .eq('status','siap').eq('diarsipkan', false)
+          .eq('status','siap').eq('diarsipkan', false).neq('jenis_ujian','Remedial')
       : Promise.resolve({ data: [] })
   ]);
   if(eSesi) return alert(eSesi.message);
@@ -4748,7 +5015,7 @@ async function tampilkanLaporanSiswa(){
   // Paket yang sudah DIARSIPKAN juga tidak ikut (nilainya tetap ada di menu Hasil Ujian & Arsip).
   // Ulangan Harian ikut dimuat supaya bisa dipilih lewat filter Jenis Ujian (mis. cetak kartu UH),
   // tetapi TIDAK tampil saat filter "Semua Jenis Ujian" (lihat ambilBarisTerfilter) agar Rapor tetap UTS/UAS saja.
-  const sesiValid = (sesiData||[]).filter(s=>s.paket_ujian && !s.paket_ujian.diarsipkan);
+  const sesiValid = (sesiData||[]).filter(s=>s.paket_ujian && !s.paket_ujian.diarsipkan && s.paket_ujian.jenis_ujian!=='Remedial');  // remedial online dihitung lewat Leger/Transkrip, bukan baris ujian
   // Paket ujian sesuai kelas & program siswa saat ini yang BELUM ia kerjakan
   // (UTS ataupun UAS) tetap dimasukkan sebagai baris "Tidak Mengerjakan".
   const paketRelevanFormal = (paketRelevan||[]);
@@ -4928,7 +5195,7 @@ async function cetakKartuUjianSiswa(){
   const { data, error } = await supa.from('paket_ujian')
     .select('id, judul, jenis_ujian, semester, tahun_ajaran, kelas, program, durasi_menit, status, kode_akses, diarsipkan, mata_pelajaran(nama)')
     .eq('kelas', siswa.kelasRomawi).eq('program', siswa.programLabel)
-    .in('status', ['siap','draft']).eq('diarsipkan', false);
+    .in('status', ['siap','draft']).eq('diarsipkan', false).neq('jenis_ujian','Remedial');
   if(error){ win.close(); return alert('Gagal memuat paket ujian: '+error.message); }
   const ta = document.getElementById('lap-filter-ta').value;
   const smt = document.getElementById('lap-filter-smt').value;
@@ -5039,7 +5306,8 @@ async function hitungPeringkatKelas(kelas, program, ta, smt, nisnTarget){
     .eq('paket_ujian.diarsipkan', false)
     .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program)
     .eq('paket_ujian.tahun_ajaran', ta).eq('paket_ujian.semester', smt)
-    .neq('paket_ujian.jenis_ujian', 'Ulangan Harian');
+    .neq('paket_ujian.jenis_ujian', 'Ulangan Harian')
+    .neq('paket_ujian.jenis_ujian', 'Remedial');
   if(error || !data || !data.length) return null;
   const map = new Map();
   data.forEach(r=>{
@@ -5373,13 +5641,27 @@ function teksBobotNilai(){
 let nilaiArsip = [], nilaiMenunggu = 0, daftarSiswaNilai = [], dataNilaiSiap = false;
 let manualMap = new Map();      // nisn##ta||smt||kelas||program||mapel -> { tugas, praktik }
 let manualBaris = [];           // baris mentah nilai_manual_komponen
+let remOnlineMap = new Map();   // nisn##ta||smt||kelas||program||mapel -> { rem_uh, rem_uts, rem_uas } dari Paket Remedial online (nilai terbaik)
+// Nilai remedial yang berlaku: input manual guru didahulukan; bila kosong dipakai nilai remedial online terbaik.
+function manEfektif(kunci){
+  const m = manualMap.get(kunci), o = remOnlineMap.get(kunci);
+  if(!o) return m;
+  const r = { ...(m||{}) };
+  ['rem_uh','rem_uts','rem_uas'].forEach(k=>{ if(r[k]==null && o[k]!=null) r[k] = o[k]; });
+  return r;
+}
 let catatanMap = new Map();     // nisn##ta##smt -> baris catatan_siswa_semester
 let catatanBaris = [];
 
 async function siapkanDataNilai(){
   const [arsip, manual, cat, peng] = await Promise.all([
-    ambilSemuaBaris(()=>supa.from('arsip_nilai')
-      .select('siswa_nisn, siswa_nama, paket_id, paket_judul, jenis_ujian, mapel_nama, program, kelas, semester, tahun_ajaran, status, total_skor, waktu_selesai').order('id')),
+    (async ()=>{
+      const kolom = 'siswa_nisn, siswa_nama, paket_id, paket_judul, jenis_ujian, mapel_nama, program, kelas, semester, tahun_ajaran, status, total_skor, waktu_selesai';
+      let r = await ambilSemuaBaris(()=>supa.from('arsip_nilai').select(kolom+', remedial_komponen').order('id'));
+      // Sebelum migrasi-v15 dijalankan kolom remedial_komponen belum ada: baca tanpa kolom itu.
+      if(r.error && /remedial_komponen/i.test(r.error.message||'')) r = await ambilSemuaBaris(()=>supa.from('arsip_nilai').select(kolom).order('id'));
+      return r;
+    })(),
     ambilSemuaBaris(()=>supa.from('nilai_manual_komponen').select('*').order('id')),
     ambilSemuaBaris(()=>supa.from('catatan_siswa_semester').select('*').order('id')),
     supa.from('pengaturan_nilai').select('*').eq('id','umum').maybeSingle()
@@ -5415,6 +5697,14 @@ async function siapkanDataNilai(){
   catatanMap = new Map(catatanBaris.map(r=>[`${r.siswa_nisn}##${r.tahun_ajaran}##${r.semester}`, r]));
 
   const semua = arsip.data || [];
+  remOnlineMap = new Map();
+  semua.filter(r=>r.jenis_ujian==='Remedial' && r.status==='dinilai' && r.total_skor!=null && r.siswa_nisn && ['uh','uts','uas'].includes(r.remedial_komponen)).forEach(r=>{
+    const n = normSmtTa(r);
+    const k = `${r.siswa_nisn}##${[n.ta, n.smt, r.kelas, r.program, r.mapel_nama].join('||')}`;
+    if(!remOnlineMap.has(k)) remOnlineMap.set(k, {});
+    const o = remOnlineMap.get(k), f = 'rem_'+r.remedial_komponen, v = Number(r.total_skor);
+    if(o[f]==null || v>o[f]) o[f] = v;
+  });
   nilaiMenunggu = semua.filter(r=>r.status!=='dinilai').length;
   nilaiArsip = semua.filter(r=>r.status==='dinilai' && r.total_skor!=null && r.siswa_nisn).map(r=>{
     const n = normSmtTa(r);
@@ -5519,7 +5809,7 @@ function susunNilaiSiswa(nisn, ta, smt){
   const hasil = [...grup.entries()].map(([k, list])=>{
     const [t, sm, kl, pr, mp] = k.split('||');
     const kkm = ambilKKM(pr, kl, mp);
-    const h = hitungMapel(list, manualMap.get(`${nisn}##${k}`), kkm);
+    const h = hitungMapel(list, manEfektif(`${nisn}##${k}`), kkm);
     return { ta:t, smt:sm, kelas:kl, program:pr, mapel:mp, ...h, kkm, tuntas: h.na==null ? null : h.na>=kkm };
   });
   hasil.sort((a,c)=>a.ta.localeCompare(c.ta) || urutSmt(a.smt)-urutSmt(c.smt) || a.mapel.localeCompare(c.mapel,'id'));
@@ -5826,7 +6116,7 @@ function bangunLeger(){
   const kkmMapel = mapel.map(m=>ambilKKM(program, kelas, m));
   const baris = siswa.map(s=>{
     const nilai = mapel.map((m,j)=>{
-      const h = hitungMapel(perSiswaMapel.get(s.nisn+'||'+m) || [], manualMap.get(`${s.nisn}##${[ta, smt, kelas, program, m].join('||')}`), kkmMapel[j]);
+      const h = hitungMapel(perSiswaMapel.get(s.nisn+'||'+m) || [], manEfektif(`${s.nisn}##${[ta, smt, kelas, program, m].join('||')}`), kkmMapel[j]);
       return { ...h, kkm:kkmMapel[j], tuntas: h.na==null ? null : h.na>=kkmMapel[j] };
     });
     const nas = nilai.map(n=>n.na).filter(x=>x!=null);
@@ -5848,6 +6138,7 @@ function tampilkanLeger(){
   const totalBelum = L.baris.reduce((a,s)=>a+s.belumTuntas,0);
   info.innerHTML = `<b>${L.baris.length}</b> siswa &bull; <b>${L.mapel.length}</b> mata pelajaran &bull; ${esc2(teksBobotNilai())}` +
     (totalBelum ? ` &bull; <span style="color:#b3261e;">${totalBelum} nilai di bawah KKM (merah)</span>` : '') +
+    (L.baris.some(s=>s.nilai.some(n=>n.rem)) ? ' &bull; <sup style="color:#b36b00;font-weight:700;">R</sup> = nilai setelah remedial' : '') +
     (L.jumlahRows===0 ? ' &bull; <span style="color:#b3261e;">belum ada nilai final untuk periode ini</span>' : '');
   const nk = L.kolom.length;
   const th1 = L.mapel.map((m,j)=>`<th colspan="${nk}" style="text-align:center;border-left:1px solid var(--line);">${esc2(m)}<br><span class="muted" style="font-weight:400;">KKM ${fmtN(L.kkmMapel[j])}</span></th>`).join('');
@@ -5858,7 +6149,7 @@ function tampilkanLeger(){
     ${s.nilai.map(n=>L.kolom.map((k,ix)=>{
       const v = k==='na' ? n.na : n[k];
       const merah = k==='na' && n.tuntas===false;
-      return `<td style="${ix===0?'border-left:1px solid var(--line);':''}${merah?'color:#b3261e;background:#FBEEEC;':''}">${k==='na'?`<b>${cel(v)}</b>`:cel(v)}</td>`;
+      return `<td style="${ix===0?'border-left:1px solid var(--line);':''}${merah?'color:#b3261e;background:#FBEEEC;':''}">${k==='na'?`<b>${cel(v)}</b>`:cel(v)+tandaRem(n,k)}</td>`;
     }).join('')).join('')}
     <td><b>${cel(s.jumlah)}</b></td><td><b>${cel(s.rata)}</b></td><td>${s.peringkat||'-'}</td>
     <td>${s.catatan&&s.catatan.sikap?esc2(s.catatan.sikap):'-'}</td><td>${s.catatan&&s.catatan.hadir!=null?s.catatan.hadir:'-'}</td><td>${s.catatan?s.catatan.sakit:'-'}</td><td>${s.catatan?s.catatan.izin:'-'}</td><td>${s.catatan?s.catatan.alpa:'-'}</td>
@@ -5883,14 +6174,15 @@ function unduhLeger(){
   const hK = ['','KKM','']; L.mapel.forEach((m,j)=>L.kolom.forEach(k=>hK.push(k==='na' ? L.kkmMapel[j] : ''))); for(let i=0;i<9;i++) hK.push('');
   const data = L.baris.map((s,i)=>{
     const r = [i+1, s.nama, s.nisn];
-    s.nilai.forEach(n=>L.kolom.forEach(k=>r.push(bulat1(k==='na' ? n.na : n[k]))));
+    s.nilai.forEach(n=>L.kolom.forEach(k=>{ const v = bulat1(k==='na' ? n.na : n[k]); r.push((k!=='na' && n.rem && n.rem[k] && v!=='' && v!=null) ? `${v}*` : v); }));
     r.push(bulat1(s.jumlah), bulat1(s.rata), s.peringkat||'', s.catatan&&s.catatan.sikap||'', s.catatan&&s.catatan.hadir!=null?s.catatan.hadir:'', s.catatan?s.catatan.sakit:'', s.catatan?s.catatan.izin:'', s.catatan?s.catatan.alpa:'', s.belumTuntas);
     return r;
   });
   const foot = ['','Rata-rata Kelas',''];
   L.mapel.forEach((m,j)=>L.kolom.forEach(k=>foot.push(bulat1(rataRata(L.baris.map(s=>k==='na' ? s.nilai[j].na : s.nilai[j][k]))))));
   foot.push('', bulat1(rataRata(L.baris.map(s=>s.rata))), '', '', '', '', '', '', '');
-  const aoa = [...judul, h1, h2, hK, ...data, foot];
+  const adaRem = L.baris.some(s=>s.nilai.some(n=>n.rem));
+  const aoa = [...judul, h1, h2, hK, ...data, foot, ...(adaRem ? [[], ['* = nilai setelah remedial']] : [])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const r0 = judul.length;
   const merges = [];
@@ -5951,8 +6243,15 @@ function isiMapelRemedial(){
   if(set.has(prev)) sel.value = prev;
   renderRemedial();
 }
+let rmPaketList = [], rmLink = [];
+function bukaBuatPaketRemedialIdx(i){ const d = rmLink[i]; if(d) bukaBuatPaketRemedial(d.program, d.kelas, d.mapel, d.komp, d.ta, d.smt); }
 async function loadRemedial(){
   if(!await siapkanDataNilai()) return;
+  rmPaketList = [];
+  try{
+    const r = await supa.from('paket_ujian').select('id, status, program, kelas, semester, tahun_ajaran, remedial_komponen, mata_pelajaran(nama)').eq('jenis_ujian','Remedial').eq('diarsipkan', false);
+    if(!r.error) rmPaketList = r.data || [];
+  }catch(e){ /* migrasi v15 belum dijalankan: kolom paket remedial online tampil kosong */ }
   const selTa = document.getElementById('rm-ta'); const prevTa = selTa.value;
   const opsi = opsiTahunAjaranNilai();
   selTa.innerHTML = opsi.map(t=>`<option>${esc2(t)}</option>`).join('');
@@ -6007,7 +6306,20 @@ function susunGrupRemedial(baris, mode){
   grup.sort((a,c)=> mode==='mapel' ? a.urut.localeCompare(c.urut,'id') : bandingKelasRem(a.urut, c.urut));
   return grup;
 }
-function htmlTabelRemedial(rows, mode){
+// Status Paket Remedial online untuk satu baris (mapel) dan komponen: belum | draft | siap | ditutup
+function statusPaketRem(r, k){
+  const ps = rmPaketList.filter(p=>{
+    if(p.remedial_komponen!==k || (p.mata_pelajaran && p.mata_pelajaran.nama)!==r.mapel || p.program!==r.program || p.kelas!==r.kelas) return false;
+    const n = normSmtTa(p); return n.ta===r.ta && n.smt===r.smt;
+  });
+  if(!ps.length) return 'belum';
+  if(ps.some(p=>p.status==='siap')) return 'siap';
+  if(ps.some(p=>p.status==='draft')) return 'draft';
+  return 'ditutup';
+}
+const TEKS_STATUS_PAKET_REM = { belum:'belum ada paket', draft:'draft (belum dibuka)', siap:'tersedia online', ditutup:'ditutup' };
+function teksPaketRem(r){ return r.kb.length ? r.kb.map(k=>`${SINGKAT_KOMP[k]}: ${TEKS_STATUS_PAKET_REM[statusPaketRem(r,k)]}`).join('; ') : '-'; }
+function htmlTabelRemedial(rows, mode, layar){
   const perKelas = mode!=='mapel';
   const merah = 'color:#b3261e;font-weight:600;';
   const cel = (v, k, r) => v==null ? '<span class="muted">-</span>' : ((k && r.kb.includes(k)) ? `<span style="${merah}">${fmtN(v)}</span>` : fmtN(v));
@@ -6023,9 +6335,10 @@ function htmlTabelRemedial(rows, mode){
     return `<tr>${idCols}<td>${perKelas ? esc2(r.mapel) : `${esc2(r.program)} ${esc2(r.kelas)}`}</td>
       <td>${cel(r.uh,'uh',r)}</td><td>${cel(r.uts,'uts',r)}</td><td>${cel(r.uas,'uas',r)}</td>
       <td><b>${r.na==null ? '<span class="muted">-</span>' : `<span style="${merah}">${fmtN(r.na)}</span>`}</b></td><td>${fmtN(r.kkm)}</td><td>${r.kurang==null ? '-' : fmtN(r.kurang)}</td>
-      <td>${esc2(perlu)}</td><td>${status}</td></tr>`;
+      <td>${esc2(perlu)}</td><td>${status}</td>${layar ? `<td>${r.kb.length ? r.kb.map(k=>{ const st = statusPaketRem(r,k); const warna = st==='siap' ? '#1E6B3A' : st==='belum' ? '#b3261e' : '#b36b00';
+        return `<div style="white-space:nowrap;"><span style="color:${warna};">${SINGKAT_KOMP[k]}: ${TEKS_STATUS_PAKET_REM[st]}</span>${st==='belum' ? ` <a href="#" onclick="bukaBuatPaketRemedialIdx(${rmLink.push({ program:r.program, kelas:r.kelas, mapel:r.mapel, komp:k, ta:r.ta, smt:r.smt })-1});return false;">Buat paket</a>` : ''}</div>`; }).join('') : '<span class="muted">-</span>'}</td>` : ''}</tr>`;
   }).join('');
-  return `<table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>${perKelas ? 'Mata Pelajaran' : 'Kelas'}</th><th>UH</th><th>UTS</th><th>UAS</th><th>NA</th><th>KKM</th><th>Kurang</th><th>Perlu Remedial</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>`;
+  return `<table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>${perKelas ? 'Mata Pelajaran' : 'Kelas'}</th><th>UH</th><th>UTS</th><th>UAS</th><th>NA</th><th>KKM</th><th>Kurang</th><th>Perlu Remedial</th><th>Status</th>${layar ? '<th>Paket Remedial Online</th>' : ''}</tr></thead><tbody>${body}</tbody></table>`;
 }
 function teksFilterRemedial(){
   const pr = rmV('rm-program'), kl = rmV('rm-kelas'), mp = rmV('rm-mapel');
@@ -6052,7 +6365,7 @@ function renderRemedial(){
   chip.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;">${rmChipMapel.map((m,i)=>`<button class="btn outline" style="padding:3px 10px;font-size:12px;" title="Tampilkan hanya mata pelajaran ini" onclick="rmPilihMapel(${i})">${esc2(m)}: <b>${perMapel.get(m).size}</b></button>`).join('')}</div>`;
   const grup = susunGrupRemedial(baris, mode);
   isi.innerHTML = grup.map(g=>`<div class="card" style="overflow-x:auto;"><h3 style="margin-bottom:2px;">${esc2(g.judul)}</h3>
-    <p class="muted" style="margin:0 0 8px;">${esc2(g.ringkas)}</p>${htmlTabelRemedial(g.rows, mode)}</div>`).join('');
+    <p class="muted" style="margin:0 0 8px;">${esc2(g.ringkas)}</p>${htmlTabelRemedial(g.rows, mode, true)}</div>`).join('');
 }
 function rmPilihMapel(i){
   const sel = document.getElementById('rm-mapel'); const nama = rmChipMapel[i];
@@ -6063,11 +6376,11 @@ function unduhRemedial(){
   if(!b.length) return alert('Tidak ada data untuk diunduh pada filter ini.');
   b.sort((x,y)=>bandingKelasRem(x,y) || String(x.nama).localeCompare(String(y.nama),'id') || String(x.mapel).localeCompare(String(y.mapel),'id'));
   const aoa = [['DAFTAR SISWA BELUM TUNTAS KKM (PERLU REMEDIAL)'], [teksFilterRemedial()], [],
-    ['No','Nama Siswa','NISN','Jenjang','Kelas','Rombel','Tahun Ajaran','Semester','Mata Pelajaran','UH','UTS','UAS','Nilai Akhir','KKM','Kurang dari KKM','Komponen Perlu Remedial','Status Remedial','Nilai Remedial (diisi guru)','Tanggal Remedial','Keterangan']];
+    ['No','Nama Siswa','NISN','Jenjang','Kelas','Rombel','Tahun Ajaran','Semester','Mata Pelajaran','UH','UTS','UAS','Nilai Akhir','KKM','Kurang dari KKM','Komponen Perlu Remedial','Status Remedial','Paket Remedial Online','Nilai Remedial (diisi guru)','Tanggal Remedial','Keterangan']];
   b.forEach((r,i)=>aoa.push([i+1, r.nama, r.nisn, r.program, r.kelas, r.rombel, r.ta, labelSmt(r.smt), r.mapel, bulat1(r.uh), bulat1(r.uts), bulat1(r.uas), bulat1(r.na), r.kkm, r.kurang==null ? '' : bulat1(r.kurang),
-    r.kb.length ? r.kb.map(k=>SINGKAT_KOMP[k]).join(', ') : 'Nilai akhir', r.sudah.length ? 'Sudah remedial '+r.sudah.map(k=>SINGKAT_KOMP[k]).join(', ')+', masih di bawah KKM' : 'Belum remedial', '', '', '']));
+    r.kb.length ? r.kb.map(k=>SINGKAT_KOMP[k]).join(', ') : 'Nilai akhir', r.sudah.length ? 'Sudah remedial '+r.sudah.map(k=>SINGKAT_KOMP[k]).join(', ')+', masih di bawah KKM' : 'Belum remedial', teksPaketRem(r), '', '', '']));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [5,30,14,9,7,14,11,18,34,7,7,7,10,7,12,22,30,16,14,22].map(w=>({ wch:w }));
+  ws['!cols'] = [5,30,14,9,7,14,11,18,34,7,7,7,10,7,12,22,30,34,16,14,22].map(w=>({ wch:w }));
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Daftar Remedial');
   // Rekap per mapel
   const pm = new Map();
@@ -6369,10 +6682,11 @@ async function muatInputNilai(){
       inRoster.map((s,i)=>{
         const key = [c.ta, c.smt, c.kelas, c.program, c.mapel].join('||');
         const m = manualMap.get(`${s.nisn}##${key}`) || {};
+        const onl = remOnlineMap.get(`${s.nisn}##${key}`) || {};
         const rowsS = nilaiArsip.filter(r=>r.siswa_nisn===s.nisn && r.ta===c.ta && r.smt===c.smt && r.kelas===c.kelas && r.program===c.program && r.mapel_nama===c.mapel);
         const asli = hitungMapel(rowsS, null);
         const sel = (k, pre) => { const a = asli[k]; const rendah = a==null || a<kkm;
-          return `<td${a!=null&&rendah?' style="color:#b3261e;font-weight:600;"':''}>${a==null?'<span class="muted">-</span>':fmtN(a)}</td><td><input type="text" inputmode="decimal" id="${pre}${i}" value="${m['rem_'+k]!=null?m['rem_'+k]:''}" /></td>`; };
+          return `<td${a!=null&&rendah?' style="color:#b3261e;font-weight:600;"':''}>${a==null?'<span class="muted">-</span>':fmtN(a)}</td><td><input type="text" inputmode="decimal" id="${pre}${i}" value="${m['rem_'+k]!=null?m['rem_'+k]:''}" />${onl['rem_'+k]!=null ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(onl['rem_'+k])}</b>${m['rem_'+k]!=null ? ' (dikalahkan nilai manual)' : ' (dipakai)'}</div>` : ''}</td>`; };
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>${sel('uh','in-ru-')}${sel('uts','in-rt-')}${sel('uas','in-ra-')}</tr>`;
       }).join('') + '</tbody></table></div>';
   } else if(c.mode==='tugas'){

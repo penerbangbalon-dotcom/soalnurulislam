@@ -274,7 +274,165 @@ async function catatGagal(...daftarKunci) {
   } catch (e) { /* tabel belum ada: abaikan */ }
 }
 
+// ---------------------------------------------------------------------------
+// REMEDIAL ONLINE
+// Siswa berhak remedial untuk satu komponen (UH / UTS / UAS) bila nilai komponen itu di bawah KKM
+// dan ia belum lulus remedial (nilai remedial terbaik, online ATAU input manual guru, belum mencapai KKM).
+// Paket Remedial (paket_ujian.jenis_ujian = 'Remedial') yang dibuka diberikan OTOMATIS sesuai mapel, kelas,
+// semester, dan komponen. Bila ada beberapa paket, siswa mendapat paket yang BELUM pernah ia kerjakan,
+// sehingga soal remedial selalu berbeda dari ujian asli (aturan 1 soal = 1 paket) dan dari percobaan sebelumnya.
+// ---------------------------------------------------------------------------
+const NAMA_KOMP_REM = { uh: 'Ulangan Harian', uts: 'UTS', uas: 'UAS' };
+function komponenDariJenis(jenis) {
+  const j = String(jenis || '').trim().toLowerCase();
+  if (j === 'uts') return 'uts';
+  if (j === 'uas') return 'uas';
+  if (j === 'uh' || j.includes('harian')) return 'uh';
+  return null;
+}
+function pisahSmtTa(semester, ta) {
+  let smt = semester || null, t = ta || null;
+  if (!t) {
+    const m = String(smt || '').trim().match(/^(Ganjil|Genap)\s+(\d{4}\/\d{4})$/i);
+    if (m) { smt = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(); t = m[2]; }
+  }
+  return { smt, ta: t };
+}
+function kunciPeriode(r) {
+  const n = pisahSmtTa(r.semester, r.tahun_ajaran);
+  return [n.ta || '-', n.smt || '-', r.kelas || '-', r.program || '-', r.mapel_nama || '-'].join('||');
+}
+
+async function daftarRemedialSiswa(nisn) {
+  const n = encodeURIComponent(String(nisn).trim());
+  let arsip;
+  try {
+    arsip = await sb(`arsip_nilai?siswa_nisn=eq.${n}&status=eq.dinilai&total_skor=not.is.null&select=jenis_ujian,mapel_nama,program,kelas,semester,tahun_ajaran,total_skor,waktu_selesai,remedial_komponen`);
+  } catch (e) {
+    throw new Error('Fitur remedial belum aktif di database. Admin perlu menjalankan migrasi-v15-paket-remedial.sql di Supabase. (' + e.message + ')');
+  }
+  const [pengRows, manualRows, paketRows] = await Promise.all([
+    sb('pengaturan_nilai?id=eq.umum&select=kkm,kkm_mapel,remedial').catch(() => []),
+    sb(`nilai_manual_komponen?siswa_nisn=eq.${n}&komponen=in.(rem_uh,rem_uts,rem_uas)&select=program,kelas,tahun_ajaran,semester,mapel_nama,komponen,nilai`).catch(() => []),
+    sb(`paket_ujian?jenis_ujian=eq.Remedial&status=eq.siap&diarsipkan=eq.false&select=id,judul,kode_akses,durasi_menit,kelas,program,semester,tahun_ajaran,remedial_komponen,remedial_batas,created_at,mata_pelajaran(nama)&order=created_at.asc`),
+  ]);
+  const peng = (pengRows && pengRows[0]) || {};
+  const kkmUmum = peng.kkm != null ? Number(peng.kkm) : 70;
+  const kkmMapel = peng.kkm_mapel || {};
+  const modeRem = (peng.remedial && peng.remedial.mode) || 'kkm';
+  const kkmUntuk = (program, kelas, mapel) => {
+    const v = kkmMapel[[program || '', kelas || '', mapel || ''].join('|')];
+    return v != null && v !== '' && !isNaN(v) ? Number(v) : kkmUmum;
+  };
+
+  // Kelompokkan nilai asli per (TA, semester, kelas, program, mapel)
+  const grup = new Map();
+  const ambil = (k) => { if (!grup.has(k)) grup.set(k, { uh: [], uts: [], uas: [], rem: {} }); return grup.get(k); };
+  (arsip || []).forEach((r) => {
+    const sk = Number(r.total_skor); if (!Number.isFinite(sk)) return;
+    const g = ambil(kunciPeriode(r));
+    if (r.jenis_ujian === 'Remedial') {
+      const k = r.remedial_komponen;
+      if (k && (g.rem[k] == null || sk > g.rem[k])) g.rem[k] = sk;   // remedial online terbaik
+      return;
+    }
+    const komp = komponenDariJenis(r.jenis_ujian); if (!komp) return;
+    g[komp].push({ sk, t: r.waktu_selesai ? new Date(r.waktu_selesai).getTime() : 0 });
+  });
+  const manualRem = new Map();
+  (manualRows || []).forEach((r) => {
+    manualRem.set([r.tahun_ajaran, r.semester, r.kelas, r.program, r.mapel_nama].join('||') + '##' + r.komponen, Number(r.nilai));
+  });
+
+  // Paket remedial terbuka (belum lewat batas), lalu sesi siswa pada paket-paket itu
+  const sekarang = Date.now();
+  const paketBuka = (paketRows || []).filter((p) => !p.remedial_batas || new Date(p.remedial_batas).getTime() >= sekarang);
+  let sesiPerPaket = new Map();
+  if (paketBuka.length) {
+    const ids = paketBuka.map((p) => p.id).join(',');
+    const sesi = await sb(`sesi_ujian?siswa_nisn=eq.${n}&paket_ujian_id=in.(${ids})&select=paket_ujian_id,status,total_skor`);
+    (sesi || []).forEach((x) => sesiPerPaket.set(x.paket_ujian_id, x));
+  }
+
+  const hasil = [];
+  for (const [kunci, g] of grup.entries()) {
+    const [ta, smt, kelas, program, mapel] = kunci.split('||');
+    const kkm = kkmUntuk(program, kelas, mapel);
+    const nilaiAsli = {
+      uh: g.uh.length ? g.uh.reduce((a, c) => a + c.sk, 0) / g.uh.length : null,
+      uts: g.uts.length ? g.uts.sort((a, b) => b.t - a.t)[0].sk : null,
+      uas: g.uas.length ? g.uas.sort((a, b) => b.t - a.t)[0].sk : null,
+    };
+    for (const komp of ['uh', 'uts', 'uas']) {
+      const asli = nilaiAsli[komp];
+      if (asli == null || asli >= kkm) continue;                      // belum ada nilai / sudah tuntas
+      const manual = manualRem.get(kunci + '##rem_' + komp);
+      const remTerbaik = manual != null ? manual : (g.rem[komp] != null ? g.rem[komp] : null);
+      const item = {
+        mapel, program, kelas, tahun_ajaran: ta, semester: smt, komponen: komp, label: NAMA_KOMP_REM[komp],
+        nilai_asli: Math.round(asli * 100) / 100, kkm, remedial_terbaik: remTerbaik, status: '', paket: null,
+      };
+      if (modeRem === 'nonaktif') { item.status = 'nonaktif'; hasil.push(item); continue; }
+      // Nilai efektif setelah remedial memakai aturan yang sama dengan index.html (terapkanRemedial).
+      if (remTerbaik != null) {
+        let eff = modeRem === 'tertinggi' ? remTerbaik : modeRem === 'rata' ? (asli + remTerbaik) / 2 : Math.min(remTerbaik, kkm);
+        if (eff <= asli) eff = asli;
+        if (eff >= kkm) { item.status = 'lulus'; hasil.push(item); continue; }
+      }
+      const cocok = paketBuka.filter((p) => {
+        if (p.remedial_komponen !== komp) return false;
+        if ((p.mata_pelajaran && p.mata_pelajaran.nama) !== mapel) return false;
+        if (p.program !== program || p.kelas !== kelas) return false;
+        const pn = pisahSmtTa(p.semester, p.tahun_ajaran);
+        return (pn.ta || '-') === ta && (pn.smt || '-') === smt;
+      });
+      const berlangsung = cocok.find((p) => sesiPerPaket.get(p.id) && sesiPerPaket.get(p.id).status === 'berlangsung');
+      const menunggu = cocok.find((p) => sesiPerPaket.get(p.id) && sesiPerPaket.get(p.id).status === 'selesai');
+      const belumDikerjakan = cocok.find((p) => !sesiPerPaket.get(p.id));
+      const pilih = berlangsung || (menunggu ? null : belumDikerjakan);
+      if (berlangsung) item.status = 'berlangsung';
+      else if (menunggu) item.status = 'menunggu_nilai';             // essay remedial belum dinilai guru
+      else if (belumDikerjakan) item.status = 'tersedia';
+      else if (cocok.length) item.status = 'semua_sudah';            // semua paket sudah dikerjakan, masih di bawah KKM
+      else item.status = 'belum_ada_paket';
+      if (pilih) item.paket = { id: pilih.id, judul: pilih.judul, durasi_menit: pilih.durasi_menit, kode_akses: pilih.kode_akses, batas: pilih.remedial_batas || null };
+      hasil.push(item);
+    }
+  }
+  const urutan = { berlangsung: 0, tersedia: 1, menunggu_nilai: 2, semua_sudah: 3, belum_ada_paket: 4, lulus: 5, nonaktif: 6 };
+  hasil.sort((a, b) => (urutan[a.status] - urutan[b.status]) || a.mapel.localeCompare(b.mapel, 'id'));
+  return hasil;
+}
+
+// Apakah siswa ini peserta sah untuk paket remedial tertentu? (dipakai mulai-ujian)
+async function cekPesertaRemedial(nisn, paket) {
+  if (paket.remedial_batas && new Date(paket.remedial_batas).getTime() < Date.now()) {
+    return { ok: false, pesan: 'Pendaftaran remedial ini sudah ditutup.' };
+  }
+  const daftar = await daftarRemedialSiswa(nisn);
+  const ok = daftar.some((d) => d.paket && d.paket.id === paket.id && (d.status === 'tersedia' || d.status === 'berlangsung'));
+  return ok ? { ok: true } : { ok: false, pesan: 'Paket remedial ini bukan untukmu: nilaimu sudah tuntas, mata pelajarannya berbeda, atau kamu sudah mengerjakan paket ini.' };
+}
+
+// Verifikasi NISN (+PIN) siswa, sama aturannya dengan mulai-ujian.
+async function verifikasiSiswa(nisn, pin) {
+  const TABEL = process.env.TABEL_SISWA || 'students';
+  const K_NISN = process.env.KOLOM_NISN || 'nisn';
+  const K_NAMA = process.env.KOLOM_NAMA_SISWA || 'nama';
+  const K_PIN = process.env.KOLOM_PIN || '';
+  if (String(process.env.WAJIB_PIN || '').toLowerCase() === 'true' && !K_PIN) return { status: 500, error: 'Server diatur WAJIB_PIN=true tetapi KOLOM_PIN belum diisi. Hubungi admin.' };
+  const list = await sb(`${TABEL}?${K_NISN}=eq.${encodeURIComponent(String(nisn).trim())}&select=${K_NISN},${K_NAMA}${K_PIN ? ',' + K_PIN : ''}${TABEL === 'students' ? '&status=eq.AKTIF' : ''}`);
+  const siswa = list && list[0];
+  if (!siswa) return { status: 404, error: 'NISN tidak ditemukan di data siswa' };
+  if (K_PIN) {
+    const nn = (v) => String(v == null ? '' : v).trim().toLowerCase();
+    if (!nn(pin) || nn(pin) !== nn(siswa[K_PIN])) return { status: 401, error: 'PIN salah. Tanyakan ke guru.' };
+  }
+  return { siswa, nama: siswa[K_NAMA] };
+}
+
 module.exports = {
+  daftarRemedialSiswa, cekPesertaRemedial, verifikasiSiswa,
   UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi,
   authAdmin, tentukanPeran, wajibLogin, wajibAdmin, wajibSuperAdmin, peranDari, adminLangsung, superLangsung, ipDari, hitungGagal, catatGagal,
 };

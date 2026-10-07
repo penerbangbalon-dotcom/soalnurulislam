@@ -1,5 +1,24 @@
 # Perubahan terbaru
 
+## v12.0 — Paket Remedial online + tombol "Ikuti Remedial" untuk siswa
+**Wajib dijalankan:** `migrasi-v14-remedial.sql` (bila belum), lalu `migrasi-v15-paket-remedial.sql`, di Supabase SQL Editor. Setelah itu unggah semua file ke GitHub (Vercel deploy otomatis). Ada fungsi server baru `api/remedial-siswa.js`.
+1. **Menu baru "Paket Remedial"** (grup Paket Ujian; index.html)
+   - Buat paket: pilih Jenjang, Kelas, Mata Pelajaran, **komponen yang diremedial (UH / UTS / UAS)**, Tahun Ajaran, Semester, durasi, acak soal, batas waktu (opsional), status awal (draft / langsung dibuka).
+   - Soal diambil **otomatis hanya dari soal yang belum terpakai di paket mana pun**, sehingga selalu berbeda dari soal ujian asli. Soal bertanda **Khusus Remedial** di Bank Soal diprioritaskan; bila kurang bisa dilengkapi soal belum terpakai lain. Jumlah per jenis (PG / Isian / Essay) bisa diatur; hitungan soal tersedia dan daftar siswa yang masih di bawah KKM tampil sebelum paket dibuat.
+   - Daftar paket: jumlah soal, siswa belum tuntas, siswa sudah mengerjakan, jumlah tuntas dan rata-rata, tombol Buka / Tutup, Edit Soal, Cetak, Hapus.
+2. **Siswa: tab "Ikuti Remedial"** (ujian.html)
+   - Siswa cukup memasukkan NISN (+PIN bila dipakai), tanpa kode akses. Muncul daftar mapel/komponen yang nilainya di bawah KKM, lengkap dengan nilai, KKM, dan statusnya (tersedia / lanjutkan / menunggu penilaian / belum ada paket / sudah tuntas).
+   - Paket diberikan **otomatis** sesuai mapel, kelas, semester, dan komponen. Bila ada beberapa paket dan siswa masih di bawah KKM, ia mendapat paket berikutnya yang belum pernah ia kerjakan.
+   - **Server memeriksa kelayakan**: siswa yang nilainya sudah tuntas, atau mapel yang tidak sesuai, ditolak walau memakai kode akses paket remedial (mulai-ujian.js + ujian-core.js).
+3. **Nilai remedial online tersambung ke laporan**
+   - Nilai paket remedial (terbaik dari semua percobaan) otomatis menjadi nilai remedial untuk Leger, Transkrip, Rekap Nilai, dan Perlu Remedial, memakai aturan di Pengaturan Nilai (maks KKM / tertinggi / rata-rata / nonaktif). Nilai yang diinput manual guru di Input Nilai Tambahan tetap didahulukan.
+   - Leger kini memberi tanda **R** (layar) dan tanda * (Excel) pada nilai setelah remedial. Transkrip sudah bertanda * sejak v11.9.
+   - Input Nilai Tambahan, Remedial menampilkan nilai remedial online di bawah kotak isian.
+   - Essay pada paket remedial dinilai lewat menu Perlu Dinilai seperti biasa; nilainya ikut masuk setelah selesai dinilai.
+4. **Perlu Remedial**: kolom baru "Paket Remedial Online" (belum ada paket / draft / tersedia online / ditutup) dengan tautan "Buat paket" yang langsung membuka formulir Paket Remedial terisi; kolom ikut di Unduh Excel.
+5. **Bank Soal**: kotak centang **Khusus Remedial** pada soal manual dan pada Generate dengan AI; lencana di daftar soal. Soal khusus remedial tidak ditawarkan di paket UTS/UAS/UH dan tidak ikut "Jadikan Paket Ujian Otomatis".
+6. Paket remedial tidak dihitung sebagai ujian reguler di Belum Mengikuti Ujian, Laporan Siswa, Rapor, Kartu Ujian, dan peringkat; nilainya masuk lewat remedial. Form Buat Paket Ujian punya pilihan jenis Remedial + komponen untuk mengedit paket remedial.
+
 ## v11.9 — Perlu Remedial, Transkrip Massal, Paket Otomatis (tanpa migrasi SQL baru)
 1. **Menu baru "Perlu Remedial (di bawah KKM)"** (Laporan Nilai; index.html)
    - Daftar siswa belum tuntas KKM per **kelas** (urut nama siswa) atau per **mata pelajaran** (urut kelas, lalu siswa).

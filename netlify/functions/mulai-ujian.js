@@ -2,7 +2,7 @@
 // Tidak pakai library npm apapun (langsung fetch ke Supabase REST API)
 // supaya deploy drag-and-drop tidak perlu proses build sama sekali.
 
-const { ipDari, hitungGagal, catatGagal } = require('../lib/ujian-core');
+const { ipDari, hitungGagal, catatGagal, cekPesertaRemedial } = require('../lib/ujian-core');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -98,6 +98,12 @@ exports.handler = async function (event) {
 
     if (sesi && sesi.status !== 'berlangsung') {
       return { statusCode: 403, body: JSON.stringify({ error: 'Kamu sudah menyelesaikan ujian ini' }) };
+    }
+
+    // Paket Remedial hanya boleh dikerjakan siswa yang nilainya memang di bawah KKM (dicek di server).
+    if (!sesi && paket.jenis_ujian === 'Remedial') {
+      const izin = await cekPesertaRemedial(nisn.trim(), paket);
+      if (!izin.ok) return { statusCode: 403, body: JSON.stringify({ error: izin.pesan }) };
     }
 
     if (!sesi) {

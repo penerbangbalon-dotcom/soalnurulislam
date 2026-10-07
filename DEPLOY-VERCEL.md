@@ -63,6 +63,10 @@ Kesalahan umum:
 
 Jangan pernah memasukkan `SUPABASE_SERVICE_ROLE_KEY` ke `index.html`, `ujian.html`, atau JavaScript frontend.
 
+## 5b. Remedial online
+- Jalankan `migrasi-v14-remedial.sql` lalu `migrasi-v15-paket-remedial.sql` di Supabase SQL Editor.
+- Fungsi server baru: `api/remedial-siswa.js` (otomatis dikenali Vercel).
+
 ## 6. Super Admin (opsional)
 - `SUPER_ADMIN_EMAILS` = email Super Admin, pisahkan koma (mis. `kepala@contoh.com`). Tanpa ini, akun admin tertua otomatis jadi Super Admin saat login pertama.
 - Jalankan `migrasi-v12-superadmin.sql` di Supabase SQL Editor.

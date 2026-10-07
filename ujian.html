@@ -63,7 +63,11 @@
         <p id="brand-nama" style="color:var(--ink-soft);margin:2px 0 0;">PKBM Nurul Islam</p>
       </div>
     </div>
-    <div class="card">
+    <div style="display:flex;gap:8px;margin:0 0 10px;">
+      <button class="btn" id="tab-btn-ujian" onclick="gantiMode('ujian')" style="flex:1;justify-content:center;">Ujian</button>
+      <button class="btn" id="tab-btn-remedial" onclick="gantiMode('remedial')" style="flex:1;justify-content:center;background:#fff;color:var(--ink);">Ikuti Remedial</button>
+    </div>
+    <div class="card" id="panel-ujian">
       <div style="margin-bottom:14px;">
         <label>Kode Akses Ujian</label>
         <input type="text" id="input-kode" placeholder="Contoh: 7F3K2A" style="text-transform:uppercase;" />
@@ -78,6 +82,22 @@
       </div>
       <button class="btn" onclick="mulaiUjian()" id="btn-mulai">Mulai Ujian</button>
       <div class="error" id="masuk-error"></div>
+    </div>
+
+    <!-- PANEL REMEDIAL: siswa cukup memasukkan NISN (+PIN); soal remedial diberikan otomatis -->
+    <div class="card hidden" id="panel-remedial">
+      <p style="margin:0 0 12px;color:var(--ink-soft);font-size:14px;">Remedial untuk mata pelajaran yang nilainya masih di bawah KKM. Kamu tidak perlu kode akses: soal remedial diberikan otomatis dan berbeda dari soal ujian sebelumnya.</p>
+      <div style="margin-bottom:14px;">
+        <label>NISN</label>
+        <input type="text" id="rm-nisn" placeholder="Masukkan NISN kamu" />
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>PIN (jika diminta guru, mis. tanggal lahir)</label>
+        <input type="text" id="rm-pin" placeholder="Kosongkan bila tidak diminta" />
+      </div>
+      <button class="btn" onclick="cekRemedial()" id="btn-cek-remedial">Cek Remedial Saya</button>
+      <div class="error" id="rm-error"></div>
+      <div id="rm-daftar" style="margin-top:16px;"></div>
     </div>
   </div>
 
@@ -291,6 +311,63 @@ async function mulaiUjian(){
   }finally{
     btn.disabled = false; btn.textContent = 'Mulai Ujian';
   }
+}
+
+// ---------- REMEDIAL ----------
+function gantiMode(m){
+  const rem = m==='remedial';
+  document.getElementById('panel-ujian').classList.toggle('hidden', rem);
+  document.getElementById('panel-remedial').classList.toggle('hidden', !rem);
+  const a = document.getElementById('tab-btn-ujian'), b = document.getElementById('tab-btn-remedial');
+  a.style.background = rem ? '#fff' : ''; a.style.color = rem ? 'var(--ink)' : '';
+  b.style.background = rem ? '' : '#fff'; b.style.color = rem ? '' : 'var(--ink)';
+  if(rem){ const n = document.getElementById('input-nisn').value.trim(); if(n && !document.getElementById('rm-nisn').value) document.getElementById('rm-nisn').value = n;
+           const p = document.getElementById('input-pin').value.trim(); if(p && !document.getElementById('rm-pin').value) document.getElementById('rm-pin').value = p; }
+}
+let remedialDaftar = [];
+async function cekRemedial(){
+  const nisn = document.getElementById('rm-nisn').value.trim();
+  const pin = document.getElementById('rm-pin').value.trim();
+  const err = document.getElementById('rm-error'), box = document.getElementById('rm-daftar'), btn = document.getElementById('btn-cek-remedial');
+  err.textContent = ''; box.innerHTML = '';
+  if(!nisn){ err.textContent = 'NISN wajib diisi'; return; }
+  btn.disabled = true; btn.textContent = 'Memeriksa...';
+  try{
+    const res = await fetch('/api/remedial-siswa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nisn, pin }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Gagal memeriksa remedial');
+    remedialDaftar = data.remedial || [];
+    if(!remedialDaftar.length){
+      box.innerHTML = `<p style="margin:0;"><b>${escapeHtml(data.nama_siswa||'')}</b>, tidak ada nilai ujianmu yang di bawah KKM. Kamu tidak perlu remedial.</p>`;
+      return;
+    }
+    const f = v => v==null ? '-' : String(Math.round(Number(v)*10)/10).replace('.',',');
+    const smtTeks = s => s==='Ganjil' ? 'Semester 1' : s==='Genap' ? 'Semester 2' : (s||'');
+    box.innerHTML = `<p style="margin:0 0 10px;">Halo, <b>${escapeHtml(data.nama_siswa||'')}</b>.</p>` + remedialDaftar.map((d,i)=>{
+      const info = `Nilai ${escapeHtml(d.label)}: <b>${f(d.nilai_asli)}</b> &bull; KKM ${f(d.kkm)}` + (d.remedial_terbaik!=null ? ` &bull; remedial terbaik: <b>${f(d.remedial_terbaik)}</b>` : '');
+      let aksi = '';
+      if(d.status==='tersedia') aksi = `<button class="btn" style="width:100%;justify-content:center;margin-top:8px;" onclick="mulaiRemedial(${i})">Mulai Remedial (${d.paket.durasi_menit||90} menit)</button>` + (d.paket.batas ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Dibuka sampai ${new Date(d.paket.batas).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})}</div>` : '');
+      else if(d.status==='berlangsung') aksi = `<button class="btn" style="width:100%;justify-content:center;margin-top:8px;" onclick="mulaiRemedial(${i})">Lanjutkan Remedial</button>`;
+      else if(d.status==='menunggu_nilai') aksi = '<div style="margin-top:6px;color:#7A5300;">Remedialmu sudah dikumpulkan dan menunggu penilaian guru.</div>';
+      else if(d.status==='semua_sudah') aksi = '<div style="margin-top:6px;color:#B3261E;">Semua paket remedial sudah kamu kerjakan, nilaimu masih di bawah KKM. Hubungi guru.</div>';
+      else if(d.status==='belum_ada_paket') aksi = '<div style="margin-top:6px;color:var(--ink-soft);">Paket remedial belum dibuka. Tanyakan ke guru kapan remedial dilaksanakan.</div>';
+      else if(d.status==='lulus') aksi = '<div style="margin-top:6px;color:#1E6B3A;font-weight:600;">&#10003; Sudah tuntas lewat remedial.</div>';
+      else if(d.status==='nonaktif') aksi = '<div style="margin-top:6px;color:var(--ink-soft);">Remedial sedang tidak dilaksanakan.</div>';
+      return `<div class="card" style="margin-bottom:10px;"><strong>${escapeHtml(d.mapel)}</strong> <span style="color:var(--ink-soft);">&mdash; Remedial ${escapeHtml(d.label)} &bull; Kelas ${escapeHtml(d.kelas)} &bull; ${escapeHtml(smtTeks(d.semester))} ${escapeHtml(d.tahun_ajaran)}</span><div style="font-size:14px;margin-top:4px;">${info}</div>${aksi}</div>`;
+    }).join('');
+  }catch(e){
+    err.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Cek Remedial Saya';
+  }
+}
+function mulaiRemedial(i){
+  const d = remedialDaftar[i]; if(!d || !d.paket) return;
+  document.getElementById('input-kode').value = d.paket.kode_akses;
+  document.getElementById('input-nisn').value = document.getElementById('rm-nisn').value.trim();
+  document.getElementById('input-pin').value = document.getElementById('rm-pin').value.trim();
+  gantiMode('ujian');
+  mulaiUjian();
 }
 
 function kunciLocal(sesiId){ return 'ujian_jawaban_' + sesiId; }
