@@ -1,5 +1,14 @@
 # Perubahan terbaru
 
+## v12.1 — Tombol "Ikuti UTS" dan "Ikuti UAS" di jendela siswa
+**Tanpa migrasi SQL baru.** Unggah semua file ke GitHub (Vercel deploy otomatis). Ada fungsi server baru `api/ujian-siswa.js` (+ `netlify/functions/ujian-siswa.js`).
+1. **Jendela siswa (ujian.html)** kini punya empat tombol: Ujian | Ikuti UTS | Ikuti UAS | Ikuti Remedial. Tab Ujian (kode akses) tetap ada untuk ujian harian dan kasus khusus.
+2. **Cara kerja Ikuti UTS / Ikuti UAS**: siswa mengisi NISN (+PIN bila dipakai), lalu muncul daftar mata pelajaran UTS/UAS yang **sudah dibuka** (status Siap) untuk kelas dan program (Paket B/C) siswa itu. Siswa memilih mata pelajaran, lalu **langsung masuk ke paket ujiannya** tanpa mengetik kode akses (ada konfirmasi sebelum waktu berjalan).
+3. **Status per mata pelajaran**: Mulai / Lanjutkan (sesi masih berlangsung) / menunggu penilaian essay / sudah dikerjakan (+ nilai). Kode akses hanya dikirim untuk paket yang masih boleh dikerjakan.
+4. **Aturan yang dihormati**: paket khusus jurusan IPA/IPS hanya tampil untuk jurusan yang sesuai (dibaca dari nama kelas siswa); siswa yang ditandai **Tidak wajib** di menu Belum Mengikuti Ujian tidak melihat paketnya; paket draft, ditutup, atau diarsipkan tidak tampil. Paket Remedial dan Ulangan Harian tidak tercampur di sini.
+5. Memakai pembatas percobaan gagal yang sama seperti Ikuti Remedial (NISN/PIN salah berulang akan dikunci sementara).
+6. Siswa yang kelas atau programnya belum terdata (mis. SD/UMUM) mendapat pesan agar memakai tab Ujian dengan kode dari guru.
+
 ## v12.0 — Paket Remedial online + tombol "Ikuti Remedial" untuk siswa
 **Wajib dijalankan:** `migrasi-v14-remedial.sql` (bila belum), lalu `migrasi-v15-paket-remedial.sql`, di Supabase SQL Editor. Setelah itu unggah semua file ke GitHub (Vercel deploy otomatis). Ada fungsi server baru `api/remedial-siswa.js`.
 1. **Menu baru "Paket Remedial"** (grup Paket Ujian; index.html)

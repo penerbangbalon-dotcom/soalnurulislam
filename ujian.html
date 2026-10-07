@@ -24,6 +24,9 @@
   .btn{display:inline-flex;padding:11px 20px;border:1px solid var(--green);background:var(--green);color:#fff;border-radius:3px;font-size:14.5px;font-weight:500;cursor:pointer;}
   .btn:hover{background:var(--green-dark);}
   .btn:disabled{opacity:.5;}
+  .tab-btn{flex:1 1 140px;justify-content:center;background:#fff;color:var(--ink);}
+  .tab-btn:hover{background:#E8EEF8;}
+  .tab-btn.aktif,.tab-btn.aktif:hover{background:var(--green);color:#fff;}
   .error{color:var(--red);font-size:13.5px;margin-top:10px;}
   .top-bar{position:sticky;top:0;background:var(--paper);padding:14px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);margin-bottom:20px;z-index:5;}
   .timer{font-family:'Source Serif 4',serif;font-weight:700;font-size:20px;}
@@ -63,9 +66,11 @@
         <p id="brand-nama" style="color:var(--ink-soft);margin:2px 0 0;">PKBM Nurul Islam</p>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin:0 0 10px;">
-      <button class="btn" id="tab-btn-ujian" onclick="gantiMode('ujian')" style="flex:1;justify-content:center;">Ujian</button>
-      <button class="btn" id="tab-btn-remedial" onclick="gantiMode('remedial')" style="flex:1;justify-content:center;background:#fff;color:var(--ink);">Ikuti Remedial</button>
+    <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap;">
+      <button class="btn tab-btn aktif" id="tab-btn-ujian" onclick="gantiMode('ujian')">Ujian</button>
+      <button class="btn tab-btn" id="tab-btn-uts" onclick="gantiMode('uts')">Ikuti UTS</button>
+      <button class="btn tab-btn" id="tab-btn-uas" onclick="gantiMode('uas')">Ikuti UAS</button>
+      <button class="btn tab-btn" id="tab-btn-remedial" onclick="gantiMode('remedial')">Ikuti Remedial</button>
     </div>
     <div class="card" id="panel-ujian">
       <div style="margin-bottom:14px;">
@@ -82,6 +87,22 @@
       </div>
       <button class="btn" onclick="mulaiUjian()" id="btn-mulai">Mulai Ujian</button>
       <div class="error" id="masuk-error"></div>
+    </div>
+
+    <!-- PANEL IKUTI UTS / UAS: siswa cukup NISN (+PIN), lalu memilih mata pelajaran; kode akses terisi otomatis -->
+    <div class="card hidden" id="panel-jenis">
+      <p id="jn-intro" style="margin:0 0 12px;color:var(--ink-soft);font-size:14px;"></p>
+      <div style="margin-bottom:14px;">
+        <label>NISN</label>
+        <input type="text" id="jn-nisn" placeholder="Masukkan NISN kamu" />
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>PIN (jika diminta guru, mis. tanggal lahir)</label>
+        <input type="text" id="jn-pin" placeholder="Kosongkan bila tidak diminta" />
+      </div>
+      <button class="btn" onclick="cekUjianJenis()" id="btn-cek-jenis">Lihat Mata Pelajaran</button>
+      <div class="error" id="jn-error"></div>
+      <div id="jn-daftar" style="margin-top:16px;"></div>
     </div>
 
     <!-- PANEL REMEDIAL: siswa cukup memasukkan NISN (+PIN); soal remedial diberikan otomatis -->
@@ -314,15 +335,84 @@ async function mulaiUjian(){
 }
 
 // ---------- REMEDIAL ----------
+let modeAktif = 'ujian';
 function gantiMode(m){
-  const rem = m==='remedial';
-  document.getElementById('panel-ujian').classList.toggle('hidden', rem);
-  document.getElementById('panel-remedial').classList.toggle('hidden', !rem);
-  const a = document.getElementById('tab-btn-ujian'), b = document.getElementById('tab-btn-remedial');
-  a.style.background = rem ? '#fff' : ''; a.style.color = rem ? 'var(--ink)' : '';
-  b.style.background = rem ? '' : '#fff'; b.style.color = rem ? '' : 'var(--ink)';
-  if(rem){ const n = document.getElementById('input-nisn').value.trim(); if(n && !document.getElementById('rm-nisn').value) document.getElementById('rm-nisn').value = n;
-           const p = document.getElementById('input-pin').value.trim(); if(p && !document.getElementById('rm-pin').value) document.getElementById('rm-pin').value = p; }
+  modeAktif = m;
+  const jenis = m==='uts' || m==='uas';
+  document.getElementById('panel-ujian').classList.toggle('hidden', m!=='ujian');
+  document.getElementById('panel-jenis').classList.toggle('hidden', !jenis);
+  document.getElementById('panel-remedial').classList.toggle('hidden', m!=='remedial');
+  ['ujian','uts','uas','remedial'].forEach(k=>document.getElementById('tab-btn-'+k).classList.toggle('aktif', k===m));
+  // NISN & PIN yang sudah diketik di tab lain ikut terisi, supaya siswa tidak mengetik berulang
+  const nisnSumber = ['input-nisn','jn-nisn','rm-nisn'].map(id=>document.getElementById(id).value.trim()).find(v=>v) || '';
+  const pinSumber = ['input-pin','jn-pin','rm-pin'].map(id=>document.getElementById(id).value.trim()).find(v=>v) || '';
+  const isi = (id,v)=>{ const el=document.getElementById(id); if(v && !el.value) el.value=v; };
+  if(jenis){
+    isi('jn-nisn',nisnSumber); isi('jn-pin',pinSumber);
+    const J = m.toUpperCase();
+    document.getElementById('jn-intro').textContent = `Masukkan NISN, lalu pilih mata pelajaran ${J} yang sudah dibuka untuk kelasmu. Kamu tidak perlu mengetik kode akses: kamu langsung masuk ke paket ujian sesuai mata pelajaran yang kamu pilih.`;
+    document.getElementById('btn-cek-jenis').textContent = `Lihat Mata Pelajaran ${J}`;
+    document.getElementById('jn-error').textContent = ''; document.getElementById('jn-daftar').innerHTML = '';
+    jenisDaftar = [];
+  } else if(m==='remedial'){ isi('rm-nisn',nisnSumber); isi('rm-pin',pinSumber); }
+}
+// ---------- IKUTI UTS / UAS ----------
+let jenisDaftar = [];
+async function cekUjianJenis(){
+  const jenis = modeAktif.toUpperCase();
+  const nisn = document.getElementById('jn-nisn').value.trim();
+  const pin = document.getElementById('jn-pin').value.trim();
+  const err = document.getElementById('jn-error'), box = document.getElementById('jn-daftar'), btn = document.getElementById('btn-cek-jenis');
+  err.textContent = ''; box.innerHTML = '';
+  if(!nisn){ err.textContent = 'NISN wajib diisi'; return; }
+  btn.disabled = true; btn.textContent = 'Memeriksa...';
+  try{
+    const res = await fetch('/api/ujian-siswa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nisn, pin, jenis }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Gagal memuat daftar ujian');
+    jenisDaftar = data.ujian || [];
+    const sapa = `<p style="margin:0 0 10px;">Halo, <b>${escapeHtml(data.nama_siswa||'')}</b>${data.kelas ? ` (Kelas ${escapeHtml(data.kelas)})` : ''}.</p>`;
+    if(data.pesan){ box.innerHTML = sapa + `<p style="margin:0;color:var(--ink-soft);">${escapeHtml(data.pesan)}</p>`; return; }
+    if(!jenisDaftar.length){
+      box.innerHTML = sapa + `<p style="margin:0;color:var(--ink-soft);">Belum ada paket ${jenis} yang dibuka untuk kelasmu. Tanyakan ke guru kapan ${jenis} dilaksanakan.</p>`;
+      return;
+    }
+    const smtTeks = s => s==='Ganjil' ? 'Semester 1' : s==='Genap' ? 'Semester 2' : (s||'');
+    box.innerHTML = sapa + `<p style="margin:0 0 10px;color:var(--ink-soft);font-size:14px;">Pilih mata pelajaran ${jenis} yang akan kamu kerjakan sekarang:</p>` + jenisDaftar.map((d,i)=>{
+      const ket = [smtTeks(d.semester), d.tahun_ajaran].filter(Boolean).join(' ');
+      let aksi = '';
+      if(d.status==='tersedia') aksi = `<button class="btn" style="width:100%;justify-content:center;margin-top:8px;" onclick="mulaiDariDaftar(${i})">Mulai ${escapeHtml(d.jenis)} ${escapeHtml(d.mapel)} (${d.durasi_menit} menit)</button>`;
+      else if(d.status==='berlangsung') aksi = `<button class="btn" style="width:100%;justify-content:center;margin-top:8px;" onclick="mulaiDariDaftar(${i})">Lanjutkan ${escapeHtml(d.jenis)} ${escapeHtml(d.mapel)}</button>`;
+      else if(d.status==='menunggu_nilai') aksi = '<div style="margin-top:6px;color:#7A5300;">Jawabanmu sudah dikumpulkan dan menunggu penilaian essay oleh guru.</div>';
+      else aksi = `<div style="margin-top:6px;color:#1E6B3A;font-weight:600;">&#10003; Sudah dikerjakan${d.nilai!=null ? ` &bull; Nilai: ${String(Math.round(d.nilai*10)/10).replace('.',',')}` : ''}</div>`;
+      return `<div class="card" style="margin-bottom:10px;"><strong>${escapeHtml(d.mapel)}</strong>${ket ? ` <span style="color:var(--ink-soft);">&mdash; ${escapeHtml(ket)}</span>` : ''}${aksi}</div>`;
+    }).join('');
+  }catch(e){
+    err.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = `Lihat Mata Pelajaran ${jenis}`;
+  }
+}
+// Langsung masuk ke paket mata pelajaran yang dipilih. Kesalahan (mis. ujian ditutup) ditampilkan di panel ini.
+async function mulaiDariDaftar(i){
+  const d = jenisDaftar[i]; if(!d || !d.kode_akses) return;
+  const nisn = document.getElementById('jn-nisn').value.trim();
+  const pin = document.getElementById('jn-pin').value.trim();
+  const err = document.getElementById('jn-error');
+  err.textContent = '';
+  if(d.status==='tersedia' && !confirm(`Mulai ${d.jenis} ${d.mapel} sekarang? Waktu ${d.durasi_menit} menit langsung berjalan dan tidak bisa dihentikan.`)) return;
+  siapkanAlarm();
+  document.querySelectorAll('#jn-daftar button').forEach(b=>b.disabled=true);
+  try{
+    const res = await fetch('/api/mulai-ujian', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kode_akses: d.kode_akses, nisn, pin }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Gagal memuat ujian');
+    sesiData = data;
+    tampilkanUjian();
+  }catch(e){
+    err.textContent = e.message;
+    document.querySelectorAll('#jn-daftar button').forEach(b=>b.disabled=false);
+  }
 }
 let remedialDaftar = [];
 async function cekRemedial(){

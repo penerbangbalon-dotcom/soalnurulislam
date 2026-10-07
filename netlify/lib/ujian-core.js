@@ -415,13 +415,13 @@ async function cekPesertaRemedial(nisn, paket) {
 }
 
 // Verifikasi NISN (+PIN) siswa, sama aturannya dengan mulai-ujian.
-async function verifikasiSiswa(nisn, pin) {
+async function verifikasiSiswa(nisn, pin, kolomTambahan) {
   const TABEL = process.env.TABEL_SISWA || 'students';
   const K_NISN = process.env.KOLOM_NISN || 'nisn';
   const K_NAMA = process.env.KOLOM_NAMA_SISWA || 'nama';
   const K_PIN = process.env.KOLOM_PIN || '';
   if (String(process.env.WAJIB_PIN || '').toLowerCase() === 'true' && !K_PIN) return { status: 500, error: 'Server diatur WAJIB_PIN=true tetapi KOLOM_PIN belum diisi. Hubungi admin.' };
-  const list = await sb(`${TABEL}?${K_NISN}=eq.${encodeURIComponent(String(nisn).trim())}&select=${K_NISN},${K_NAMA}${K_PIN ? ',' + K_PIN : ''}${TABEL === 'students' ? '&status=eq.AKTIF' : ''}`);
+  const list = await sb(`${TABEL}?${K_NISN}=eq.${encodeURIComponent(String(nisn).trim())}&select=${K_NISN},${K_NAMA}${K_PIN ? ',' + K_PIN : ''}${(kolomTambahan || []).map((k) => ',' + k).join('')}${TABEL === 'students' ? '&status=eq.AKTIF' : ''}`);
   const siswa = list && list[0];
   if (!siswa) return { status: 404, error: 'NISN tidak ditemukan di data siswa' };
   if (K_PIN) {
@@ -431,8 +431,73 @@ async function verifikasiSiswa(nisn, pin) {
   return { siswa, nama: siswa[K_NAMA] };
 }
 
+// ---------------------------------------------------------------------------
+// IKUTI UTS / IKUTI UAS (jendela siswa)
+// Siswa memasukkan NISN (+PIN) lalu melihat paket UTS atau UAS yang SUDAH DIBUKA dan sesuai dengan
+// kelas + program (Paket B / Paket C) + jurusan (IPA / IPS bila paketnya khusus jurusan) miliknya,
+// satu baris per mata pelajaran. Kode akses hanya dikirim untuk paket yang masih boleh dikerjakan siswa itu,
+// sehingga siswa tidak perlu mengetik kode: cukup memilih mata pelajaran, lalu langsung masuk ke paketnya.
+// ---------------------------------------------------------------------------
+const KELAS_ANGKA_KE_ROMAWI = { '7': 'VII', '8': 'VIII', '9': 'IX', '10': 'X', '11': 'XI', '12': 'XII' };
+const JENIS_IKUTI = { UTS: 'UTS', UAS: 'UAS' };
+function profilKelasSiswa(siswa) {
+  const kelasAsli = String((siswa && siswa.kelas) || '').trim();
+  const m = kelasAsli.match(/^(\d+)/);
+  const j = kelasAsli.match(/\b(IPA|IPS)\b/i);
+  return {
+    kelasAsli,
+    kelas: m ? (KELAS_ANGKA_KE_ROMAWI[m[1]] || null) : null,
+    program: siswa && siswa.program === 'PAKET_B' ? 'Paket B' : siswa && siswa.program === 'PAKET_C' ? 'Paket C' : null,
+    jurusan: j ? j[1].toUpperCase() : null,
+  };
+}
+async function daftarUjianSiswa(nisn, siswa, jenis) {
+  const jns = JENIS_IKUTI[String(jenis || '').toUpperCase()];
+  if (!jns) throw new Error('Jenis ujian tidak dikenali.');
+  const prof = profilKelasSiswa(siswa);
+  if (!prof.kelas || !prof.program) {
+    return { profil: prof, ujian: [], pesan: 'Kelas atau program kamu belum terdata untuk ujian online. Hubungi guru, atau gunakan tab Ujian dengan kode akses dari guru.' };
+  }
+  const n = encodeURIComponent(String(nisn).trim());
+  const paketRows = await sb(`paket_ujian?jenis_ujian=eq.${jns}&status=eq.siap&diarsipkan=eq.false&kelas=eq.${encodeURIComponent(prof.kelas)}&program=eq.${encodeURIComponent(prof.program)}&select=id,judul,kode_akses,durasi_menit,semester,tahun_ajaran,created_at,mata_pelajaran(nama)&order=created_at.asc`);
+  const paket = paketRows || [];
+  if (!paket.length) return { profil: prof, ujian: [] };
+  const ids = paket.map((p) => p.id).join(',');
+  // Tabel jurusan & pengecualian bersifat opsional (migrasi v10); bila belum ada, abaikan.
+  const [jurRows, pengRows, sesiRows] = await Promise.all([
+    sb(`paket_jurusan?paket_ujian_id=in.(${ids})&select=paket_ujian_id,jurusan`).catch(() => []),
+    sb(`ujian_pengecualian?siswa_nisn=eq.${n}&paket_ujian_id=in.(${ids})&select=paket_ujian_id,status`).catch(() => []),
+    sb(`sesi_ujian?siswa_nisn=eq.${n}&paket_ujian_id=in.(${ids})&select=paket_ujian_id,status,total_skor`),
+  ]);
+  const jurPaket = new Map((jurRows || []).map((x) => [x.paket_ujian_id, x.jurusan]));
+  const tidakWajib = new Set((pengRows || []).filter((x) => x.status === 'tidak_wajib').map((x) => x.paket_ujian_id));
+  const sesiPaket = new Map((sesiRows || []).map((x) => [x.paket_ujian_id, x]));
+
+  const hasil = [];
+  for (const p of paket) {
+    const jur = jurPaket.get(p.id);
+    if (jur && prof.jurusan && jur !== prof.jurusan) continue;   // paket khusus jurusan lain
+    if (tidakWajib.has(p.id)) continue;                          // guru menandai siswa ini tidak wajib
+    const sesi = sesiPaket.get(p.id);
+    const nt = pisahSmtTa(p.semester, p.tahun_ajaran);
+    const item = {
+      paket_id: p.id, judul: p.judul, mapel: (p.mata_pelajaran && p.mata_pelajaran.nama) || p.judul,
+      jenis: jns, durasi_menit: p.durasi_menit || 90, semester: nt.smt, tahun_ajaran: nt.ta,
+      status: 'tersedia', nilai: null, kode_akses: null,
+    };
+    if (!sesi) { item.status = 'tersedia'; item.kode_akses = p.kode_akses; }
+    else if (sesi.status === 'berlangsung') { item.status = 'berlangsung'; item.kode_akses = p.kode_akses; }
+    else if (sesi.status === 'selesai') item.status = 'menunggu_nilai';
+    else { item.status = 'selesai'; item.nilai = sesi.total_skor != null ? Number(sesi.total_skor) : null; }
+    hasil.push(item);
+  }
+  const urutan = { berlangsung: 0, tersedia: 1, menunggu_nilai: 2, selesai: 3 };
+  hasil.sort((a, b) => (urutan[a.status] - urutan[b.status]) || a.mapel.localeCompare(b.mapel, 'id'));
+  return { profil: prof, ujian: hasil };
+}
+
 module.exports = {
-  daftarRemedialSiswa, cekPesertaRemedial, verifikasiSiswa,
+  daftarUjianSiswa,daftarRemedialSiswa, cekPesertaRemedial, verifikasiSiswa,
   UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi,
   authAdmin, tentukanPeran, wajibLogin, wajibAdmin, wajibSuperAdmin, peranDari, adminLangsung, superLangsung, ipDari, hitungGagal, catatGagal,
 };
