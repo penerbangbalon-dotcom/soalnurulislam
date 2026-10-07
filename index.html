@@ -213,6 +213,7 @@
         <div class="item" data-tab="pengnilai" onclick="showTab('pengnilai')">Pengaturan Nilai</div>
         <div class="item" data-tab="mapel" onclick="showTab('mapel')">Mata Pelajaran</div>
         <div class="item" data-tab="ttd" onclick="showTab('ttd')">Tanda Tangan</div>
+        <div class="item admin-only hidden" data-tab="siswa" onclick="showTab('siswa')">Data Siswa</div>
         <div class="item admin-only hidden" data-tab="sekolah" onclick="showTab('sekolah')">Identitas Sekolah</div>
         <div class="item super-only hidden" data-tab="user" onclick="showTab('user')">Manajemen User</div>
       </div>
@@ -914,6 +915,56 @@
       </div>
     </section>
 
+    <!-- ===== TAB: DATA SISWA ===== -->
+    <section id="tab-siswa" class="hidden">
+      <h2>Data Siswa</h2>
+      <p class="muted">Menambah siswa di sini otomatis masuk ke <b>aplikasi absensi</b> (tabel siswa yang sama), begitu pula sebaliknya.
+        Kata sandi awal siswa di absensi = <b>tanggal lahir DDMMYYYY</b> (mis. 05032008) dan siswa diminta menggantinya saat login pertama.
+        NISN dipakai untuk masuk ujian, jadi wajib diisi.</p>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Tambah Satu Siswa</h3>
+        <div class="grid2">
+          <div class="field"><label>Nama lengkap *</label><input type="text" id="sw-nama" /></div>
+          <div class="field"><label>NISN *</label><input type="text" id="sw-nisn" inputmode="numeric" placeholder="Hanya angka" /></div>
+          <div class="field"><label>Kelas *</label><input type="text" id="sw-kelas" placeholder="Contoh: 8 A, 10 IPS 1, Kelas 5" /></div>
+          <div class="field"><label>Tanggal lahir *</label><input type="date" id="sw-tgl" /></div>
+          <div class="field"><label>Jenis kelamin</label><select id="sw-jk"><option value="">-</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
+          <div class="field"><label>Tempat lahir</label><input type="text" id="sw-tempat" /></div>
+          <div class="field"><label>NIPD</label><input type="text" id="sw-nipd" /></div>
+          <div class="field"><label>No. HP</label><input type="text" id="sw-hp" /></div>
+        </div>
+        <div class="field"><label>Alamat</label><input type="text" id="sw-alamat" /></div>
+        <div class="toolbar" style="justify-content:flex-end;">
+          <span class="muted" id="sw-status"></span>
+          <button class="btn" onclick="tambahSatuSiswa()">Tambah Siswa</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Upload Data Siswa (Excel / CSV)</h3>
+        <p class="muted">Kolom: <b>nama, nisn, kelas, tanggal_lahir</b> (wajib) serta jk, tempat_lahir, nipd, hp, alamat (opsional).
+          Tanggal ditulis DD/MM/YYYY. Agar nol di depan NISN tidak hilang, format kolom NISN sebagai <b>Text</b> di Excel.
+          NISN yang sudah terdaftar dilewati (tidak menimpa data lama).</p>
+        <div class="toolbar">
+          <button class="btn outline" onclick="unduhTemplateSiswa()">Unduh Template Excel</button>
+          <input type="file" id="sw-file" accept=".xlsx,.xls,.csv" onchange="bacaFileSiswa(this)" />
+        </div>
+        <div id="sw-preview" class="hidden" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <h3 style="margin:0;flex:1;">Siswa Terbaru Ditambahkan <span class="muted" id="sw-total"></span></h3>
+          <button class="btn outline" onclick="loadSiswaTerbaru()">Muat Ulang</button>
+        </div>
+        <table>
+          <thead><tr><th>Nama</th><th>NISN</th><th>Kelas</th><th>Program</th><th>Ditambahkan</th></tr></thead>
+          <tbody id="sw-body"><tr><td colspan="5" class="muted">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ===== TAB: MANAJEMEN USER ===== -->
     <section id="tab-user" class="hidden">
       <h2>Manajemen User</h2>
@@ -1255,6 +1306,132 @@ async function boot(){
 }
 boot();
 
+
+// ---------- DATA SISWA (tambah / upload ke tabel `students`, sama dengan aplikasi absensi) ----------
+async function panggilKelolaSiswa(payload){
+  const { data:{ session } } = await supa.auth.getSession();
+  const res = await fetch('/api/kelola-siswa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || `Gagal (${res.status})`);
+  return data;
+}
+async function loadSiswaTerbaru(){
+  const body = document.getElementById('sw-body');
+  try{
+    const [{ data, error }, { count }] = await Promise.all([
+      supa.from('students').select('nama, nisn, kelas, program, created_at').order('created_at', { ascending:false }).limit(15),
+      supa.from('students').select('id', { count:'exact', head:true }),
+    ]);
+    if(error) throw error;
+    document.getElementById('sw-total').textContent = count!=null ? `(total ${count} siswa)` : '';
+    body.innerHTML = (data||[]).map(s=>`<tr><td>${escapeHtml(s.nama)}</td><td>${escapeHtml(s.nisn||'-')}</td><td>${escapeHtml(s.kelas)}</td><td>${escapeHtml(String(s.program).replace('_',' '))}</td><td>${fmtTglJam(s.created_at)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Belum ada siswa.</td></tr>';
+  }catch(err){
+    body.innerHTML = `<tr><td colspan="5" class="error">${escapeHtml(err.message||String(err))}</td></tr>`;
+  }
+}
+function tampilHasilSiswa(r){
+  const lewat = r.dilewati||[];
+  return `<p><b>${r.ditambah}</b> siswa berhasil ditambahkan${lewat.length?`, <b style="color:#b3261e;">${lewat.length}</b> dilewati`:''}.</p>`
+    + (lewat.length ? `<table><thead><tr><th>Baris</th><th>Nama</th><th>NISN</th><th>Alasan</th></tr></thead><tbody>${lewat.map(x=>`<tr><td>${x.baris}</td><td>${escapeHtml(x.nama||'')}</td><td>${escapeHtml(x.nisn||'')}</td><td class="error">${escapeHtml(x.alasan||'')}</td></tr>`).join('')}</tbody></table>` : '');
+}
+async function tambahSatuSiswa(){
+  const st = document.getElementById('sw-status');
+  const v = id=>document.getElementById(id).value;
+  const row = { nama:v('sw-nama'), nisn:v('sw-nisn'), kelas:v('sw-kelas'), tanggal_lahir:v('sw-tgl'), jk:v('sw-jk'),
+    tempat_lahir:v('sw-tempat'), nipd:v('sw-nipd'), hp:v('sw-hp'), alamat:v('sw-alamat') };
+  st.textContent = 'Menyimpan...'; st.className = 'muted';
+  try{
+    const r = await panggilKelolaSiswa({ action:'tambah', rows:[row] });
+    if(r.ditambah){
+      ['sw-nama','sw-nisn','sw-kelas','sw-tgl','sw-jk','sw-tempat','sw-nipd','sw-hp','sw-alamat'].forEach(id=>document.getElementById(id).value='');
+      st.textContent = 'Siswa berhasil ditambahkan. Kata sandi awal di absensi = tanggal lahir DDMMYYYY.';
+      loadSiswaTerbaru();
+    }else{
+      st.textContent = 'Gagal: ' + ((r.dilewati[0]||{}).alasan || 'data tidak valid');
+    }
+  }catch(err){ st.textContent = 'Gagal: '+err.message; }
+}
+function unduhTemplateSiswa(){
+  const aoa = [
+    ['nama','nisn','kelas','tanggal_lahir','jk','tempat_lahir','nipd','hp','alamat'],
+    ['Contoh Siswa','0012345678','8 A','05/03/2010','L','Karawang','','081234567890','Telagasari'],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [28,14,12,14,6,16,10,16,30].map(w=>({ wch:w }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Siswa');
+  XLSX.writeFile(wb, 'template-data-siswa.xlsx');
+}
+let swBarisUpload = [];
+function swKeIso(v){
+  if(v==null || v==='') return '';
+  if(typeof v==='number'){ // serial tanggal Excel
+    const d = new Date(Math.round((v-25569)*86400*1000));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  }
+  return String(v).trim();
+}
+const SW_ALIAS = {
+  nama:['nama','nama lengkap','nama siswa'], nisn:['nisn'], kelas:['kelas'],
+  tanggal_lahir:['tanggal_lahir','tanggal lahir','tgl lahir','tgl_lahir','ttl'], jk:['jk','jenis kelamin','l/p'],
+  tempat_lahir:['tempat_lahir','tempat lahir'], nipd:['nipd'], hp:['hp','no hp','no. hp','telepon'], alamat:['alamat'],
+};
+function bacaFileSiswa(inp){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  const box = document.getElementById('sw-preview');
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(fr.result), { type:'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'', raw:true });
+      const norm = k=>String(k).trim().toLowerCase();
+      swBarisUpload = rows.map((r,i)=>{
+        const peta = {}; Object.keys(r).forEach(k=>{ peta[norm(k)] = r[k]; });
+        const o = { baris:i+2 };
+        Object.keys(SW_ALIAS).forEach(f=>{ const a = SW_ALIAS[f].find(x=>peta[x]!==undefined); o[f] = a ? peta[a] : ''; });
+        o.tanggal_lahir = swKeIso(o.tanggal_lahir);
+        o.nisn = typeof o.nisn==='number' ? String(o.nisn) : o.nisn;
+        return o;
+      }).filter(o=>String(o.nama||'').trim() || String(o.nisn||'').trim());
+      if(!swBarisUpload.length){ box.classList.remove('hidden'); box.innerHTML = '<p class="error">Tidak ada baris data. Pastikan baris pertama berisi judul kolom (nama, nisn, kelas, tanggal_lahir).</p>'; return; }
+      const contoh = swBarisUpload.slice(0,10);
+      box.classList.remove('hidden');
+      box.innerHTML = `<p>Ditemukan <b>${swBarisUpload.length}</b> baris. Pratinjau 10 baris pertama (pengecekan lengkap dilakukan saat disimpan):</p>
+        <table><thead><tr><th>Baris</th><th>Nama</th><th>NISN</th><th>Kelas</th><th>Tgl Lahir</th><th>JK</th></tr></thead><tbody>
+        ${contoh.map(o=>`<tr><td>${o.baris}</td><td>${escapeHtml(String(o.nama))}</td><td>${escapeHtml(String(o.nisn))}</td><td>${escapeHtml(String(o.kelas))}</td><td>${escapeHtml(String(o.tanggal_lahir))}</td><td>${escapeHtml(String(o.jk))}</td></tr>`).join('')}
+        </tbody></table>
+        <div class="toolbar" style="justify-content:flex-end;margin-top:10px;"><span class="muted" id="sw-up-status"></span>
+        <button class="btn" id="sw-up-btn" onclick="simpanUploadSiswa()">Simpan ${swBarisUpload.length} Siswa</button></div>
+        <div id="sw-up-hasil"></div>`;
+    }catch(err){ box.classList.remove('hidden'); box.innerHTML = `<p class="error">Gagal membaca file: ${escapeHtml(err.message||String(err))}</p>`; }
+  };
+  fr.readAsArrayBuffer(f);
+}
+async function simpanUploadSiswa(){
+  const btn = document.getElementById('sw-up-btn'), st = document.getElementById('sw-up-status'), hasil = document.getElementById('sw-up-hasil');
+  if(!swBarisUpload.length) return;
+  if(!confirm(`Simpan ${swBarisUpload.length} siswa ke database? NISN yang sudah ada akan dilewati.`)) return;
+  btn.disabled = true;
+  let ditambah = 0; const dilewati = [];
+  try{
+    for(let i=0; i<swBarisUpload.length; i+=50){
+      st.textContent = `Menyimpan ${Math.min(i+50, swBarisUpload.length)} dari ${swBarisUpload.length}...`;
+      const r = await panggilKelolaSiswa({ action:'tambah', rows: swBarisUpload.slice(i, i+50) });
+      ditambah += r.ditambah; dilewati.push(...(r.dilewati||[]));
+    }
+    st.textContent = 'Selesai.';
+    hasil.innerHTML = tampilHasilSiswa({ ditambah, dilewati });
+    document.getElementById('sw-file').value = ''; swBarisUpload = [];
+    loadSiswaTerbaru();
+  }catch(err){
+    st.textContent = 'Berhenti: '+err.message+(ditambah?` (${ditambah} siswa sudah tersimpan sebelum error)`:'');
+    btn.disabled = false;
+  }
+}
+
 // ---------- MANAJEMEN USER ----------
 async function panggilKelolaUser(payload){
   const { data:{ session } } = await supa.auth.getSession();
@@ -1343,9 +1520,9 @@ async function hapusUser(userId, email){
 // ---------- NAV ----------
 function showTab(tab){
   if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
-  if(tab==='sekolah' && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
+  if((tab==='sekolah' || tab==='siswa') && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah'].forEach(t=>{
+  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1372,6 +1549,7 @@ function showTab(tab){
   if(tab==='ttd') loadTabTtd();
   if(tab==='sekolah') isiFormSekolah();
   if(tab==='user') loadDaftarUser();
+  if(tab==='siswa') loadSiswaTerbaru();
 }
 
 // ---------- MENU BERKELOMPOK (SIDEBAR) ----------

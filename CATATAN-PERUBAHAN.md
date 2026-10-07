@@ -56,3 +56,12 @@
 - Halaman login punya tab **Super Admin**; akun yang bukan Super Admin ditolak di tab itu.
 - Penentuan Super Admin: `app_metadata.role = superadmin`, atau email di env `SUPER_ADMIN_EMAILS` (opsional, pisahkan koma). Bila belum ada Super Admin, akun admin tertua (atau akun tertua) otomatis menjadi Super Admin saat login pertama.
 - Server menolak menurunkan/menghapus satu-satunya Super Admin.
+
+## v11.5 — Data Siswa (tambah / upload siswa, tersambung ke absensi)
+**Wajib dijalankan:** `migrasi-v13-tambah-siswa.sql` di Supabase SQL Editor (membuat fungsi `tambah_siswa_massal`; tidak mengubah data).
+- Menu baru **Pengaturan → Data Siswa** (Admin & Super Admin): tambah satu siswa lewat formulir, atau upload Excel/CSV (template bisa diunduh).
+- Siswa disimpan ke tabel `students` yang SAMA dengan aplikasi absensi, jadi langsung muncul di absensi. Siswa yang ditambah dari absensi otomatis muncul di aplikasi ujian (dibaca langsung dari tabel yang sama; tidak ada penyalinan).
+- Kata sandi awal di absensi = tanggal lahir DDMMYYYY (bcrypt cost 10, `$2a$`), `must_change_password = true`; sama dengan data siswa yang sudah ada.
+- Jenjang/program diisi otomatis dari kelas: 1-6 = SD/UMUM (ditulis "Kelas N"), 7-9 = SMP/PAKET_B, 10-12 = SMA/PAKET_C. Angka Romawi dikonversi ke angka.
+- NISN yang sudah terdaftar dilewati (tidak menimpa). Nama, NISN (angka), kelas, dan tanggal lahir wajib.
+- Server: `netlify/functions/kelola-siswa.js` + `api/kelola-siswa.js`; maksimal 100 siswa/permintaan (upload dipecah otomatis per 50).
