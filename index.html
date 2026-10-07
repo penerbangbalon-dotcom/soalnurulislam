@@ -2018,6 +2018,18 @@ async function ambilSemuaBaris(bangunQuery){
   }
   return { data:hasil, error:null };
 }
+// Baca detail_jawaban untuk banyak sesi sekaligus: ID sesi dipecah per 100 dan tiap pecahan dibaca halaman demi halaman,
+// karena Supabase hanya mengembalikan maks. 1000 baris per permintaan (100 siswa x 40 soal = 4000 baris).
+async function ambilDetailPerSesi(sesiIds, kolom){
+  const hasil = [];
+  for(let i=0;i<sesiIds.length;i+=100){
+    const bagian = sesiIds.slice(i,i+100);
+    const r = await ambilSemuaBaris(()=>supa.from('detail_jawaban').select(kolom).in('sesi_ujian_id', bagian).order('id'));
+    if(r.error) return { data:null, error:r.error };
+    hasil.push(...r.data);
+  }
+  return { data:hasil, error:null };
+}
 // Peta soal_id -> daftar judul paket yang memakainya. `kecualiPaketId` = paket yang sedang diedit (tidak dihitung).
 async function petaSoalTerpakai(kecualiPaketId){
   const { data: relasi, error } = await ambilSemuaBaris(()=>supa.from('paket_soal').select('soal_id, paket_ujian_id').order('id'));
@@ -2199,7 +2211,7 @@ async function bukaMasukkanKePaket(){
   const dikunci = new Set();
   const idPaket = paket.map(x=>x.id);
   for(let i=0;i<idPaket.length;i+=100){
-    const { data: ses } = await supa.from('sesi_ujian').select('paket_ujian_id').in('paket_ujian_id', idPaket.slice(i,i+100));
+    const { data: ses } = await ambilSemuaBaris(()=>supa.from('sesi_ujian').select('paket_ujian_id').in('paket_ujian_id', idPaket.slice(i,i+100)).order('id'));
     (ses||[]).forEach(r=>dikunci.add(r.paket_ujian_id));
   }
   document.getElementById('kp-info').innerHTML = `<b>${ids.length}</b> soal dipilih akan ditambahkan di urutan paling akhir pada paket yang Anda pilih.`;
@@ -3387,9 +3399,11 @@ async function bukaBuatPaketRemedial(program, kelas, mapel, komp, ta, smt){
 // ---------- DAFTAR & CETAK ----------
 async function loadDaftarPaket(){
   const tampilArsip = !!(document.getElementById('daftar-tampil-arsip')||{}).checked;
-  let qDaftar = supa.from('paket_ujian').select('*, mata_pelajaran(nama)').order('created_at', { ascending:false });
-  if(!tampilArsip) qDaftar = qDaftar.eq('diarsipkan', false);
-  const { data, error } = await qDaftar;
+  const { data, error } = await ambilSemuaBaris(()=>{
+    let q = supa.from('paket_ujian').select('*, mata_pelajaran(nama)').order('created_at', { ascending:false }).order('id');
+    if(!tampilArsip) q = q.eq('diarsipkan', false);
+    return q;
+  });
   const body = document.getElementById('daftar-paket-body');
   if(error){ body.innerHTML = error.message; return; }
   daftarPaketData = data || [];
@@ -3648,7 +3662,7 @@ function programSiswaKeLabel(program){
 // Ambil seluruh siswa AKTIF dari database absensi (tabel `students`), sudah
 // dipetakan ke kelas romawi & label program Generator Soal.
 async function ambilSemuaSiswaAbsensi(){
-  const { data, error } = await supa.from('students').select('nisn, nama, kelas, program, status').eq('status','AKTIF');
+  const { data, error } = await ambilSemuaBaris(()=>supa.from('students').select('nisn, nama, kelas, program, status').eq('status','AKTIF').order('nisn'));
   if(error) throw error;
   return (data||[]).filter(s=>s.nisn).map(s=>({
     nisn: s.nisn, nama: s.nama, kelasAsli: s.kelas,
@@ -3729,7 +3743,7 @@ async function pilihPaketManual(){
   const sesiIds = (sesiList||[]).map(s=>s.id);
   manualDetailMap = new Map();
   if(sesiIds.length){
-    const { data: detail } = await supa.from('detail_jawaban').select('sesi_ujian_id, soal_id, jawaban, skor').in('sesi_ujian_id', sesiIds);
+    const { data: detail } = await ambilDetailPerSesi(sesiIds, 'sesi_ujian_id, soal_id, jawaban, skor');
     (detail||[]).forEach(d=>{
       if(!manualDetailMap.has(d.sesi_ujian_id)) manualDetailMap.set(d.sesi_ujian_id, new Map());
       manualDetailMap.get(d.sesi_ujian_id).set(d.soal_id, d);
@@ -3962,7 +3976,7 @@ async function importJawabanManual(inp){
 // ---------- HASIL UJIAN ----------
 let daftarPaketUntukHasil = [];
 async function loadHasilPaketOptions(){
-  const { data } = await supa.from('paket_ujian').select('id, judul, kelas, program, diarsipkan').order('created_at', { ascending:false });
+  const { data } = await ambilSemuaBaris(()=>supa.from('paket_ujian').select('id, judul, kelas, program, diarsipkan').order('created_at', { ascending:false }).order('id'));
   daftarPaketUntukHasil = data || [];
   document.getElementById('hasil-filter-kelas').value = '';
   renderHasilPaketOptions(daftarPaketUntukHasil);
@@ -4058,7 +4072,7 @@ async function analisisButir(){
   if(!hasilData.length) return alert('Pilih paket yang sudah ada hasilnya.');
   const ids = hasilData.filter(s=>s.id).map(s=>s.id);
   if(!ids.length) return alert('Belum ada siswa yang mengerjakan paket ini.');
-  const { data, error } = await supa.from('detail_jawaban').select('soal_id, skor, bank_soal(pertanyaan, poin)').in('sesi_ujian_id', ids);
+  const { data, error } = await ambilDetailPerSesi(ids, 'soal_id, skor, bank_soal(pertanyaan, poin)');
   if(error) return alert(error.message);
   const m = {};
   (data||[]).forEach(d=>{ if(d.skor==null) return; const p = d.bank_soal.poin||1;
@@ -4965,9 +4979,10 @@ async function tampilkanLaporanKelas(){
   const kosong = document.getElementById('lap-kosong'), box = document.getElementById('lap-semua');
   document.getElementById('lap-isi').classList.add('hidden');
   kosong.classList.remove('hidden'); kosong.textContent = 'Memuat ringkasan kelas...';
-  const { data, error } = await supa.from('sesi_ujian')
+  const nisnKelas = daftar.map(s=>s.nisn);
+  const { data, error } = await ambilSemuaBaris(()=>supa.from('sesi_ujian')
     .select('siswa_nisn, total_skor, waktu_selesai, paket_ujian(jenis_ujian, diarsipkan)')
-    .in('siswa_nisn', daftar.map(s=>s.nisn));
+    .in('siswa_nisn', nisnKelas).order('id'));
   if(error){ kosong.textContent = 'Gagal memuat: '+error.message; return; }
   const per = new Map();
   (data||[]).filter(r=>r.waktu_selesai && r.paket_ujian && !r.paket_ujian.diarsipkan && r.paket_ujian.jenis_ujian!=='Ulangan Harian' && r.paket_ujian.jenis_ujian!=='Remedial')
@@ -5300,14 +5315,15 @@ async function cetakKartuUjianSiswa(){
 // sudah dipilih spesifik (bukan "Semua"), supaya perbandingannya adil (periode sama).
 async function hitungPeringkatKelas(kelas, program, ta, smt, nisnTarget){
   if(!kelas || !program || !ta || !smt) return null;
-  const { data, error } = await supa.from('sesi_ujian')
+  const { data, error } = await ambilSemuaBaris(()=>supa.from('sesi_ujian')
     .select('siswa_nisn, total_skor, paket_ujian!inner(kelas,program,tahun_ajaran,semester,diarsipkan)')
     .eq('status','dinilai').not('total_skor','is',null)
     .eq('paket_ujian.diarsipkan', false)
     .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program)
     .eq('paket_ujian.tahun_ajaran', ta).eq('paket_ujian.semester', smt)
     .neq('paket_ujian.jenis_ujian', 'Ulangan Harian')
-    .neq('paket_ujian.jenis_ujian', 'Remedial');
+    .neq('paket_ujian.jenis_ujian', 'Remedial')
+    .order('id'));
   if(error || !data || !data.length) return null;
   const map = new Map();
   data.forEach(r=>{
@@ -5462,9 +5478,9 @@ const BULAN_ROMAWI = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','X
 // Roster semua siswa yang pernah ujian pada kelas & jenjang yang sama, diurutkan
 // alfabet — dipakai untuk menentukan nomor urut piagam (bukan urutan cetak).
 async function ambilRosterAlfabetis(kelas, program){
-  const { data, error } = await supa.from('sesi_ujian')
+  const { data, error } = await ambilSemuaBaris(()=>supa.from('sesi_ujian')
     .select('siswa_nisn, siswa_nama, paket_ujian!inner(kelas,program)')
-    .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program);
+    .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program).order('id'));
   if(error || !data) return [];
   const map = new Map();
   data.forEach(r=>{ if(!map.has(r.siswa_nisn)) map.set(r.siswa_nisn, r.siswa_nama); });

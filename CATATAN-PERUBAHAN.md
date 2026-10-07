@@ -1,5 +1,12 @@
 # Perubahan terbaru
 
+## v12.2 — Perbaikan batas 1000 baris Supabase (tanpa migrasi SQL)
+Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipotong tanpa pesan kesalahan. Sebagian besar menu (Bank Soal, Rekap/Leger/Transkrip, Arsip Nilai) sudah membaca halaman demi halaman. Perbaikan v12.2 menutup sisa kueri yang belum:
+1. **Analisis Butir Soal** dan **Nilai Manual (Ujian Cetak)**: detail jawaban dibaca per 100 sesi + per halaman (sebelumnya 100 siswa x 40 soal = 4000 baris, hanya 1000 yang terbaca).
+2. **Daftar Paket Ujian** dan pilihan paket di Hasil Ujian Online: kini membaca semua paket (penting setelah bertahun-tahun, termasuk yang diarsipkan).
+3. **Ringkasan Semua Siswa Kelas**, **Peringkat Kelas**, dan **Nomor Urut Piagam** (roster alfabetis): membaca seluruh riwayat sesi.
+4. **Data siswa aktif** (tabel students) dan pengecekan paket terkunci di Kelola Paket: kini tanpa batas 1000.
+
 ## v12.1 — Tombol "Ikuti UTS" dan "Ikuti UAS" di jendela siswa
 **Tanpa migrasi SQL baru.** Unggah semua file ke GitHub (Vercel deploy otomatis). Ada fungsi server baru `api/ujian-siswa.js` (+ `netlify/functions/ujian-siswa.js`).
 1. **Jendela siswa (ujian.html)** kini punya empat tombol: Ujian | Ikuti UTS | Ikuti UAS | Ikuti Remedial. Tab Ujian (kode akses) tetap ada untuk ujian harian dan kasus khusus.
