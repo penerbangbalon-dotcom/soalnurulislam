@@ -597,6 +597,7 @@
             <button class="btn gold" onclick="cetakRapor()">🎓 Cetak Rapor</button>
             <button class="btn gold" onclick="cetakPiagam()">🏅 Cetak Piagam</button>
             <button class="btn gold" onclick="cetakKartuUjianSiswa()">🪪 Cetak Kartu Ujian</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink);cursor:pointer;" title="Bila dicentang, kartu juga memuat ujian yang sudah dikerjakan siswa"><input type="checkbox" id="lap-kartu-semua" style="width:auto;"> Sertakan ujian yang sudah diikuti</label>
           </div>
           <p class="muted" style="margin-top:0;">Laporan hanya menampilkan nilai dari paket ujian yang <b>sudah dikerjakan siswa</b> dan paket
             yang masih <b>aktif tetapi belum dikerjakan</b> (muncul sebagai &quot;Perlu melapor ke wali kelas&quot;). Mata pelajaran yang
@@ -4362,10 +4363,16 @@ async function cetakKartuUjianSiswa(){
   const sudahIkut = new Set(dataLaporanSiswa
     .filter(r=>r.paket_ujian_id && r.status!=='tidak_mengerjakan' && r.status!=='belum_dibuat')
     .map(r=>r.paket_ujian_id));
-  const daftar = (data||[])
-    .filter(p=>(jenis || p.jenis_ujian!=='Ulangan Harian') && p.kode_akses && !sudahIkut.has(p.id))
+  const cocokFilter = p=>(!ta || p.tahun_ajaran===ta) && (!smt || p.semester===smt) && (!jenis || p.jenis_ujian===jenis);
+  const kandidat = (data||[])
+    .filter(p=>(jenis || p.jenis_ujian!=='Ulangan Harian') && p.kode_akses)
     .map(p=>({ ...p, ...normSemesterTA(p.semester, p.tahun_ajaran) }))
-    .filter(p=>(!ta || p.tahun_ajaran===ta) && (!smt || p.semester===smt) && (!jenis || p.jenis_ujian===jenis))
+    .filter(cocokFilter);
+  // Paket yang sudah diikuti siswa tidak dicetak di kartu, tapi dicatat di bawah tabel supaya jelas kenapa tidak muncul.
+  const sertakanSudah = !!(document.getElementById('lap-kartu-semua')||{}).checked;
+  const sudahDiikutiList = sertakanSudah ? [] : kandidat.filter(p=>sudahIkut.has(p.id)).map(p=>p.mata_pelajaran?.nama||p.judul).filter(Boolean);
+  const daftar = kandidat
+    .filter(p=>sertakanSudah || !sudahIkut.has(p.id))
     .sort((a,b)=>(a.mata_pelajaran?.nama||'').localeCompare(b.mata_pelajaran?.nama||'','id') || String(a.jenis_ujian).localeCompare(String(b.jenis_ujian)));
   if(!daftar.length){
     win.close();
@@ -4378,19 +4385,24 @@ async function cetakKartuUjianSiswa(){
     const link = `${linkDasar}?kode=${encodeURIComponent(p.kode_akses)}`;
     const qr = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(link)}`;
     const dibuka = p.status==='siap';
+    const sudahDiikuti = sudahIkut.has(p.id);
     return `<tr>
       <td class="c">${i+1}</td>
       <td><b>${escapeHtml(p.mata_pelajaran?.nama||'-')}</b><br><span class="kecil">${escapeHtml(p.judul||'')}</span></td>
       <td class="c">${escapeHtml(p.jenis_ujian||'-')}</td>
       <td class="c">${escapeHtml((p.semester||'-')+' / '+(p.tahun_ajaran||'-'))}</td>
       <td class="c">${p.durasi_menit||'-'} mnt</td>
-      <td class="c kode">${escapeHtml(p.kode_akses)}<br><span class="kecil ${dibuka?'ok':'blm'}">${dibuka?'Sudah dibuka':'Belum dibuka*'}</span></td>
+      <td class="c kode">${escapeHtml(p.kode_akses)}<br><span class="kecil ${dibuka?'ok':'blm'}">${dibuka?'Sudah dibuka':'Belum dibuka*'}</span>${sudahDiikuti?'<br><span class="kecil" style="color:#555;">Sudah diikuti</span>':''}</td>
       <td class="c"><img src="${qr}" alt="QR"></td>
     </tr>`;
   }).join('');
   const adaDraft = daftar.some(p=>p.status!=='siap');
+  // Judul kartu mengikuti jenis ujian: filter Jenis Ujian yang dipilih, atau jenis tunggal pada daftar.
+  const jenisKartu = jenis || ([...new Set(daftar.map(p=>p.jenis_ujian))].length===1 ? daftar[0].jenis_ujian : '');
+  const JUDUL_KARTU = { 'Ulangan Harian':'KARTU ULANGAN HARIAN', 'UTS':'KARTU UJIAN TENGAH SEMESTER (UTS)', 'UAS':'KARTU UJIAN AKHIR SEMESTER (UAS)' };
+  const judulKartu = JUDUL_KARTU[jenisKartu] || 'KARTU PESERTA UJIAN';
   win.document.open();
-  win.document.write(`<html><head><title>Kartu Ujian - ${escapeHtml(siswa.nama)}</title>
+  win.document.write(`<html><head><title>${escapeHtml(judulKartu)} - ${escapeHtml(siswa.nama)}</title>
   <style>
     @page{size:A4 portrait;margin:12mm;}
     body{font-family:Arial,sans-serif;color:#111;max-width:780px;margin:20px auto;}
@@ -4414,7 +4426,7 @@ async function cetakKartuUjianSiswa(){
   </style></head><body>
   <button class="btn-cetak" onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak</button>
   ${kopSekolahHTML()}
-  <h1>KARTU PESERTA UJIAN</h1>
+  <h1>${escapeHtml(judulKartu)}</h1>
   <table class="info">
     <tr><td>Nama</td><td>: ${escapeHtml(siswa.nama)}</td></tr>
     <tr><td>NISN</td><td>: ${escapeHtml(siswa.nisn)}</td></tr>
@@ -4425,6 +4437,7 @@ async function cetakKartuUjianSiswa(){
     <tbody>${baris}</tbody>
   </table>
   ${adaDraft ? '<div class="catatan">* Ujian berstatus &quot;Belum dibuka&quot; baru bisa diikuti setelah guru mengaktifkannya.</div>' : ''}
+  ${sudahDiikutiList.length ? `<div class="catatan">Sudah diikuti siswa (tidak dicetak ulang): ${sudahDiikutiList.map(escapeHtml).join(', ')}.</div>` : ''}
   ${tanpaPaket.length ? `<div class="catatan">Mata pelajaran yang paket ujiannya belum dibuat: ${tanpaPaket.map(escapeHtml).join(', ')}.</div>` : ''}
   <div class="cara"><b>Cara mengikuti ujian online:</b>
     <ol>
