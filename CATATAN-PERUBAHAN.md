@@ -48,3 +48,11 @@
 - Menu baru **Pengaturan → Identitas Sekolah** (admin): nama, NPSN, alamat, kota TTD, jabatan, logo. Dipakai di kop soal, kartu, rapor, transkrip, leger, dan halaman ujian siswa.
 - Teks soal di cetakan kini di-escape (hanya tag b, i, u, sub, sup, br yang diizinkan).
 - Rancangan tahap berikutnya (multi-sekolah): lihat `RENCANA-MULTI-SEKOLAH.md`.
+
+## v11.4 — Super Admin
+**Wajib dijalankan:** `migrasi-v11-keamanan.sql` (bila belum pernah), lalu `migrasi-v12-superadmin.sql`, di Supabase SQL Editor.
+- Peran baru **Super Admin** (guru < admin < super admin). Super Admin otomatis juga admin.
+- Menu **Manajemen User** (tambah user, ganti sandi, ubah peran, hapus) kini **khusus Super Admin**; server (`kelola-user`) juga menolak selain Super Admin. Admin biasa tetap bisa Identitas Sekolah.
+- Halaman login punya tab **Super Admin**; akun yang bukan Super Admin ditolak di tab itu.
+- Penentuan Super Admin: `app_metadata.role = superadmin`, atau email di env `SUPER_ADMIN_EMAILS` (opsional, pisahkan koma). Bila belum ada Super Admin, akun admin tertua (atau akun tertua) otomatis menjadi Super Admin saat login pertama.
+- Server menolak menurunkan/menghapus satu-satunya Super Admin.

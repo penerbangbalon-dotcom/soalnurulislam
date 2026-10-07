@@ -173,7 +173,7 @@ async function nilaiDanSimpanSesi({ sesi, paketInfo, jawabanRaw, jawabanTersimpa
 // PERAN PENGGUNA (admin / guru)
 // Peran disimpan di app_metadata.role pada Supabase Auth. app_metadata HANYA bisa diubah dengan
 // service_role key (lewat fungsi kelola-user), jadi pengguna tidak bisa menaikkan perannya sendiri.
-// Seorang admin dikenali bila: (1) app_metadata.role === 'admin', atau (2) emailnya ada di env ADMIN_EMAILS
+// Seorang admin dikenali bila: (1) app_metadata.role === 'admin' atau 'superadmin', atau (2) emailnya ada di env ADMIN_EMAILS
 // (dipisah koma), atau (3) BELUM ADA admin sama sekali dan pemanggil adalah akun tertua (bootstrap otomatis
 // supaya instalasi lama tidak terkunci). Akun lain = guru.
 // ---------------------------------------------------------------------------
@@ -190,25 +190,39 @@ async function authAdmin(path, opts = {}) {
   return data;
 }
 
+const SUPER_EMAILS = (process.env.SUPER_ADMIN_EMAILS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 const peranDari = (u) => (u && u.app_metadata && u.app_metadata.role) || null;
 const emailAdmin = (u) => !!(u && u.email && ADMIN_EMAILS.includes(String(u.email).toLowerCase()));
-const adminLangsung = (u) => peranDari(u) === 'admin' || emailAdmin(u);
+const emailSuper = (u) => !!(u && u.email && SUPER_EMAILS.includes(String(u.email).toLowerCase()));
+// Super admin otomatis juga admin (boleh semua fitur admin).
+const superLangsung = (u) => peranDari(u) === 'superadmin' || emailSuper(u);
+const adminLangsung = (u) => superLangsung(u) || peranDari(u) === 'admin' || emailAdmin(u);
 
-// Mengembalikan { admin:boolean, dipromosikan:boolean }.
+// Mengembalikan { admin, superadmin, dipromosikan }.
+// Super admin = app_metadata.role 'superadmin' ATAU email ada di env SUPER_ADMIN_EMAILS.
+// Bootstrap: bila BELUM ada super admin sama sekali, akun admin tertua (atau akun tertua bila belum ada admin)
+// otomatis menjadi super admin saat pertama kali membuka aplikasi, supaya instalasi lama tidak terkunci.
 async function tentukanPeran(pemanggil) {
-  if (!pemanggil) return { admin: false, dipromosikan: false };
-  if (peranDari(pemanggil) === 'admin') return { admin: true, dipromosikan: false };
-  let perluSimpan = emailAdmin(pemanggil);
-  if (!perluSimpan) {
+  const tidak = { admin: false, superadmin: false, dipromosikan: false };
+  if (!pemanggil) return tidak;
+  if (peranDari(pemanggil) === 'superadmin') return { admin: true, superadmin: true, dipromosikan: false };
+  let jadiSuper = emailSuper(pemanggil);
+  if (!jadiSuper) {
     const data = await authAdmin('/users?per_page=200');
     const users = (data && data.users) || [];
-    if (users.some(adminLangsung)) return { admin: false, dipromosikan: false };
-    const tertua = users.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))[0];
-    perluSimpan = !!(tertua && tertua.id === pemanggil.id);
+    if (!users.some(superLangsung)) {
+      const urut = (a) => a.slice().sort((x, y) => String(x.created_at).localeCompare(String(y.created_at)));
+      const admins = users.filter(adminLangsung);
+      const calon = urut(admins.length ? admins : users)[0];
+      jadiSuper = !!(calon && calon.id === pemanggil.id);
+    }
   }
-  if (!perluSimpan) return { admin: false, dipromosikan: false };
-  await authAdmin(`/users/${pemanggil.id}`, { method: 'PUT', body: JSON.stringify({ app_metadata: { ...(pemanggil.app_metadata || {}), role: 'admin' } }) });
-  return { admin: true, dipromosikan: true };
+  if (!jadiSuper) {
+    const admin = adminLangsung(pemanggil);
+    return { admin, superadmin: false, dipromosikan: false };
+  }
+  await authAdmin(`/users/${pemanggil.id}`, { method: 'PUT', body: JSON.stringify({ app_metadata: { ...(pemanggil.app_metadata || {}), role: 'superadmin' } }) });
+  return { admin: true, superadmin: true, dipromosikan: true };
 }
 
 // Guard siap pakai: { pemanggil } bila login, atau { error:response }.
@@ -222,6 +236,13 @@ async function wajibAdmin(event) {
   if (g.error) return g;
   const peran = await tentukanPeran(g.pemanggil);
   if (!peran.admin) return { error: { statusCode: 403, body: JSON.stringify({ error: 'Fitur ini hanya untuk admin.' }) } };
+  return { pemanggil: g.pemanggil, peran };
+}
+async function wajibSuperAdmin(event) {
+  const g = await wajibLogin(event);
+  if (g.error) return g;
+  const peran = await tentukanPeran(g.pemanggil);
+  if (!peran.superadmin) return { error: { statusCode: 403, body: JSON.stringify({ error: 'Fitur ini hanya untuk Super Admin.' }) } };
   return { pemanggil: g.pemanggil, peran };
 }
 
@@ -255,5 +276,5 @@ async function catatGagal(...daftarKunci) {
 
 module.exports = {
   UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi,
-  authAdmin, tentukanPeran, wajibLogin, wajibAdmin, peranDari, adminLangsung, ipDari, hitungGagal, catatGagal,
+  authAdmin, tentukanPeran, wajibLogin, wajibAdmin, wajibSuperAdmin, peranDari, adminLangsung, superLangsung, ipDari, hitungGagal, catatGagal,
 };

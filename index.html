@@ -149,7 +149,11 @@
       <img class="brand-logo" src="logo-pkbm.png" alt="Logo" style="width:64px;height:64px;object-fit:contain;" />
     </div>
     <h1 style="text-align:center;">Aplikasi Ujian</h1>
-    <p class="muted" style="text-align:center;"><span id="brand-login-nama">PKBM Nurul Islam</span> &mdash; Login Guru</p>
+    <p class="muted" style="text-align:center;"><span id="brand-login-nama">PKBM Nurul Islam</span> &mdash; <span id="login-mode-label">Login Guru</span></p>
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <button type="button" id="login-tab-guru" class="btn" style="flex:1;justify-content:center;" onclick="setModeLogin('guru')">Guru / Admin</button>
+      <button type="button" id="login-tab-super" class="btn outline" style="flex:1;justify-content:center;" onclick="setModeLogin('super')">Super Admin</button>
+    </div>
     <div class="field"><label>Email</label><input type="email" id="login-email" /></div>
     <div class="field"><label>Kata sandi</label><input type="password" id="login-pass" /></div>
     <button class="btn" style="width:100%;justify-content:center" onclick="login()">Masuk</button>
@@ -210,7 +214,7 @@
         <div class="item" data-tab="mapel" onclick="showTab('mapel')">Mata Pelajaran</div>
         <div class="item" data-tab="ttd" onclick="showTab('ttd')">Tanda Tangan</div>
         <div class="item admin-only hidden" data-tab="sekolah" onclick="showTab('sekolah')">Identitas Sekolah</div>
-        <div class="item admin-only hidden" data-tab="user" onclick="showTab('user')">Manajemen User</div>
+        <div class="item super-only hidden" data-tab="user" onclick="showTab('user')">Manajemen User</div>
       </div>
     </div>
   </nav>
@@ -913,7 +917,7 @@
     <!-- ===== TAB: MANAJEMEN USER ===== -->
     <section id="tab-user" class="hidden">
       <h2>Manajemen User</h2>
-      <p class="muted">Kelola akun login. <b>Admin</b> boleh mengelola user dan identitas sekolah; <b>Guru</b> memakai semua fitur ujian dan nilai
+      <p class="muted">Kelola akun login. Halaman ini <b>khusus Super Admin</b>. <b>Admin</b> boleh mengelola identitas sekolah (tidak bisa menambah user); <b>Guru</b> memakai semua fitur ujian dan nilai
         tetapi tidak bisa mengelola user atau identitas sekolah.</p>
 
       <div class="card">
@@ -921,7 +925,7 @@
         <div class="grid2">
           <div class="field"><label>Email</label><input type="email" id="user-email" placeholder="guru@contoh.com" /></div>
           <div class="field"><label>Kata Sandi</label><input type="password" id="user-password" placeholder="Minimal 6 karakter" /></div>
-          <div class="field"><label>Peran</label><select id="user-role"><option value="guru">Guru</option><option value="admin">Admin</option></select></div>
+          <div class="field"><label>Peran</label><select id="user-role"><option value="guru">Guru</option><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select></div>
         </div>
         <div class="toolbar" style="justify-content:flex-end;">
           <span class="muted" id="user-status"></span>
@@ -1130,12 +1134,20 @@ const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentMapelList = [];
 
 // ---------- AUTH ----------
+let MODE_LOGIN = 'guru';
+function setModeLogin(m){
+  MODE_LOGIN = m;
+  document.getElementById('login-tab-guru').classList.toggle('outline', m!=='guru');
+  document.getElementById('login-tab-super').classList.toggle('outline', m!=='super');
+  document.getElementById('login-mode-label').textContent = m==='super' ? 'Login Super Admin' : 'Login Guru';
+  document.getElementById('login-error').textContent = '';
+}
 async function login(){
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-pass').value;
   const { error } = await supa.auth.signInWithPassword({ email, password });
   if(error){ document.getElementById('login-error').textContent = error.message; return; }
-  boot();
+  await boot();
 }
 async function logout(){
   const btn = document.querySelector('.logout');
@@ -1161,6 +1173,7 @@ const SEKOLAH_DEFAULT = {
 };
 let SEKOLAH = { ...SEKOLAH_DEFAULT };
 let ADALAH_ADMIN = false;
+let ADALAH_SUPER = false;
 let logoSekolahBaru = null; // data URL logo yang baru dipilih (belum disimpan)
 function logoSekolah(){ return SEKOLAH.logo_url || (location.origin + '/logo.png'); }
 function kopBaris(){
@@ -1213,15 +1226,22 @@ async function tentukanPeranSaya(){
   try{
     const r = await panggilKelolaUser({ action:'saya' });
     ADALAH_ADMIN = !!r.admin;
+    ADALAH_SUPER = !!r.superadmin;
     if(r.dipromosikan) await supa.auth.refreshSession(); // supaya token baru memuat peran admin (dipakai kebijakan database)
-  }catch(e){ ADALAH_ADMIN = false; console.warn('Gagal membaca peran:', e.message); }
+  }catch(e){ ADALAH_ADMIN = false; ADALAH_SUPER = false; console.warn('Gagal membaca peran:', e.message); }
   document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden', !ADALAH_ADMIN));
+  document.querySelectorAll('.super-only').forEach(el=>el.classList.toggle('hidden', !ADALAH_SUPER));
 }
 async function boot(){
   await loadSekolah();
   const { data:{ session } } = await supa.auth.getSession();
   if(!session){ return; }
   await tentukanPeranSaya();
+  if(MODE_LOGIN==='super' && !ADALAH_SUPER){
+    try{ await supa.auth.signOut(); }catch(e){}
+    document.getElementById('login-error').textContent = 'Akun ini bukan Super Admin. Gunakan tab "Guru / Admin" atau akun Super Admin.';
+    return;
+  }
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   isiOpsiKelasMapel();
@@ -1251,6 +1271,7 @@ function fmtTglJam(iso){
   if(!iso) return '-';
   return new Date(iso).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
+const NAMA_PERAN = { guru:'Guru', admin:'Admin', superadmin:'Super Admin' };
 async function loadDaftarUser(){
   const body = document.getElementById('user-body');
   body.innerHTML = '<tr><td colspan="5" class="muted">Memuat...</td></tr>';
@@ -1261,11 +1282,11 @@ async function loadDaftarUser(){
     body.innerHTML = users.map(u=>`
       <tr>
         <td>${escapeHtml(u.email)}${u.email===emailSaya?' <span class="badge siap">Anda</span>':''}</td>
-        <td><span class="badge ${u.role==='admin'?'ai':'manual'}">${u.role==='admin'?'Admin':'Guru'}</span></td>
+        <td><span class="badge ${u.role==='guru'?'manual':'ai'}">${NAMA_PERAN[u.role]||'Guru'}</span></td>
         <td>${fmtTglJam(u.created_at)}</td>
         <td>${fmtTglJam(u.last_sign_in_at)}</td>
         <td style="white-space:nowrap;">
-          ${u.dariEnv ? '' : `<button class="btn outline" style="padding:5px 10px;" onclick="ubahPeranUser('${u.id}','${u.role==='admin'?'guru':'admin'}')">${u.role==='admin'?'Jadikan Guru':'Jadikan Admin'}</button>`}
+          ${u.dariEnv ? '' : `<select style="padding:5px 8px;" onchange="ubahPeranUser('${u.id}',this.value)">${['guru','admin','superadmin'].map(r=>`<option value="${r}" ${r===u.role?'selected':''}>${NAMA_PERAN[r]}</option>`).join('')}</select>`}
           <button class="btn outline" style="padding:5px 10px;" onclick="resetPasswordUser('${u.id}','${escapeHtml(u.email)}')">Ganti Sandi</button>
           ${u.id!==session?.user?.id ? `<button class="btn danger" style="padding:5px 10px;" onclick="hapusUser('${u.id}','${escapeHtml(u.email)}')">Hapus</button>` : ''}
         </td>
@@ -1301,7 +1322,7 @@ async function resetPasswordUser(userId, email){
   }
 }
 async function ubahPeranUser(userId, peranBaru){
-  if(!confirm(`Ubah peran akun ini menjadi ${peranBaru==='admin'?'Admin':'Guru'}?`)) return;
+  if(!confirm(`Ubah peran akun ini menjadi ${NAMA_PERAN[peranBaru]||'Guru'}?`)){ loadDaftarUser(); return; }
   try{
     await panggilKelolaUser({ action:'set-role', user_id:userId, role:peranBaru });
     loadDaftarUser();
@@ -1321,7 +1342,8 @@ async function hapusUser(userId, email){
 
 // ---------- NAV ----------
 function showTab(tab){
-  if((tab==='user' || tab==='sekolah') && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
+  if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
+  if(tab==='sekolah' && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
   ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);

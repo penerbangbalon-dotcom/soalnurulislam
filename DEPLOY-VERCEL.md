@@ -62,3 +62,8 @@ Kesalahan umum:
 ## Penting
 
 Jangan pernah memasukkan `SUPABASE_SERVICE_ROLE_KEY` ke `index.html`, `ujian.html`, atau JavaScript frontend.
+
+## 6. Super Admin (opsional)
+- `SUPER_ADMIN_EMAILS` = email Super Admin, pisahkan koma (mis. `kepala@contoh.com`). Tanpa ini, akun admin tertua otomatis jadi Super Admin saat login pertama.
+- Jalankan `migrasi-v12-superadmin.sql` di Supabase SQL Editor.
+- Setelah menambah/mengubah variabel di Vercel, lakukan Redeploy agar berlaku.
