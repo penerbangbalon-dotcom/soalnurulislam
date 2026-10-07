@@ -639,7 +639,7 @@
             <option value="">Semua Semester</option><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select>
           <button class="btn outline" onclick="loadRekapNilai()">↻ Muat Ulang Data</button>
           <button class="btn gold" onclick="unduhRekapNilaiSiswa()">⬇ Unduh Excel</button>
-          <button class="btn" onclick="cetakRaporSemester()">🖨 Cetak Rapor Semester</button>
+          <button class="btn" onclick="cetakRaporSemester()" title="Satu siswa; pilih 'Semua siswa' untuk mencetak satu kelas sekaligus">🖨 Cetak Rapor Semester</button>
         </div>
         <p class="muted" id="rn-info-bobot" style="margin:10px 0 0;"></p>
       </div>
@@ -5376,33 +5376,7 @@ function peringkatRaporSemester(nisn, ta, smt, kelas, program){
   const idx = daftar.findIndex(x=>x.nisn===nisn);
   return idx<0 ? null : { peringkat: daftar.slice(0,idx).filter(x=>x.rata>daftar[idx].rata).length + 1, total: daftar.length };
 }
-async function cetakRaporSemester(){
-  const nisn = document.getElementById('rn-siswa').value;
-  if(!nisn) return alert('Pilih siswa terlebih dahulu.');
-  if(nisn===SEMUA_SISWA) return alert('Rapor dicetak per siswa. Pilih satu siswa dari kelas ini (Excel dan tampilan layar sudah mendukung semua siswa).');
-  const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
-  if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
-  if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
-  const rows = susunNilaiSiswa(nisn, ta, smt);
-  if(!rows.length) return alert('Belum ada nilai final untuk siswa ini pada semester tersebut.');
-  const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
-  const nama = s ? s.nama : nisn;
-  const kelas = rows[0].kelas, program = rows[0].program;
-  const adaTugas = rows.some(r=>r.tugas!=null), adaPraktik = rows.some(r=>r.praktik!=null);
-  const nas = rows.map(r=>r.na).filter(x=>x!=null);
-  const rata = nas.length ? rataRata(nas) : null;
-  const belumTuntas = rows.filter(r=>r.tuntas===false).length;
-  const peringkat = peringkatRaporSemester(nisn, ta, smt, kelas, program);
-  const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
-  const [hadirRek, ttdKepala, ttdWali] = await Promise.all([
-    ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', kelas)
-  ]);
-  const cel = v => v==null ? '-' : fmtN(v);
-  const win = window.open('', '_blank');
-  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
-  win.document.write(`
-    <html><head><title>Rapor - ${esc2(nama)}</title>
-    <style>
+const CSS_RAPOR = `
       body{font-family:Georgia,'Times New Roman',serif;max-width:780px;margin:30px auto;color:#111;}
       .kop{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;border-bottom:4px double #000;padding-bottom:6px;font-family:Arial,sans-serif;text-align:center;line-height:1.25;}
       .kop img{width:96px;height:auto;flex:none;}
@@ -5424,9 +5398,25 @@ async function cetakRaporSemester(){
       .ttd .kolom{width:230px;}
       .ttd .garis{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-weight:bold;}
       @media print{ button{display:none;} body{margin:12mm auto;} }
-    </style></head><body>
-    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
-    ${kopSekolahHTML()}
+    
+      .halaman{page-break-after:always;} .halaman:last-child{page-break-after:auto;}
+      .halaman + .halaman{margin-top:40px;} @media print{ .halaman + .halaman{margin-top:0;} }`;
+// Isi satu lembar rapor (HTML) untuk satu siswa; null bila siswa belum punya nilai pada semester itu.
+async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
+  const rows = susunNilaiSiswa(nisn, ta, smt);
+  if(!rows.length) return null;
+  const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
+  const nama = s ? s.nama : nisn;
+  const kelas = rows[0].kelas, program = rows[0].program;
+  const adaTugas = rows.some(r=>r.tugas!=null), adaPraktik = rows.some(r=>r.praktik!=null);
+  const nas = rows.map(r=>r.na).filter(x=>x!=null);
+  const rata = nas.length ? rataRata(nas) : null;
+  const belumTuntas = rows.filter(r=>r.tuntas===false).length;
+  const peringkat = peringkatRaporSemester(nisn, ta, smt, kelas, program);
+  const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
+  const [hadirRek, ttdWali] = await Promise.all([ ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilWali(kelas) ]);
+  const cel = v => v==null ? '-' : fmtN(v);
+  return `${kopSekolahHTML()}
     <h1>LAPORAN HASIL BELAJAR (RAPOR)</h1>
     <div class="sub">${esc2(labelSmt(smt))} &mdash; Tahun Ajaran ${esc2(ta)}</div>
     <table class="info">
@@ -5458,8 +5448,57 @@ async function cetakRaporSemester(){
       <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
       <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
     </div>
-    </body></html>`);
+`;
+}
+function bukaDokumenRapor(win, judul, isi){
+  win.document.open();
+  win.document.write(`<html><head><title>${esc2(judul)}</title><style>${CSS_RAPOR}
+    @media print{ button{display:none;} body{margin:12mm auto;} }</style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>${isi}</body></html>`);
   win.document.close();
+}
+function pembuatTtdWali(){
+  const cache = new Map();
+  return k => { if(!cache.has(k)) cache.set(k, ambilTtd('wali_kelas', k)); return cache.get(k); };
+}
+async function cetakRaporSemester(){
+  const nisn = document.getElementById('rn-siswa').value;
+  if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  if(nisn===SEMUA_SISWA) return cetakRaporSemesterSemua();
+  const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
+  if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
+  if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
+  const ttdKepala = await ambilTtd('kepala_pkbm','');
+  const isi = await htmlRaporSiswa(nisn, ta, smt, ttdKepala, pembuatTtdWali());
+  if(!isi) return alert('Belum ada nilai final untuk siswa ini pada semester tersebut.');
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
+  bukaDokumenRapor(win, 'Rapor - '+(s?s.nama:nisn), `<div class="halaman">${isi}</div>`);
+}
+// Rapor SEMUA siswa pada kelas terpilih: satu dokumen, satu halaman per siswa (Cetak / Simpan PDF).
+async function cetakRaporSemesterSemua(){
+  const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
+  const kelas = document.getElementById('rn-kelas').value;
+  if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
+  if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
+  const daftar = daftarPickerSiswa('rn').filter(s=>susunNilaiSiswa(s.nisn, ta, smt).length);
+  if(!daftar.length) return alert('Belum ada nilai final untuk siswa Kelas '+kelas+' pada semester tersebut.');
+  // Jendela dibuka dulu (sebelum proses async) supaya tidak diblokir pop-up blocker.
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  win.document.write('<p style="font-family:sans-serif;padding:20px;">Menyiapkan rapor... <span id="p">0</span>/'+daftar.length+'</p>');
+  try{
+    const ttdKepala = await ambilTtd('kepala_pkbm','');
+    const ambilWali = pembuatTtdWali();
+    const hasil = [];
+    for(let i=0;i<daftar.length;i+=5){
+      const bagian = await Promise.all(daftar.slice(i,i+5).map(s=>htmlRaporSiswa(s.nisn, ta, smt, ttdKepala, ambilWali)));
+      hasil.push(...bagian);
+      const p = win.document.getElementById('p'); if(p) p.textContent = Math.min(i+5, daftar.length);
+    }
+    bukaDokumenRapor(win, `Rapor Kelas ${kelas} - ${labelSmt(smt)} ${ta}`, hasil.filter(Boolean).map(h=>`<div class="halaman">${h}</div>`).join(''));
+  }catch(err){ win.close(); alert('Gagal menyiapkan rapor: '+err.message); }
 }
 function unduhRekapNilaiSiswa(){
   const nisn = document.getElementById('rn-siswa').value;
