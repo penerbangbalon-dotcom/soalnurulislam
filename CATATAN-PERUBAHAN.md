@@ -1,5 +1,24 @@
 # Perubahan terbaru
 
+## v11.9 — Perlu Remedial, Transkrip Massal, Paket Otomatis (tanpa migrasi SQL baru)
+1. **Menu baru "Perlu Remedial (di bawah KKM)"** (Laporan Nilai; index.html)
+   - Daftar siswa belum tuntas KKM per **kelas** (urut nama siswa) atau per **mata pelajaran** (urut kelas, lalu siswa).
+   - Filter Jenjang, Kelas, Mata Pelajaran, Tahun Ajaran, Semester, cari nama/NISN; pilihan "Nilai akhir di bawah KKM" atau "Nilai akhir ATAU salah satu UH/UTS/UAS di bawah KKM"; opsi "Hanya yang belum remedial".
+   - Tiap baris memuat UH/UTS/UAS (yang di bawah KKM merah), nilai akhir, KKM, kekurangan, **komponen yang perlu diremedial**, dan **status remedial**. Chip ringkasan per mapel bisa diklik untuk menyaring.
+   - Memakai nilai SETELAH remedial (aturan di Pengaturan Nilai), jadi siswa yang sudah tuntas setelah remedial otomatis keluar dari daftar.
+   - **Cetak Daftar** (kop sekolah + tanda tangan) dan **Unduh Excel** (3 sheet: Daftar Remedial dengan kolom kosong untuk nilai/tanggal remedial, Rekap per Mapel, Rekap per Siswa).
+   - Hanya membaca data; kelas IPA/IPS tampil lewat kolom rombel di bawah nama siswa.
+2. **Cetak Transkrip Massal** (menu Transkrip Nilai)
+   - Tombol baru "Cetak Massal (semua siswa terfilter)"; tombol "Cetak Transkrip" saat memilih "★ Semua siswa Kelas ..." juga langsung mencetak massal.
+   - Satu siswa satu halaman lengkap dengan kop, tanda tangan wali kelas (per kelas terakhir siswa) dan kepala. Mengikuti filter Kelas dan kotak pencarian. Di atas 80 siswa muncul konfirmasi.
+   - Cetakan transkrip (satuan dan massal) kini memberi tanda * pada nilai setelah remedial.
+3. **Jadikan Paket Ujian Otomatis** (menu Bank Soal)
+   - Bila ada soal yang belum terpakai di paket mana pun, muncul banner hijau dengan tombol "Jadikan Paket Ujian Otomatis".
+   - Pilih satu mata pelajaran (jumlah soal per jenis PG/Isian/Essay bisa diatur, bawaan semua; cara pilih urut atau acak) atau "Semua mata pelajaran" (satu paket per mapel, berisi semua soal belum terpakai, judul otomatis).
+   - Jenis ujian, semester, tahun ajaran, durasi, acak urutan, bobot PG/Isian/Essay bisa diatur. Paket dibuat berstatus **draft** dengan kode akses baru; susunan masih bisa diubah di Daftar Paket Ujian.
+   - Daftar soal terpakai dibaca ulang dari database tepat sebelum paket dibuat, sehingga soal tidak pernah dipakai dua kali. Bila gagal di tengah jalan, paket yang setengah jadi dihapus.
+
+
 1. **Batas pelanggaran 3x** (ujian.html + netlify/functions/heartbeat.js + netlify/lib/ujian-core.js)
    - Pelanggaran 1 dan 2: peringatan bertahap ("x dari 3").
    - Pelanggaran ke-3: ujian diakhiri otomatis, jawaban yang sudah terisi langsung dinilai.

@@ -202,6 +202,7 @@
         <div class="item" data-tab="laporan" onclick="showTab('laporan')">Laporan Siswa</div>
         <div class="item" data-tab="rekapnilai" onclick="showTab('rekapnilai')">Rekap Nilai Siswa</div>
         <div class="item" data-tab="leger" onclick="showTab('leger')">Leger Nilai (Excel)</div>
+        <div class="item" data-tab="remedial" onclick="showTab('remedial')">Perlu Remedial (di bawah KKM)</div>
         <div class="item" data-tab="transkrip" onclick="showTab('transkrip')">Transkrip Nilai</div>
         <div class="item" data-tab="arsip" onclick="showTab('arsip')">Arsip Nilai</div>
         <div class="item" data-tab="inputnilai" onclick="showTab('inputnilai')">Input Nilai Tambahan</div>
@@ -251,6 +252,12 @@
         <button class="btn outline" onclick="cekDuplikatBank()" title="Cari soal dengan isi yang persis sama">Cek Soal Ganda</button>
         <input type="file" id="file-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSoal(this)">
         <button class="btn gold" onclick="openGenerateAI()">✦ Generate dengan AI</button>
+      </div>
+      <div id="bank-belum-banner" class="hidden">
+        <div style="margin-bottom:10px;background:#eef4e8;border:1px solid #b9d3a5;border-radius:var(--radius);padding:8px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+          <span><b id="bank-belum-jumlah">0</b> soal belum terpakai di paket ujian mana pun (sesuai filter mata pelajaran, jenis, dan pencarian di atas).</span>
+          <button class="btn" style="padding:5px 12px;" onclick="bukaPaketOtomatis()">⚡ Jadikan Paket Ujian Otomatis</button>
+        </div>
       </div>
       <div id="bank-dup-panel"></div>
       <div id="bank-massal" class="toolbar hidden" style="margin-bottom:10px;background:#f7f5ef;border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;">
@@ -695,6 +702,49 @@
       <div id="lg-tabel" style="overflow:auto;max-height:70vh;"></div>
     </section>
 
+    <!-- ===== TAB: PERLU REMEDIAL ===== -->
+    <section id="tab-remedial" class="hidden">
+      <h2>Perlu Remedial (Belum Tuntas KKM)</h2>
+      <p class="muted">Daftar siswa yang nilainya di bawah KKM per kelas atau per mata pelajaran, lengkap dengan komponen (UH/UTS/UAS) yang perlu diremedial dan status remedialnya.
+        Nilai remedial diisi di menu Input Nilai Tambahan &rarr; Remedial; siswa yang setelah remedial sudah tuntas otomatis hilang dari daftar ini.</p>
+      <div class="card">
+        <div class="grid3">
+          <div class="field"><label>Jenjang</label>
+            <select id="rm-program" onchange="isiKelasRemedial()"><option value="">Semua Jenjang</option><option>Paket B</option><option>Paket C</option></select></div>
+          <div class="field"><label>Kelas</label><select id="rm-kelas" onchange="isiMapelRemedial()"><option value="">Semua Kelas</option></select></div>
+          <div class="field"><label>Mata Pelajaran</label><select id="rm-mapel" onchange="renderRemedial()"><option value="">Semua mata pelajaran</option></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Tahun Ajaran</label><select id="rm-ta" onchange="isiMapelRemedial()"></select></div>
+          <div class="field"><label>Semester</label>
+            <select id="rm-smt" onchange="isiMapelRemedial()"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+          <div class="field"><label>Cari Siswa (nama / NISN)</label><input type="text" id="rm-cari" placeholder="Ketik nama atau NISN..." oninput="renderRemedial()" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Yang dianggap perlu remedial</label>
+            <select id="rm-dasar" onchange="renderRemedial()">
+              <option value="na">Nilai akhir di bawah KKM</option>
+              <option value="komp">Nilai akhir ATAU salah satu UH/UTS/UAS di bawah KKM</option>
+            </select></div>
+          <div class="field"><label>Kelompokkan menurut</label>
+            <select id="rm-kelompok" onchange="renderRemedial()">
+              <option value="kelas">Kelas (urut nama siswa)</option>
+              <option value="mapel">Mata pelajaran (urut kelas, lalu siswa)</option>
+            </select></div>
+          <div class="field"><label>&nbsp;</label>
+            <label class="checkline" style="margin:0;"><input type="checkbox" id="rm-belum-rem" onchange="renderRemedial()"><span>Hanya yang belum remedial</span></label></div>
+        </div>
+        <div class="toolbar" style="margin:0;">
+          <button class="btn gold" onclick="cetakRemedial()">🖨 Cetak Daftar</button>
+          <button class="btn gold" onclick="unduhRemedial()">⬇ Unduh Excel</button>
+          <button class="btn outline" onclick="loadRemedial()">↻ Muat Ulang Data</button>
+        </div>
+      </div>
+      <div id="rm-info" style="margin-bottom:8px;"></div>
+      <div id="rm-chip"></div>
+      <div id="rm-isi"></div>
+    </section>
+
     <!-- ===== TAB: TRANSKRIP NILAI ===== -->
     <section id="tab-transkrip" class="hidden">
       <h2>Transkrip Nilai</h2>
@@ -713,6 +763,7 @@
         </div>
         <div class="toolbar" style="margin:0;">
           <button class="btn gold" onclick="cetakTranskrip()">🖨 Cetak Transkrip</button>
+          <button class="btn gold" onclick="cetakTranskripMassal()" title="Cetak semua siswa pada Kelas/pencarian yang dipilih, satu siswa satu halaman">🖨 Cetak Massal (semua siswa terfilter)</button>
           <button class="btn gold" onclick="unduhTranskripExcel()">⬇ Unduh Excel</button>
           <button class="btn outline" onclick="loadTranskrip()">↻ Muat Ulang Data</button>
         </div>
@@ -739,7 +790,7 @@
           <div class="field"><label>Semester</label>
             <select id="in-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
           <div class="field"><label>Yang diisi</label>
-            <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option></select></div>
+            <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="remedial">Remedial UH / UTS / UAS (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option></select></div>
           <div class="field" id="in-wrap-mapel"><label>Mata Pelajaran</label><select id="in-mapel"><option value="">— pilih kelas dulu —</option></select></div>
         </div>
         <div class="toolbar" style="margin:0;">
@@ -770,6 +821,15 @@
           <div class="field"><label>Bila komponen belum ada</label>
             <select id="pn-mode"><option value="sebagian">Hitung dari komponen yang sudah ada</option><option value="lengkap">Nilai Akhir hanya jika semua komponen berbobot ada</option></select></div>
         </div>
+        <h3 style="margin-top:14px;">Remedial</h3>
+        <div class="grid3"><div class="field"><label>Aturan nilai setelah remedial</label>
+          <select id="pn-rem-mode">
+            <option value="kkm">Nilai remedial maksimal = KKM (standar)</option>
+            <option value="tertinggi">Ambil nilai tertinggi (asli atau remedial)</option>
+            <option value="rata">Rata-rata nilai asli dan remedial</option>
+            <option value="nonaktif">Tanpa remedial (abaikan nilai remedial)</option>
+          </select>
+          <p class="muted" style="margin:4px 0 0;font-size:12px;">Remedial hanya berlaku untuk UH/UTS/UAS yang nilainya di bawah KKM, dan tidak pernah menurunkan nilai asli. Diisi di menu Input Nilai Tambahan &rarr; Remedial.</p></div></div>
         <h3 style="margin-top:14px;">KKM</h3>
         <div class="grid3">
           <div class="field"><label>KKM standar (umumnya 70 – 75)</label><input type="number" id="pn-kkm" min="0" max="100" /></div>
@@ -1103,6 +1163,38 @@
 </div>
 
 <!-- MODAL: Bank Soal - Masukkan soal terpilih ke Paket Ujian -->
+<!-- MODAL: Jadikan Paket Ujian Otomatis -->
+<div class="modal-bg hidden" id="modal-paket-otomatis">
+  <div class="modal" style="max-width:660px;">
+    <h2>Jadikan Paket Ujian Otomatis</h2>
+    <p class="muted">Soal yang <b>belum terpakai di paket mana pun</b> dipilih otomatis dari Bank Soal, lalu dijadikan paket ujian berstatus <b>draft</b>. Susunan soal masih bisa diubah di Daftar Paket Ujian sebelum paket diaktifkan.</p>
+    <div class="field"><label>Mata Pelajaran</label><select id="po-mapel" onchange="poGantiMapel()"></select></div>
+    <p class="muted" id="po-info" style="margin:0 0 6px;"></p>
+    <div id="po-jumlah"></div>
+    <div class="grid3" style="margin-top:10px;">
+      <div class="field"><label>Cara memilih soal</label><select id="po-cara"><option value="urut">Urut (soal terlama dulu)</option><option value="acak">Acak</option></select></div>
+      <div class="field"><label>Jenis Ujian</label><select id="po-jenis" onchange="poUpdateJudul()"><option>UTS</option><option>UAS</option><option>Ulangan Harian</option></select></div>
+      <div class="field"><label>Semester</label><select id="po-semester" onchange="poUpdateJudul()"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Tahun Ajaran</label><select id="po-tahun" onchange="poUpdateJudul()"></select></div>
+      <div class="field"><label>Durasi (menit)</label><input type="number" id="po-durasi" value="90" /></div>
+      <div class="field"><label>Acak urutan soal saat ujian?</label><select id="po-acak"><option value="false">Tidak</option><option value="true">Ya</option></select></div>
+    </div>
+    <div class="field" id="po-judul-wrap"><label>Judul Paket</label><input type="text" id="po-judul" oninput="poJudulManual=true" /></div>
+    <div class="grid3">
+      <div class="field"><label>Bobot PG (%)</label><input type="number" id="po-b-pg" placeholder="opsional" /></div>
+      <div class="field"><label>Bobot Isian (%)</label><input type="number" id="po-b-isian" placeholder="opsional" /></div>
+      <div class="field"><label>Bobot Essay (%)</label><input type="number" id="po-b-essay" placeholder="opsional" /></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:-4px 0 12px;">Bobot dikosongkan = nilai dihitung sesuai poin soal. Bila diisi, totalnya harus 100.</p>
+    <div class="toolbar" style="margin:0;justify-content:flex-end;">
+      <button class="btn outline" onclick="closeModal('modal-paket-otomatis')">Batal</button>
+      <button class="btn" id="po-buat" onclick="buatPaketOtomatis()">Buat Paket</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg hidden" id="modal-ke-paket">
   <div class="modal" style="max-width:560px;">
     <h2>Masukkan Soal ke Paket Ujian</h2>
@@ -1523,7 +1615,7 @@ function showTab(tab){
   if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa') && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
+  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1541,6 +1633,7 @@ function showTab(tab){
   if(tab==='laporan') loadDaftarSiswaLaporan();
   if(tab==='rekapnilai') loadRekapNilai();
   if(tab==='leger') loadLeger();
+  if(tab==='remedial') loadRemedial();
   if(tab==='transkrip') loadTranskrip();
   if(tab==='inputnilai') loadInputNilai();
   if(tab==='pengnilai') loadPengaturanNilai();
@@ -1973,6 +2066,7 @@ async function loadBankSoal(){
   };
   let { data, error } = await ambilSemuaBaris(bangun);
   const { peta: terpakai } = error ? { peta:new Map() } : await petaSoalTerpakai();
+  if(!error) tampilBannerBelumTerpakai((data||[]).filter(s=>!terpakai.has(s.id)).length);
   if(!error && filterPakai) data = data.filter(s => filterPakai==='sudah' ? terpakai.has(s.id) : !terpakai.has(s.id));
   const body = document.getElementById('bank-soal-body');
   const empty = document.getElementById('bank-soal-empty');
@@ -2886,6 +2980,142 @@ async function hapusPaket(id){
 }
 function generateKode(){
   return Math.random().toString(36).substring(2,8).toUpperCase();
+}
+
+// ---------- PAKET OTOMATIS DARI SOAL BELUM TERPAKAI (v11.9) ----------
+// Soal yang belum ada di paket mana pun dipilih otomatis dari Bank Soal, lalu dibuatkan paket ujian berstatus draft.
+// Aturan "soal tidak boleh dipakai dua kali" tetap dijaga: daftar soal terpakai dibaca ulang dari database saat paket dibuat.
+const PO_SEMUA = '__SEMUA_MAPEL__';
+const URUT_JENIS_SOAL = ['pilihan_ganda','isian_singkat','essay'];
+let poSoalBelum = [], poJudulManual = false;
+function tampilBannerBelumTerpakai(n){
+  const el = document.getElementById('bank-belum-banner'); if(!el) return;
+  el.classList.toggle('hidden', !(n>0));
+  const t = document.getElementById('bank-belum-jumlah'); if(t) t.textContent = n;
+}
+function poOpsiTahun(){
+  const mulai = tahunAjaranSekarang();
+  return Array.from({length:5}, (_,i)=>`${mulai+i}/${mulai+i+1}`);
+}
+async function bukaPaketOtomatis(){
+  const [bank, tp] = await Promise.all([
+    ambilSemuaBaris(()=>supa.from('bank_soal').select('id, mapel_id, jenis, poin').order('created_at').order('id')),
+    petaSoalTerpakai()
+  ]);
+  if(bank.error) return alert('Gagal membaca Bank Soal: '+bank.error.message);
+  if(tp.error) return alert('Gagal memeriksa soal yang sudah terpakai: '+tp.error.message);
+  const idMapel = new Set(currentMapelList.map(m=>m.id));
+  poSoalBelum = (bank.data||[]).filter(s=>!tp.peta.has(s.id) && idMapel.has(s.mapel_id));
+  if(!poSoalBelum.length) return alert('Semua soal di Bank Soal sudah terpakai di paket ujian (atau belum ada soal). Tambahkan soal baru dulu.');
+  const hitung = new Map(); poSoalBelum.forEach(s=>hitung.set(s.mapel_id, (hitung.get(s.mapel_id)||0)+1));
+  const mapelAda = currentMapelList.filter(m=>hitung.has(m.id));
+  const sel = document.getElementById('po-mapel');
+  sel.innerHTML = '<option value="">— pilih mata pelajaran —</option>' +
+    (mapelAda.length>1 ? `<option value="${PO_SEMUA}">★ Semua mata pelajaran yang punya soal belum terpakai (${mapelAda.length} paket)</option>` : '') +
+    mapelAda.map(m=>`<option value="${m.id}">${escapeHtml(labelMapel(m))} — ${hitung.get(m.id)} soal belum terpakai</option>`).join('');
+  const pre = document.getElementById('filter-mapel').value;
+  sel.value = hitung.has(pre) ? pre : (mapelAda.length===1 ? mapelAda[0].id : '');
+  document.getElementById('po-tahun').innerHTML = poOpsiTahun().map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('po-tahun').value = taBerjalan();
+  document.getElementById('po-semester').value = semesterBerjalan();
+  document.getElementById('po-jenis').value = 'UTS';
+  ['po-b-pg','po-b-isian','po-b-essay'].forEach(id=>document.getElementById(id).value = '');
+  document.getElementById('po-durasi').value = 90;
+  document.getElementById('po-acak').value = 'false';
+  document.getElementById('po-cara').value = 'urut';
+  poJudulManual = false;
+  poGantiMapel();
+  document.getElementById('po-buat').disabled = false;
+  document.getElementById('po-buat').textContent = 'Buat Paket';
+  document.getElementById('modal-paket-otomatis').classList.remove('hidden');
+}
+function poJudulOtomatis(m){
+  return `${document.getElementById('po-jenis').value} ${m.nama} ${document.getElementById('po-semester').value} ${document.getElementById('po-tahun').value}`;
+}
+function poUpdateJudul(){
+  const v = document.getElementById('po-mapel').value;
+  const inp = document.getElementById('po-judul');
+  if(poJudulManual) return;
+  const m = currentMapelList.find(x=>x.id===v);
+  inp.value = m ? poJudulOtomatis(m) : '';
+}
+function poGantiMapel(){
+  const v = document.getElementById('po-mapel').value;
+  const box = document.getElementById('po-jumlah'), info = document.getElementById('po-info');
+  const semua = v===PO_SEMUA;
+  document.getElementById('po-judul-wrap').classList.toggle('hidden', semua);
+  if(!v){ box.innerHTML = ''; info.textContent = ''; poUpdateJudul(); return; }
+  if(semua){
+    const nMapel = new Set(poSoalBelum.map(s=>s.mapel_id)).size;
+    box.innerHTML = '';
+    info.innerHTML = `Akan dibuat <b>${nMapel} paket</b> (satu per mata pelajaran), masing-masing berisi <b>semua</b> soal yang belum terpakai. Judul dibuat otomatis: Jenis + Mapel + Semester + Tahun Ajaran. Total ${poSoalBelum.length} soal.`;
+    return;
+  }
+  const m = currentMapelList.find(x=>x.id===v);
+  const soal = poSoalBelum.filter(s=>s.mapel_id===v);
+  const cnt = {}; soal.forEach(s=>{ cnt[s.jenis] = (cnt[s.jenis]||0)+1; });
+  info.innerHTML = `${escapeHtml(m ? `${m.program} Kelas ${m.kelas||'-'}` : '')} &bull; <b>${soal.length}</b> soal belum terpakai. Atur jumlah yang diambil per jenis (bawaan: semua).`;
+  box.innerHTML = URUT_JENIS_SOAL.filter(j=>cnt[j]).map(j=>`<div class="toolbar" style="margin:6px 0;gap:8px;">
+    <b style="min-width:180px;">${NAMA_JENIS[j]} <span class="muted">(belum terpakai ${cnt[j]})</span></b>
+    Ambil <input type="number" id="po-n-${j}" min="0" max="${cnt[j]}" value="${cnt[j]}" style="width:80px;"> soal</div>`).join('');
+  poUpdateJudul();
+}
+async function buatPaketOtomatis(){
+  const mapelVal = document.getElementById('po-mapel').value;
+  if(!mapelVal) return alert('Pilih mata pelajaran dulu.');
+  const semua = mapelVal===PO_SEMUA;
+  const jenis_ujian = document.getElementById('po-jenis').value;
+  const semester = document.getElementById('po-semester').value;
+  const tahun_ajaran = document.getElementById('po-tahun').value;
+  const durasi = parseInt(document.getElementById('po-durasi').value) || 90;
+  const acak_soal = document.getElementById('po-acak').value === 'true';
+  const acakPilih = document.getElementById('po-cara').value === 'acak';
+  const bv = id=>{ const v = document.getElementById(id).value.trim(); return v==='' ? null : parseFloat(v); };
+  const bobot = { bobot_pg:bv('po-b-pg'), bobot_isian:bv('po-b-isian'), bobot_essay:bv('po-b-essay') };
+  if(Object.values(bobot).some(v=>v!=null) && Math.round(Object.values(bobot).reduce((a,v)=>a+(v||0),0))!==100) return alert('Total bobot PG + Isian + Essay harus 100%.');
+  const judulManual = document.getElementById('po-judul').value.trim();
+  if(!semua && !judulManual) return alert('Judul paket wajib diisi.');
+  const btn = document.getElementById('po-buat');
+  btn.disabled = true; btn.textContent = 'Membuat paket...';
+  const dibuat = [];
+  try{
+    // Baca ulang soal terpakai dari database tepat sebelum membuat paket
+    const { peta, error: eCek } = await petaSoalTerpakai();
+    if(eCek) throw new Error('Gagal memeriksa soal yang sudah terpakai: '+eCek.message);
+    const urutAsli = new Map(poSoalBelum.map((s,i)=>[s.id, i]));
+    const targets = semua ? [...new Set(poSoalBelum.map(s=>s.mapel_id))] : [mapelVal];
+    for(const mid of targets){
+      const m = currentMapelList.find(x=>x.id===mid); if(!m) continue;
+      const pool = poSoalBelum.filter(s=>s.mapel_id===mid && !peta.has(s.id));
+      let pilih = [];
+      URUT_JENIS_SOAL.forEach(j=>{
+        let list = pool.filter(s=>s.jenis===j);
+        if(!list.length) return;
+        let n = list.length;
+        if(!semua){ const inp = document.getElementById('po-n-'+j); n = inp ? Math.max(0, Math.min(list.length, parseInt(inp.value)||0)) : 0; }
+        if(acakPilih) list = acakArr(list, Math.random());
+        pilih.push(...list.slice(0, n).sort((a,c)=>urutAsli.get(a.id)-urutAsli.get(c.id)));
+      });
+      if(!pilih.length){ if(semua) continue; throw new Error('Jumlah soal yang diambil masih 0. Isi jumlah minimal 1 soal.'); }
+      const judul = semua ? poJudulOtomatis(m) : judulManual;
+      const dataPaket = { ...bobot, judul, jenis_ujian, mapel_id: mid, kelas: m.kelas||'', program: m.program, semester, tahun_ajaran,
+        durasi_menit: durasi, acak_soal, status:'draft', kode_akses: generateKode() };
+      const { data: paket, error: eP } = await supa.from('paket_ujian').insert(dataPaket).select().single();
+      if(eP) throw new Error(eP.message);
+      const rows = pilih.map((s,i)=>({ paket_ujian_id: paket.id, soal_id: s.id, nomor: i+1, poin: parseFloat(s.poin)||1 }));
+      const { error: eS } = await supa.from('paket_soal').insert(rows);
+      if(eS){ await supa.from('paket_ujian').delete().eq('id', paket.id); throw new Error(eS.message); }
+      pilih.forEach(s=>peta.set(s.id, [judul]));
+      dibuat.push(`${judul} (${pilih.length} soal)`);
+    }
+    if(!dibuat.length) throw new Error('Tidak ada soal yang bisa dimasukkan.');
+    closeModal('modal-paket-otomatis');
+    await loadBankSoal();
+    if(confirm(`Berhasil membuat ${dibuat.length} paket ujian (status: draft):\n\n- ${dibuat.join('\n- ')}\n\nBuka Daftar Paket Ujian sekarang?`)){ showTab('daftar'); loadDaftarPaket(); }
+  }catch(err){
+    alert((dibuat.length ? `Sebagian paket sudah dibuat:\n- ${dibuat.join('\n- ')}\n\n` : '') + 'Gagal: '+err.message);
+    btn.disabled = false; btn.textContent = 'Buat Paket';
+  }
 }
 
 // ---------- DAFTAR & CETAK ----------
@@ -5080,7 +5310,7 @@ async function cetakPiagam(){
 // Nilai ujian dibaca dari tabel arsip_nilai (salinan permanen). Bobot, KKM, nilai Tugas/Praktik,
 // sikap & kehadiran disimpan di database (lihat migrasi-v7.sql).
 // ============================================================
-const DEF_PENG = { bobot:{ uh:30, uts:30, uas:40, tugas:0, praktik:0 }, mode:'sebagian', kkm:70, kkm_mapel:{} };
+const DEF_PENG = { bobot:{ uh:30, uts:30, uas:40, tugas:0, praktik:0 }, mode:'sebagian', kkm:70, kkm_mapel:{}, remedial:{ mode:'kkm' } };
 let pengNilai = JSON.parse(JSON.stringify(DEF_PENG));
 let dbV7Tersedia = true, sudahPeringatV7 = false;
 const NAMA_KOMP = { uh:'Ulangan Harian', uts:'UTS', uas:'UAS', tugas:'Tugas', praktik:'Praktik' };
@@ -5170,7 +5400,8 @@ async function siapkanDataNilai(){
       bobot: { ...DEF_PENG.bobot, ...(peng.data.bobot||{}) },
       mode: peng.data.mode || 'sebagian',
       kkm: peng.data.kkm!=null ? Number(peng.data.kkm) : 70,
-      kkm_mapel: peng.data.kkm_mapel || {}
+      kkm_mapel: peng.data.kkm_mapel || {},
+      remedial: { mode:'kkm', ...(peng.data.remedial||{}) }
     };
   }
   manualBaris = manual.error ? [] : (manual.data||[]);
@@ -5236,7 +5467,22 @@ function saringPickerSiswa(p){
 }
 
 // ---------- perhitungan ----------
-function hitungMapel(list, man){
+// Remedial: berlaku untuk komponen UH/UTS/UAS yang nilai aslinya di bawah KKM (atau belum ada = ujian susulan).
+//   mode 'kkm'       -> nilai jadi maksimal KKM (min(remedial, KKM)); tidak pernah menurunkan nilai asli
+//   mode 'tertinggi' -> nilai = yang lebih tinggi antara asli dan remedial
+//   mode 'rata'      -> nilai = rata-rata asli & remedial (bila lebih tinggi dari asli)
+function terapkanRemedial(asli, rem, kkm){
+  const mode = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
+  if(mode==='nonaktif' || rem==null || kkm==null) return null;
+  if(asli!=null && asli>=kkm) return null;            // sudah tuntas: remedial tidak dipakai
+  let eff;
+  if(mode==='tertinggi') eff = rem;
+  else if(mode==='rata') eff = asli==null ? rem : (asli+rem)/2;
+  else eff = Math.min(rem, kkm);
+  if(asli!=null && eff<=asli) return null;            // tidak menurunkan / tidak mengubah nilai asli
+  return eff;
+}
+function hitungMapel(list, man, kkm){
   const b = pengNilai.bobot;
   const uhs = list.filter(r=>r.komp==='uh').map(r=>r.skor);
   const terbaru = k => {
@@ -5245,6 +5491,11 @@ function hitungMapel(list, man){
   };
   const uh = uhs.length ? uhs.reduce((a,c)=>a+c,0)/uhs.length : null;
   const v = { uh, uts:terbaru('uts'), uas:terbaru('uas'), tugas: man && man.tugas!=null ? man.tugas : null, praktik: man && man.praktik!=null ? man.praktik : null };
+  const rem = {};   // komponen yang memakai nilai remedial: { uts:{ asli, rem } }
+  ['uh','uts','uas'].forEach(k=>{
+    const eff = man ? terapkanRemedial(v[k], man['rem_'+k]!=null ? man['rem_'+k] : null, kkm) : null;
+    if(eff!=null){ rem[k] = { asli: v[k], rem: man['rem_'+k] }; v[k] = eff; }
+  });
   const aktifBobot = ['uh','uts','uas','tugas','praktik'].filter(k=>(b[k]||0)>0);
   const ada = aktifBobot.filter(k=>v[k]!=null);
   let na = null;
@@ -5252,7 +5503,11 @@ function hitungMapel(list, man){
     const w = ada.reduce((a,k)=>a+b[k],0);
     na = ada.reduce((a,k)=>a+v[k]*b[k],0)/w;
   }
-  return { ...v, uhList:uhs, na };
+  return { ...v, uhList:uhs, na, rem: Object.keys(rem).length ? rem : null };
+}
+// Penanda remedial di sel nilai: "R" + nilai asli sebagai tooltip
+function tandaRem(r, k){
+  return (r.rem && r.rem[k]) ? ` <sup title="Remedial. Nilai sebelum remedial: ${r.rem[k].asli==null?'belum ada':fmtN(r.rem[k].asli)}" style="color:#b36b00;font-weight:700;">R</sup>` : '';
 }
 function susunNilaiSiswa(nisn, ta, smt){
   const rows = nilaiArsip.filter(r=>r.siswa_nisn===nisn && (!ta || r.ta===ta) && (!smt || r.smt===smt));
@@ -5263,8 +5518,8 @@ function susunNilaiSiswa(nisn, ta, smt){
   });
   const hasil = [...grup.entries()].map(([k, list])=>{
     const [t, sm, kl, pr, mp] = k.split('||');
-    const h = hitungMapel(list, manualMap.get(`${nisn}##${k}`));
     const kkm = ambilKKM(pr, kl, mp);
+    const h = hitungMapel(list, manualMap.get(`${nisn}##${k}`), kkm);
     return { ta:t, smt:sm, kelas:kl, program:pr, mapel:mp, ...h, kkm, tuntas: h.na==null ? null : h.na>=kkm };
   });
   hasil.sort((a,c)=>a.ta.localeCompare(c.ta) || urutSmt(a.smt)-urutSmt(c.smt) || a.mapel.localeCompare(c.mapel,'id'));
@@ -5317,7 +5572,7 @@ function renderRekapNilaiSemua(){
     return `<tr style="background:#F0EDE2;"><td colspan="11"><b>${i+1}. ${esc2(x.s.nama)}</b> <span class="muted">(${esc2(x.s.nisn)})</span>${belum?` &bull; <span style="color:#b3261e;">${belum} mapel belum tuntas KKM</span>`:''}</td></tr>` +
       x.rows.map(r=>`<tr${r.tuntas===false?' style="background:#FBEEEC;"':''}>
         <td>${esc2(r.mapel)}</td><td>${esc2(labelSmt(r.smt))}<br><span class="muted">${esc2(r.ta)}</span></td><td>${esc2(r.kelas)}</td>
-        <td>${cel(r.uh)}</td><td>${cel(r.uts)}</td><td>${cel(r.uas)}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
+        <td>${cel(r.uh)}${tandaRem(r,'uh')}</td><td>${cel(r.uts)}${tandaRem(r,'uts')}</td><td>${cel(r.uas)}${tandaRem(r,'uas')}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
         <td><b>${r.na==null?'-':fmtN(r.na)}</b></td><td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td></tr>`).join('');
   }).join('');
   document.getElementById('rn-catatan').innerHTML = '<span class="muted">Ringkasan di atas = rata-rata dari rata-rata Nilai Akhir tiap siswa. Pilih satu siswa untuk melihat sikap &amp; kehadiran.</span>';
@@ -5353,7 +5608,7 @@ function renderRekapNilai(){
       <td>${esc2(r.mapel)}</td>
       <td>${esc2(labelSmt(r.smt))}<br><span class="muted">${esc2(r.ta)}</span></td>
       <td>${esc2(r.kelas)}</td>
-      <td>${uhTxt}</td><td>${cel(r.uts)}</td><td>${cel(r.uas)}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
+      <td>${uhTxt}${tandaRem(r,'uh')}</td><td>${cel(r.uts)}${tandaRem(r,'uts')}</td><td>${cel(r.uas)}${tandaRem(r,'uas')}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
       <td><b>${r.na==null?'-':fmtN(r.na)}</b>${r.na==null?'':`<br><span class="muted">${esc2(predikatNilai(r.na))}</span>`}</td>
       <td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td>
     </tr>`;
@@ -5426,7 +5681,7 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
     <table class="nilai">
       <thead><tr><th class="c">No</th><th>Mata Pelajaran</th><th class="c">UH</th><th class="c">UTS</th><th class="c">UAS</th>${adaTugas?'<th class="c">Tugas</th>':''}${adaPraktik?'<th class="c">Praktik</th>':''}<th class="c">Nilai Akhir</th><th>Predikat</th><th class="c">KKM</th><th>Ket.</th></tr></thead>
       <tbody>
-      ${rows.map((r,i)=>`<tr${r.tuntas===false?' style="color:#b3261e;"':''}><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.uh)}</td><td class="c">${cel(r.uts)}</td><td class="c">${cel(r.uas)}</td>${adaTugas?`<td class="c">${cel(r.tugas)}</td>`:''}${adaPraktik?`<td class="c">${cel(r.praktik)}</td>`:''}<td class="c"><b>${cel(r.na)}</b></td><td>${r.na==null?'-':esc2(predikatNilai(r.na))}</td><td class="c">${fmtN(r.kkm)}</td><td>${ketTuntas(r.tuntas)}</td></tr>`).join('')}
+      ${rows.map((r,i)=>`<tr${r.tuntas===false?' style="color:#b3261e;"':''}><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.uh)}${r.rem&&r.rem.uh?'*':''}</td><td class="c">${cel(r.uts)}${r.rem&&r.rem.uts?'*':''}</td><td class="c">${cel(r.uas)}${r.rem&&r.rem.uas?'*':''}</td>${adaTugas?`<td class="c">${cel(r.tugas)}</td>`:''}${adaPraktik?`<td class="c">${cel(r.praktik)}</td>`:''}<td class="c"><b>${cel(r.na)}</b></td><td>${r.na==null?'-':esc2(predikatNilai(r.na))}</td><td class="c">${fmtN(r.kkm)}</td><td>${ketTuntas(r.tuntas)}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="ringkasan">
@@ -5443,7 +5698,7 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
     </table>
     <div class="kotak"><b>Sikap:</b> ${cat && cat.sikap ? esc2(cat.sikap)+' ('+esc2(NAMA_SIKAP[cat.sikap])+')' : '-'}<br>
       <b>Catatan Wali Kelas:</b> ${catatanWali(cat) ? esc2(catatanWali(cat)) : '-'}</div>
-    <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${rows.some(r=>r.na==null)?' Tanda "-" berarti nilai belum final.':''}</div>
+    <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${rows.some(r=>r.na==null)?' Tanda "-" berarti nilai belum final.':''}${rows.some(r=>r.rem)?' Tanda * = nilai setelah remedial.':''}</div>
     <div class="ttd">
       <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
       <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
@@ -5571,7 +5826,7 @@ function bangunLeger(){
   const kkmMapel = mapel.map(m=>ambilKKM(program, kelas, m));
   const baris = siswa.map(s=>{
     const nilai = mapel.map((m,j)=>{
-      const h = hitungMapel(perSiswaMapel.get(s.nisn+'||'+m) || [], manualMap.get(`${s.nisn}##${[ta, smt, kelas, program, m].join('||')}`));
+      const h = hitungMapel(perSiswaMapel.get(s.nisn+'||'+m) || [], manualMap.get(`${s.nisn}##${[ta, smt, kelas, program, m].join('||')}`), kkmMapel[j]);
       return { ...h, kkm:kkmMapel[j], tuntas: h.na==null ? null : h.na>=kkmMapel[j] };
     });
     const nas = nilai.map(n=>n.na).filter(x=>x!=null);
@@ -5671,6 +5926,203 @@ function unduhLeger(){
 }
 
 // ============================================================
+// PERLU REMEDIAL: daftar siswa belum tuntas KKM per kelas / per mata pelajaran (v11.9)
+// Hanya membaca data nilai yang sudah ada (tanpa migrasi SQL). Nilai yang dipakai adalah nilai SETELAH remedial,
+// jadi siswa yang sudah diremedial dan kini tuntas otomatis tidak muncul lagi.
+// ============================================================
+const URUT_KELAS_RM = ['VII','VIII','IX','X','XI','XII'];
+let rmBaris = [], rmChipMapel = [];
+function rmV(id){ return document.getElementById(id).value; }
+function isiKelasRemedial(){
+  const pr = rmV('rm-program');
+  const opsi = pr ? (KELAS_PER_PROGRAM[pr]||[]) : URUT_KELAS_RM;
+  const sel = document.getElementById('rm-kelas'); const prev = sel.value;
+  sel.innerHTML = '<option value="">Semua Kelas</option>' + opsi.map(k=>`<option value="${k}">Kelas ${k}</option>`).join('');
+  if(opsi.includes(prev)) sel.value = prev;
+  isiMapelRemedial();
+}
+function isiMapelRemedial(){
+  const pr = rmV('rm-program'), kl = rmV('rm-kelas'), ta = rmV('rm-ta'), smt = rmV('rm-smt');
+  const set = new Set();
+  nilaiArsip.forEach(r=>{ if((!pr||r.program===pr) && (!kl||r.kelas===kl) && (!ta||r.ta===ta) && (!smt||r.smt===smt) && r.mapel_nama) set.add(r.mapel_nama); });
+  manualBaris.forEach(r=>{ if((!pr||r.program===pr) && (!kl||r.kelas===kl) && (!ta||r.tahun_ajaran===ta) && (!smt||r.semester===smt) && r.mapel_nama) set.add(r.mapel_nama); });
+  const sel = document.getElementById('rm-mapel'); const prev = sel.value;
+  sel.innerHTML = '<option value="">Semua mata pelajaran</option>' + [...set].sort((a,c)=>a.localeCompare(c,'id')).map(m=>`<option>${esc2(m)}</option>`).join('');
+  if(set.has(prev)) sel.value = prev;
+  renderRemedial();
+}
+async function loadRemedial(){
+  if(!await siapkanDataNilai()) return;
+  const selTa = document.getElementById('rm-ta'); const prevTa = selTa.value;
+  const opsi = opsiTahunAjaranNilai();
+  selTa.innerHTML = opsi.map(t=>`<option>${esc2(t)}</option>`).join('');
+  selTa.value = opsi.includes(prevTa) ? prevTa : taBerjalan();
+  const selSmt = document.getElementById('rm-smt');
+  if(!selSmt.dataset.diatur){ selSmt.value = semesterBerjalan(); selSmt.dataset.diatur = '1'; }
+  isiKelasRemedial();
+}
+function kumpulkanRemedial(){
+  const pr = rmV('rm-program'), kl = rmV('rm-kelas'), ta = rmV('rm-ta'), smt = rmV('rm-smt'), mp = rmV('rm-mapel');
+  const dasar = rmV('rm-dasar'), q = rmV('rm-cari').trim().toLowerCase();
+  const hanyaBelum = document.getElementById('rm-belum-rem').checked;
+  const out = [];
+  if(!ta || !smt) return out;
+  daftarSiswaNilai.forEach(s=>{
+    if(s.nonaktif) return;
+    if(q && !(String(s.nama).toLowerCase().includes(q) || String(s.nisn).toLowerCase().includes(q))) return;
+    susunNilaiSiswa(s.nisn, ta, smt).forEach(r=>{
+      if((pr && r.program!==pr) || (kl && r.kelas!==kl) || (mp && r.mapel!==mp)) return;
+      const kb = ['uh','uts','uas'].filter(k=>r[k]!=null && r.kkm!=null && r[k]<r.kkm);
+      const naBelum = r.tuntas===false;
+      if(dasar==='na' ? !naBelum : !(naBelum || kb.length)) return;
+      const sudah = r.rem ? Object.keys(r.rem) : [];
+      if(hanyaBelum && sudah.length) return;
+      out.push({ nama:s.nama, nisn:s.nisn, rombel:s.kelasAsli||'', program:r.program, kelas:r.kelas, ta:r.ta, smt:r.smt, mapel:r.mapel,
+        uh:r.uh, uts:r.uts, uas:r.uas, na:r.na, kkm:r.kkm, kurang: r.na!=null ? r.kkm-r.na : null, kb, sudah });
+    });
+  });
+  return out;
+}
+function bandingKelasRem(a, c){
+  return String(a.program).localeCompare(String(c.program)) || (URUT_KELAS_RM.indexOf(a.kelas) - URUT_KELAS_RM.indexOf(c.kelas));
+}
+// Hasil: [{ judul, ringkas, rows }] — mode 'kelas' (per kelas, urut siswa) atau 'mapel' (per mata pelajaran, urut kelas lalu siswa)
+function susunGrupRemedial(baris, mode){
+  const peta = new Map();
+  baris.forEach(b=>{
+    const k = mode==='mapel' ? b.mapel : `${b.program}||${b.kelas}`;
+    if(!peta.has(k)) peta.set(k, []);
+    peta.get(k).push(b);
+  });
+  const grup = [...peta.entries()].map(([k, rows])=>{
+    const nSiswa = new Set(rows.map(r=>r.nisn)).size;
+    if(mode==='mapel'){
+      rows.sort((a,c)=>bandingKelasRem(a,c) || String(a.nama).localeCompare(String(c.nama),'id'));
+      return { urut: k, judul: k, ringkas: `${nSiswa} siswa belum tuntas`, rows };
+    }
+    rows.sort((a,c)=>String(a.nama).localeCompare(String(c.nama),'id') || String(a.mapel).localeCompare(String(c.mapel),'id'));
+    const [pr, kl] = k.split('||');
+    return { urut: rows[0], judul: `${pr} — Kelas ${kl}`, ringkas: `${nSiswa} siswa · ${rows.length} mata pelajaran belum tuntas`, rows };
+  });
+  grup.sort((a,c)=> mode==='mapel' ? a.urut.localeCompare(c.urut,'id') : bandingKelasRem(a.urut, c.urut));
+  return grup;
+}
+function htmlTabelRemedial(rows, mode){
+  const perKelas = mode!=='mapel';
+  const merah = 'color:#b3261e;font-weight:600;';
+  const cel = (v, k, r) => v==null ? '<span class="muted">-</span>' : ((k && r.kb.includes(k)) ? `<span style="${merah}">${fmtN(v)}</span>` : fmtN(v));
+  const span = new Map(); if(perKelas) rows.forEach(r=>span.set(r.nisn, (span.get(r.nisn)||0)+1));
+  let no = 0, lastNisn = null;
+  const body = rows.map(r=>{
+    const awal = !perKelas || r.nisn!==lastNisn; lastNisn = r.nisn;
+    if(awal) no++;
+    const rs = (perKelas && awal) ? ` rowspan="${span.get(r.nisn)}"` : '';
+    const idCols = awal ? `<td${rs}>${no}</td><td${rs}>${esc2(r.nama)}${(perKelas && r.rombel) ? `<br><span class="muted" style="font-size:11px;">${esc2(r.rombel)}</span>` : ''}</td><td${rs}>${esc2(r.nisn)}</td>` : '';
+    const perlu = r.kb.length ? r.kb.map(k=>`${SINGKAT_KOMP[k]} (${fmtN(r[k])})`).join(', ') : 'Nilai akhir';
+    const status = r.sudah.length ? `<span style="color:#b36b00;">Sudah remedial ${r.sudah.map(k=>SINGKAT_KOMP[k]).join(', ')}, masih di bawah KKM</span>` : 'Belum remedial';
+    return `<tr>${idCols}<td>${perKelas ? esc2(r.mapel) : `${esc2(r.program)} ${esc2(r.kelas)}`}</td>
+      <td>${cel(r.uh,'uh',r)}</td><td>${cel(r.uts,'uts',r)}</td><td>${cel(r.uas,'uas',r)}</td>
+      <td><b>${r.na==null ? '<span class="muted">-</span>' : `<span style="${merah}">${fmtN(r.na)}</span>`}</b></td><td>${fmtN(r.kkm)}</td><td>${r.kurang==null ? '-' : fmtN(r.kurang)}</td>
+      <td>${esc2(perlu)}</td><td>${status}</td></tr>`;
+  }).join('');
+  return `<table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>${perKelas ? 'Mata Pelajaran' : 'Kelas'}</th><th>UH</th><th>UTS</th><th>UAS</th><th>NA</th><th>KKM</th><th>Kurang</th><th>Perlu Remedial</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+function teksFilterRemedial(){
+  const pr = rmV('rm-program'), kl = rmV('rm-kelas'), mp = rmV('rm-mapel');
+  return [pr || 'Semua jenjang', kl ? `Kelas ${kl}` : 'Semua kelas', mp || 'Semua mata pelajaran', labelSmt(rmV('rm-smt')), `TA ${rmV('rm-ta')}`].join(' · ');
+}
+function renderRemedial(){
+  if(!dataNilaiSiap) return;
+  const isi = document.getElementById('rm-isi'), info = document.getElementById('rm-info'), chip = document.getElementById('rm-chip');
+  const baris = kumpulkanRemedial(); rmBaris = baris;
+  const mode = rmV('rm-kelompok'), dasar = rmV('rm-dasar');
+  const modeRem = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
+  const namaRem = { kkm:'nilai remedial maksimal = KKM', tertinggi:'ambil nilai tertinggi', rata:'rata-rata nilai asli & remedial', nonaktif:'remedial dinonaktifkan' }[modeRem];
+  if(!baris.length){
+    info.textContent = ''; chip.innerHTML = ''; rmChipMapel = [];
+    isi.innerHTML = `<div class="card muted">${nilaiArsip.length || manualBaris.length ? 'Tidak ada siswa yang belum tuntas KKM pada filter ini. 🎉' : 'Belum ada nilai final tersimpan.'}${nilaiMenunggu ? ` (${nilaiMenunggu} nilai lain masih menunggu koreksi essay dan belum dihitung.)` : ''}</div>`;
+    return;
+  }
+  const nSiswa = new Set(baris.map(b=>b.nisn)).size;
+  info.innerHTML = `<b>${nSiswa}</b> siswa &bull; <b>${baris.length}</b> mata pelajaran ${dasar==='na' ? 'dengan nilai akhir di bawah KKM' : 'dengan nilai akhir atau komponen UH/UTS/UAS di bawah KKM'}. <span class="muted">Aturan remedial: ${esc2(namaRem)} (ubah di Pengaturan Nilai).${nilaiMenunggu ? ` ${nilaiMenunggu} nilai masih menunggu koreksi essay dan belum dihitung.` : ''}</span>`;
+  // Ringkasan per mapel (klik untuk menyaring)
+  const perMapel = new Map();
+  baris.forEach(b=>{ if(!perMapel.has(b.mapel)) perMapel.set(b.mapel, new Set()); perMapel.get(b.mapel).add(b.nisn); });
+  rmChipMapel = [...perMapel.entries()].sort((a,c)=>c[1].size-a[1].size || a[0].localeCompare(c[0],'id')).map(x=>x[0]);
+  chip.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;">${rmChipMapel.map((m,i)=>`<button class="btn outline" style="padding:3px 10px;font-size:12px;" title="Tampilkan hanya mata pelajaran ini" onclick="rmPilihMapel(${i})">${esc2(m)}: <b>${perMapel.get(m).size}</b></button>`).join('')}</div>`;
+  const grup = susunGrupRemedial(baris, mode);
+  isi.innerHTML = grup.map(g=>`<div class="card" style="overflow-x:auto;"><h3 style="margin-bottom:2px;">${esc2(g.judul)}</h3>
+    <p class="muted" style="margin:0 0 8px;">${esc2(g.ringkas)}</p>${htmlTabelRemedial(g.rows, mode)}</div>`).join('');
+}
+function rmPilihMapel(i){
+  const sel = document.getElementById('rm-mapel'); const nama = rmChipMapel[i];
+  if([...sel.options].some(o=>o.value===nama)){ sel.value = nama; renderRemedial(); }
+}
+function unduhRemedial(){
+  const b = rmBaris.slice();
+  if(!b.length) return alert('Tidak ada data untuk diunduh pada filter ini.');
+  b.sort((x,y)=>bandingKelasRem(x,y) || String(x.nama).localeCompare(String(y.nama),'id') || String(x.mapel).localeCompare(String(y.mapel),'id'));
+  const aoa = [['DAFTAR SISWA BELUM TUNTAS KKM (PERLU REMEDIAL)'], [teksFilterRemedial()], [],
+    ['No','Nama Siswa','NISN','Jenjang','Kelas','Rombel','Tahun Ajaran','Semester','Mata Pelajaran','UH','UTS','UAS','Nilai Akhir','KKM','Kurang dari KKM','Komponen Perlu Remedial','Status Remedial','Nilai Remedial (diisi guru)','Tanggal Remedial','Keterangan']];
+  b.forEach((r,i)=>aoa.push([i+1, r.nama, r.nisn, r.program, r.kelas, r.rombel, r.ta, labelSmt(r.smt), r.mapel, bulat1(r.uh), bulat1(r.uts), bulat1(r.uas), bulat1(r.na), r.kkm, r.kurang==null ? '' : bulat1(r.kurang),
+    r.kb.length ? r.kb.map(k=>SINGKAT_KOMP[k]).join(', ') : 'Nilai akhir', r.sudah.length ? 'Sudah remedial '+r.sudah.map(k=>SINGKAT_KOMP[k]).join(', ')+', masih di bawah KKM' : 'Belum remedial', '', '', '']));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [5,30,14,9,7,14,11,18,34,7,7,7,10,7,12,22,30,16,14,22].map(w=>({ wch:w }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Daftar Remedial');
+  // Rekap per mapel
+  const pm = new Map();
+  b.forEach(r=>{ const k = [r.mapel, r.program, r.kelas].join('||'); if(!pm.has(k)) pm.set(k, new Set()); pm.get(k).add(r.nisn); });
+  const rekM = [['REKAP PER MATA PELAJARAN'], [], ['Mata Pelajaran','Jenjang','Kelas','Jumlah Siswa Belum Tuntas']];
+  [...pm.entries()].map(([k, s])=>[...k.split('||'), s.size]).sort((x,y)=>String(x[0]).localeCompare(String(y[0]),'id') || bandingKelasRem({program:x[1],kelas:x[2]},{program:y[1],kelas:y[2]})).forEach(x=>rekM.push(x));
+  const wsM = XLSX.utils.aoa_to_sheet(rekM); wsM['!cols'] = [{wch:36},{wch:10},{wch:8},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, wsM, 'Rekap per Mapel');
+  // Rekap per siswa
+  const ps = new Map();
+  b.forEach(r=>{ if(!ps.has(r.nisn)) ps.set(r.nisn, { nama:r.nama, nisn:r.nisn, program:r.program, kelas:r.kelas, rombel:r.rombel, mapel:[] }); ps.get(r.nisn).mapel.push(r.mapel); });
+  const rekS = [['REKAP PER SISWA'], [], ['No','Nama Siswa','NISN','Jenjang','Kelas','Rombel','Jumlah Mapel Belum Tuntas','Mata Pelajaran']];
+  [...ps.values()].sort((x,y)=>bandingKelasRem(x,y) || String(x.nama).localeCompare(String(y.nama),'id')).forEach((s,i)=>rekS.push([i+1, s.nama, s.nisn, s.program, s.kelas, s.rombel, s.mapel.length, s.mapel.join(', ')]));
+  const wsS = XLSX.utils.aoa_to_sheet(rekS); wsS['!cols'] = [{wch:5},{wch:30},{wch:14},{wch:9},{wch:7},{wch:14},{wch:12},{wch:70}];
+  XLSX.utils.book_append_sheet(wb, wsS, 'Rekap per Siswa');
+  XLSX.writeFile(wb, `perlu-remedial-${namaFileAman(rmV('rm-ta'))}-${rmV('rm-smt')}.xlsx`);
+}
+async function cetakRemedial(){
+  const b = rmBaris;
+  if(!b.length) return alert('Tidak ada data untuk dicetak pada filter ini.');
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  win.document.write('<p style="font-family:Arial;padding:20px;">Menyiapkan daftar...</p>');
+  const mode = rmV('rm-kelompok');
+  const ttdKepala = await ambilTtd('kepala_pkbm', '');
+  const grup = susunGrupRemedial(b, mode);
+  const nSiswa = new Set(b.map(x=>x.nisn)).size;
+  win.document.open();
+  win.document.write(`<html><head><title>Daftar Perlu Remedial</title><style>
+    body{font-family:Arial,Helvetica,sans-serif;max-width:1000px;margin:24px auto;color:#111;font-size:12px;}
+    .kop{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;border-bottom:4px double #000;padding-bottom:6px;text-align:center;line-height:1.25;}
+    .kop img{width:80px;height:auto;flex:none;} .kop .t{flex:1;}
+    .kop .l1{font-size:15px;font-weight:bold;} .kop .l2{font-size:17px;font-weight:bold;} .kop .l3{font-size:26px;font-weight:bold;letter-spacing:1px;}
+    .kop .l4{font-size:13px;font-weight:bold;} .kop .l5{font-size:11px;} .kop .l6{font-size:8px;} .kop .l7{font-size:10px;}
+    h1{font-size:17px;text-align:center;margin:16px 0 2px;} .sub{text-align:center;font-size:12px;color:#333;margin-bottom:12px;}
+    .grup{margin-bottom:16px;} ${mode==='mapel' ? '.grup{page-break-inside:avoid;}' : '.grup + .grup{page-break-before:always;}'}
+    .grup h3{font-size:14px;margin:10px 0 2px;} .grup .rg{font-size:11px;color:#555;margin-bottom:6px;}
+    table{width:100%;border-collapse:collapse;} th,td{border:1px solid #999;padding:4px 6px;text-align:left;vertical-align:top;} th{background:#f0ede2;}
+    tr{page-break-inside:avoid;} .muted{color:#666;}
+    .ttd{display:flex;justify-content:space-between;margin-top:30px;font-size:12px;text-align:center;page-break-inside:avoid;} .ttd .kolom{width:220px;}
+    .ttd .garis{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-weight:bold;}
+    @media print{ button{display:none;} }
+  </style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
+    ${kopSekolahHTML()}
+    <h1>DAFTAR SISWA BELUM TUNTAS KKM (PERLU REMEDIAL)</h1>
+    <div class="sub">${esc2(teksFilterRemedial())}<br>${nSiswa} siswa &bull; ${b.length} mata pelajaran</div>
+    ${grup.map(g=>`<div class="grup"><h3>${esc2(g.judul)}</h3><div class="rg">${esc2(g.ringkas)}</div>${htmlTabelRemedial(g.rows, mode)}</div>`).join('')}
+    <div class="ttd"><div class="kolom">${tglTtd()}<br>Guru Mata Pelajaran / Wali Kelas<div class="garis">(...........................)</div></div>
+      <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div></div>
+  </body></html>`);
+  win.document.close();
+}
+
+// ============================================================
 // TRANSKRIP NILAI
 // ============================================================
 async function loadTranskrip(){
@@ -5701,7 +6153,7 @@ function renderTranskripSemua(){
   }
   kosong.classList.add('hidden'); isi.classList.remove('hidden');
   isi.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin-bottom:2px;">Ringkasan Transkrip — Semua siswa Kelas ${esc2(kelas)}</h3>
-    <p class="muted" style="margin:0 0 8px;">${daftar.length} siswa. Pilih satu siswa untuk melihat dan mencetak transkrip lengkapnya; tombol Unduh Excel memuat semua siswa.</p>
+    <p class="muted" style="margin:0 0 8px;">${daftar.length} siswa. Pilih satu siswa untuk melihat transkrip lengkapnya. Tombol Cetak Massal mencetak transkrip semua siswa di atas (satu siswa per halaman), dan Unduh Excel memuat semua siswa.</p>
     <table><thead><tr><th>No</th><th>Nama</th><th>NISN</th><th>Semester Tercatat</th><th>Jumlah Mapel</th><th>Rata-rata Nilai Akhir</th><th>Belum Tuntas KKM</th></tr></thead><tbody>
     ${daftar.map((x,i)=>`<tr><td>${i+1}</td><td>${esc2(x.s.nama)}</td><td>${esc2(x.s.nisn)}</td><td>${x.T.blok.length}</td><td>${x.T.jumlahMapel}</td><td><b>${fmtN(x.T.rataKeseluruhan)}</b></td><td>${x.T.belumTuntas?`<span style="color:#b3261e;">${x.T.belumTuntas}</span>`:'-'}</td></tr>`).join('')}
     </tbody></table></div>`;
@@ -5766,22 +6218,7 @@ function unduhTranskripExcel(){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Transkrip');
   XLSX.writeFile(wb, `transkrip-${namaFileAman(s?s.nama:nisn)}.xlsx`);
 }
-async function cetakTranskrip(){
-  const nisn = document.getElementById('tk-siswa').value;
-  if(!nisn) return alert('Pilih siswa terlebih dahulu.');
-  if(nisn===SEMUA_SISWA) return alert('Transkrip dicetak per siswa. Pilih satu siswa dari kelas ini (Excel dan tampilan layar sudah mendukung semua siswa).');
-  const T = susunTranskrip(nisn);
-  if(!T.blok.length) return alert('Belum ada nilai untuk dicetak.');
-  const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
-  const nama = s ? s.nama : nisn;
-  const terakhir = T.blok[T.blok.length-1];
-  const [ttdKepala, ttdWali] = await Promise.all([ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', terakhir.kelas)]);
-  const cel = v => v==null ? '-' : fmtN(v);
-  const win = window.open('', '_blank');
-  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
-  win.document.write(`
-    <html><head><title>Transkrip - ${esc2(nama)}</title>
-    <style>
+const CSS_TRANSKRIP = `
       body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:30px auto;color:#111;}
       .kop{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;border-bottom:4px double #000;padding-bottom:6px;font-family:Arial,sans-serif;text-align:center;line-height:1.25;}
       .kop img{width:96px;height:auto;flex:none;}
@@ -5802,10 +6239,14 @@ async function cetakTranskrip(){
       .ttd{display:flex;justify-content:space-between;margin-top:40px;font-size:13px;text-align:center;page-break-inside:avoid;}
       .ttd .kolom{width:220px;}
       .ttd .garis{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-weight:bold;}
-      @media print{ button{display:none;} }
-    </style></head><body>
-    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
-    ${kopSekolahHTML()}
+      .halaman{page-break-after:always;}
+      .halaman:last-child{page-break-after:auto;}
+      @media print{ button{display:none;} }`;
+// Isi SATU halaman transkrip (kop sampai tanda tangan). Dipakai cetak satuan dan cetak massal.
+function htmlHalamanTranskrip(nisn, nama, T, ttdKepala, ttdWali){
+  const terakhir = T.blok[T.blok.length-1];
+  const cel = v => v==null ? '-' : fmtN(v);
+  return `${kopSekolahHTML()}
     <h1>TRANSKRIP NILAI</h1>
     <div class="sub">Akumulasi Ulangan Harian, UTS, UAS${T.blok.some(b=>b.adaTugas||b.adaPraktik)?', Tugas &amp; Praktik':''}</div>
     <table class="info">
@@ -5814,16 +6255,59 @@ async function cetakTranskrip(){
     </table>
     ${T.blok.map(bk=>`<div class="blok"><h3>${esc2(labelSmt(bk.smt))} &mdash; Tahun Ajaran ${esc2(bk.ta)} (Kelas ${esc2(bk.kelas)})</h3>
       <table class="nilai"><thead><tr><th>No</th><th>Mata Pelajaran</th><th>UH</th><th>UTS</th><th>UAS</th>${bk.adaTugas?'<th>Tugas</th>':''}${bk.adaPraktik?'<th>Praktik</th>':''}<th>Nilai Akhir</th><th>KKM</th><th>Ket.</th></tr></thead><tbody>
-      ${bk.mapel.map((m,i)=>`<tr><td>${i+1}</td><td>${esc2(m.mapel)}</td><td>${cel(m.uh)}</td><td>${cel(m.uts)}</td><td>${cel(m.uas)}</td>${bk.adaTugas?`<td>${cel(m.tugas)}</td>`:''}${bk.adaPraktik?`<td>${cel(m.praktik)}</td>`:''}<td><b>${cel(m.na)}</b></td><td>${fmtN(m.kkm)}</td><td>${ketTuntas(m.tuntas)}</td></tr>`).join('')}
+      ${bk.mapel.map((m,i)=>`<tr><td>${i+1}</td><td>${esc2(m.mapel)}</td><td>${cel(m.uh)}${tandaRemCetak(m,'uh')}</td><td>${cel(m.uts)}${tandaRemCetak(m,'uts')}</td><td>${cel(m.uas)}${tandaRemCetak(m,'uas')}</td>${bk.adaTugas?`<td>${cel(m.tugas)}</td>`:''}${bk.adaPraktik?`<td>${cel(m.praktik)}</td>`:''}<td><b>${cel(m.na)}</b></td><td>${fmtN(m.kkm)}</td><td>${ketTuntas(m.tuntas)}</td></tr>`).join('')}
       <tr><td colspan="${5+(bk.adaTugas?1:0)+(bk.adaPraktik?1:0)}" style="text-align:right;"><b>Rata-rata semester</b></td><td colspan="3"><b>${cel(bk.rata)}</b></td></tr>
       </tbody></table>
       ${bk.catatan ? `<div class="catatan" style="margin-top:4px;">${esc2(teksCatatan(bk.catatan))}</div>` : ''}</div>`).join('')}
     <div class="ringkasan"><b>Jumlah mata pelajaran tercatat:</b> ${T.jumlahMapel} &nbsp;&bull;&nbsp; <b>Rata-rata keseluruhan:</b> ${cel(T.rataKeseluruhan)}${T.rataKeseluruhan!=null?' ('+esc2(predikatNilai(T.rataKeseluruhan))+')':''} &nbsp;&bull;&nbsp; <b>Belum tuntas KKM:</b> ${T.belumTuntas}</div>
-    <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.</div>
+    <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${T.blok.some(b=>b.mapel.some(m=>m.rem)) ? ' Tanda * = nilai setelah remedial.' : ''}</div>
     <div class="ttd">
       <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
       <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
-    </div>
+    </div>`;
+}
+// Tanda * di cetakan untuk komponen yang memakai nilai remedial (versi cetak dari tandaRem)
+function tandaRemCetak(m, k){ return (m.rem && m.rem[k]) ? '*' : ''; }
+async function cetakTranskrip(){
+  const nisn = document.getElementById('tk-siswa').value;
+  if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  if(nisn===SEMUA_SISWA) return cetakTranskripMassal();
+  const T = susunTranskrip(nisn);
+  if(!T.blok.length) return alert('Belum ada nilai untuk dicetak.');
+  const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
+  const nama = s ? s.nama : nisn;
+  const terakhir = T.blok[T.blok.length-1];
+  const [ttdKepala, ttdWali] = await Promise.all([ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', terakhir.kelas)]);
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  win.document.write(`<html><head><title>Transkrip - ${esc2(nama)}</title><style>${CSS_TRANSKRIP}</style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
+    <div class="halaman">${htmlHalamanTranskrip(nisn, nama, T, ttdKepala, ttdWali)}</div>
+    </body></html>`);
+  win.document.close();
+}
+// Cetak massal: satu siswa satu halaman (dst. bila semester banyak), semua siswa pada Kelas/pencarian yang sedang dipilih.
+async function cetakTranskripMassal(){
+  const daftar = daftarPickerSiswa('tk').map(s=>({ s, T: susunTranskrip(s.nisn) })).filter(x=>x.T.blok.length);
+  if(!daftar.length) return alert('Tidak ada siswa dengan nilai tercatat pada pilihan Kelas/pencarian ini.');
+  if(daftar.length>80 && !confirm(`Akan membuat ${daftar.length} transkrip sekaligus. Halaman bisa berat dimuat; disarankan memilih satu kelas dulu. Lanjutkan?`)) return;
+  const win = window.open('', '_blank');
+  if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  win.document.write(`<p style="font-family:Arial;padding:20px;">Menyiapkan ${daftar.length} transkrip...</p>`);
+  const kelasSet = [...new Set(daftar.map(x=>x.T.blok[x.T.blok.length-1].kelas))];
+  const waliMap = new Map();
+  const [ttdKepala] = await Promise.all([
+    ambilTtd('kepala_pkbm',''),
+    ...kelasSet.map(async k=>{ waliMap.set(k, await ambilTtd('wali_kelas', k)); })
+  ]);
+  const kelas = document.getElementById('tk-kelas').value;
+  win.document.open();
+  win.document.write(`<html><head><title>Transkrip Massal${kelas?' Kelas '+esc2(kelas):''} (${daftar.length} siswa)</title><style>${CSS_TRANSKRIP}</style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF (${daftar.length} siswa)</button>
+    ${daftar.map(x=>{
+      const terakhir = x.T.blok[x.T.blok.length-1];
+      return `<div class="halaman">${htmlHalamanTranskrip(x.s.nisn, x.s.nama, x.T, ttdKepala, waliMap.get(terakhir.kelas))}</div>`;
+    }).join('')}
     </body></html>`);
   win.document.close();
 }
@@ -5846,7 +6330,7 @@ function isiMapelInput(){
 }
 function ubahModeInput(){
   const mode = document.getElementById('in-mode').value;
-  document.getElementById('in-wrap-mapel').classList.toggle('hidden', mode!=='tugas');
+  document.getElementById('in-wrap-mapel').classList.toggle('hidden', mode==='sikap');
   document.getElementById('in-tabel').innerHTML = '';
   document.getElementById('in-simpan-bar').classList.add('hidden');
 }
@@ -5864,7 +6348,7 @@ function ctxInput(){
     ta:document.getElementById('in-ta').value, smt:document.getElementById('in-smt').value, mode:document.getElementById('in-mode').value,
     mapel:document.getElementById('in-mapel').value };
   if(!c.program || !c.kelas || !c.ta || !c.smt){ alert('Pilih Jenjang, Kelas, Tahun Ajaran, dan Semester dulu.'); return null; }
-  if(c.mode==='tugas' && !c.mapel){ alert('Pilih mata pelajaran dulu.'); return null; }
+  if(c.mode!=='sikap' && !c.mapel){ alert('Pilih mata pelajaran dulu.'); return null; }
   if(!dbV7Tersedia){ alert('Jalankan migrasi-v7.sql di Supabase SQL Editor dulu sebelum menyimpan nilai tambahan.'); return null; }
   return c;
 }
@@ -5877,7 +6361,21 @@ async function muatInputNilai(){
     tabel.innerHTML = '<p class="muted">Tidak ada siswa aktif pada jenjang/kelas ini di database absensi.</p>'; bar.classList.add('hidden'); return;
   }
   bar.classList.remove('hidden');
-  if(c.mode==='tugas'){
+  if(c.mode==='remedial'){
+    const kkm = ambilKKM(c.program, c.kelas, c.mapel);
+    const modeRem = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
+    tabel.innerHTML = `<div class="card"><p class="muted" style="margin:0 0 8px;">KKM mapel ini: <b>${fmtN(kkm)}</b>. Aturan: <b>${esc2({kkm:'nilai remedial maksimal = KKM',tertinggi:'ambil nilai tertinggi',rata:'rata-rata nilai asli & remedial',nonaktif:'remedial dinonaktifkan (nilai remedial diabaikan)'}[modeRem])}</b> (ubah di Pengaturan Nilai). Isi kolom Remedial hanya untuk komponen yang nilainya di bawah KKM (ditandai merah); yang sudah tuntas diabaikan.</p>
+      <table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>UH asli</th><th style="width:90px;">Remedial UH</th><th>UTS asli</th><th style="width:90px;">Remedial UTS</th><th>UAS asli</th><th style="width:90px;">Remedial UAS</th></tr></thead><tbody>` +
+      inRoster.map((s,i)=>{
+        const key = [c.ta, c.smt, c.kelas, c.program, c.mapel].join('||');
+        const m = manualMap.get(`${s.nisn}##${key}`) || {};
+        const rowsS = nilaiArsip.filter(r=>r.siswa_nisn===s.nisn && r.ta===c.ta && r.smt===c.smt && r.kelas===c.kelas && r.program===c.program && r.mapel_nama===c.mapel);
+        const asli = hitungMapel(rowsS, null);
+        const sel = (k, pre) => { const a = asli[k]; const rendah = a==null || a<kkm;
+          return `<td${a!=null&&rendah?' style="color:#b3261e;font-weight:600;"':''}>${a==null?'<span class="muted">-</span>':fmtN(a)}</td><td><input type="text" inputmode="decimal" id="${pre}${i}" value="${m['rem_'+k]!=null?m['rem_'+k]:''}" /></td>`; };
+        return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>${sel('uh','in-ru-')}${sel('uts','in-rt-')}${sel('uas','in-ra-')}</tr>`;
+      }).join('') + '</tbody></table></div>';
+  } else if(c.mode==='tugas'){
     tabel.innerHTML = `<div class="card"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th style="width:110px;">Tugas (0-100)</th><th style="width:110px;">Praktik (0-100)</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
         const m = manualMap.get(`${s.nisn}##${[c.ta, c.smt, c.kelas, c.program, c.mapel].join('||')}`) || {};
@@ -5956,11 +6454,13 @@ async function simpanInputNilai(){
   if(!inRoster.length) return alert('Klik "Muat Siswa" dulu.');
   const btn = document.getElementById('in-simpan-btn'); btn.disabled = true;
   try{
-    if(c.mode==='tugas'){
+    if(c.mode!=='sikap'){
       const upsert = [], hapus = [];
+      const KOMPS = c.mode==='remedial' ? [['rem_uh','in-ru-'],['rem_uts','in-rt-'],['rem_uas','in-ra-']] : [['tugas','in-t-'],['praktik','in-p-']];
       for(let i=0;i<inRoster.length;i++){
         const s = inRoster[i];
-        for(const [komp, id] of [['tugas','in-t-'+i],['praktik','in-p-'+i]]){
+        for(const [komp, pre] of KOMPS){
+          const id = pre+i;
           const n = angkaAtauNull(document.getElementById(id).value);
           if(Number.isNaN(n) || (n!=null && (n<0 || n>100))) throw new Error(`Nilai ${komp} untuk ${s.nama} harus angka 0-100.`);
           const ada = manualBaris.find(r=>r.siswa_nisn===s.nisn && r.program===c.program && r.kelas===c.kelas && r.tahun_ajaran===c.ta && r.semester===c.smt && r.mapel_nama===c.mapel && r.komponen===komp);
@@ -6006,6 +6506,7 @@ async function loadPengaturanNilai(){
   const b = pengNilai.bobot;
   ['uh','uts','uas','tugas','praktik'].forEach(k=>{ document.getElementById('pn-b-'+k).value = b[k]; });
   document.getElementById('pn-mode').value = pengNilai.mode;
+  document.getElementById('pn-rem-mode').value = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
   document.getElementById('pn-kkm').value = pengNilai.kkm;
   document.getElementById('pn-banner').innerHTML = dbV7Tersedia ? '' : '<b style="color:#b3261e;">Tabel pengaturan belum ada di database — jalankan migrasi-v7.sql di Supabase SQL Editor dulu.</b>';
   const urut = currentMapelList.filter(m=>!m.tidak_diujikan).slice().sort((a,c)=>(a.program+a.kelas+a.nama).localeCompare(c.program+c.kelas+c.nama,'id'));
@@ -6034,8 +6535,8 @@ async function simpanPengaturanNilai(){
     if(Number.isNaN(n) || (n!=null && (n<0 || n>100))) return alert('KKM per mapel harus angka 0-100 (kosongkan untuk memakai KKM standar).');
     if(n!=null) kkmMapel[el.dataset.kunci] = n;
   }
-  const { error } = await supa.from('pengaturan_nilai').upsert({ id:'umum', bobot, mode:document.getElementById('pn-mode').value, kkm, kkm_mapel:kkmMapel, updated_at:new Date().toISOString() });
-  if(error) return alert('Gagal menyimpan: '+error.message);
+  const { error } = await supa.from('pengaturan_nilai').upsert({ id:'umum', bobot, mode:document.getElementById('pn-mode').value, kkm, kkm_mapel:kkmMapel, remedial:{ mode:document.getElementById('pn-rem-mode').value }, updated_at:new Date().toISOString() });
+  if(error) return alert('Gagal menyimpan: '+error.message+(/remedial/i.test(error.message)?' — jalankan migrasi-v14-remedial.sql di Supabase SQL Editor dulu.':''));
   alert('Pengaturan nilai tersimpan. Berlaku untuk Rekap Nilai, Leger, dan Transkrip.');
   await loadPengaturanNilai();
 }
