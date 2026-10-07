@@ -578,6 +578,7 @@
       </div>
 
       <div id="lap-kosong" class="muted">Belum ada siswa dipilih, atau belum ada data ujian tersimpan.</div>
+      <div id="lap-semua" class="hidden"></div>
 
       <div id="lap-isi" class="hidden">
         <div class="card">
@@ -4414,12 +4415,20 @@ async function loadDaftarSiswaLaporan(){
   document.getElementById('lap-filter-kelas').value = '';
   renderOpsiSiswaLaporan(daftarSiswaLaporan);
 }
+function daftarSiswaLaporanTerfilter(){
+  const q = document.getElementById('lap-cari').value.trim().toLowerCase();
+  const kelas = document.getElementById('lap-filter-kelas').value;
+  return daftarSiswaLaporan.filter(s=>(!kelas || s.kelasRomawi===kelas) &&
+    (!q || s.nama.toLowerCase().includes(q) || s.nisn.toLowerCase().includes(q)));
+}
 function renderOpsiSiswaLaporan(list){
   const sel = document.getElementById('lap-siswa-select');
+  const kelas = document.getElementById('lap-filter-kelas').value;
   const prev = sel.value;
   sel.innerHTML = '<option value="">— pilih siswa —</option>' +
+    (kelas && list.length ? `<option value="__SEMUA__">★ Semua siswa Kelas ${escapeHtml(kelas)} (${list.length} siswa)</option>` : '') +
     list.map(s=>`<option value="${escapeHtml(s.nisn)}">${escapeHtml(s.nama)} (${escapeHtml(s.nisn)})</option>`).join('');
-  if(list.some(s=>s.nisn===prev)) sel.value = prev;
+  if(list.some(s=>s.nisn===prev) || (prev==='__SEMUA__' && kelas && list.length)) sel.value = prev;
 }
 function saringDaftarSiswaLaporan(){
   const q = document.getElementById('lap-cari').value.trim().toLowerCase();
@@ -4427,7 +4436,9 @@ function saringDaftarSiswaLaporan(){
   const filtered = daftarSiswaLaporan.filter(s=>
     (!kelas || s.kelasRomawi===kelas) &&
     (!q || s.nama.toLowerCase().includes(q) || s.nisn.toLowerCase().includes(q)));
+  const sebelum = document.getElementById('lap-siswa-select').value;
   renderOpsiSiswaLaporan(filtered);
+  if(sebelum==='__SEMUA__') tampilkanLaporanSiswa();
 }
 
 function predikatNilai(n){
@@ -4450,8 +4461,35 @@ function formatPeriode(smt, ta, fallback){
   return fallback;
 }
 
+// Ringkasan seluruh siswa dalam kelas terpilih (opsi "Semua siswa"); klik nama untuk membuka laporan lengkapnya.
+async function tampilkanLaporanKelas(){
+  const kelas = document.getElementById('lap-filter-kelas').value;
+  const daftar = daftarSiswaLaporanTerfilter();
+  const kosong = document.getElementById('lap-kosong'), box = document.getElementById('lap-semua');
+  document.getElementById('lap-isi').classList.add('hidden');
+  kosong.classList.remove('hidden'); kosong.textContent = 'Memuat ringkasan kelas...';
+  const { data, error } = await supa.from('sesi_ujian')
+    .select('siswa_nisn, total_skor, waktu_selesai, paket_ujian(jenis_ujian, diarsipkan)')
+    .in('siswa_nisn', daftar.map(s=>s.nisn));
+  if(error){ kosong.textContent = 'Gagal memuat: '+error.message; return; }
+  const per = new Map();
+  (data||[]).filter(r=>r.waktu_selesai && r.paket_ujian && !r.paket_ujian.diarsipkan && r.paket_ujian.jenis_ujian!=='Ulangan Harian')
+    .forEach(r=>{ const a = per.get(r.siswa_nisn) || []; a.push(Number(r.total_skor)||0); per.set(r.siswa_nisn, a); });
+  kosong.classList.add('hidden'); box.classList.remove('hidden');
+  box.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin-bottom:2px;">Semua siswa Kelas ${escapeHtml(kelas)}</h3>
+    <p class="muted" style="margin:0 0 8px;">${daftar.length} siswa. Klik nama untuk membuka laporan, rapor, dan piagam siswa tersebut.</p>
+    <table><thead><tr><th>No</th><th>Nama</th><th>NISN</th><th>Ujian Diikuti</th><th>Rata-rata Nilai</th></tr></thead><tbody>
+    ${daftar.map((s,i)=>{ const a = per.get(s.nisn)||[]; return `<tr><td>${i+1}</td><td><a href="#" onclick="bukaLaporanDariKelas('${escapeHtml(s.nisn)}');return false;">${escapeHtml(s.nama)}</a></td><td>${escapeHtml(s.nisn)}</td><td>${a.length}</td><td>${a.length ? (a.reduce((x,y)=>x+y,0)/a.length).toFixed(1).replace('.',',') : '-'}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
+}
+function bukaLaporanDariKelas(nisn){
+  document.getElementById('lap-siswa-select').value = nisn;
+  tampilkanLaporanSiswa();
+}
 async function tampilkanLaporanSiswa(){
   const nisn = document.getElementById('lap-siswa-select').value;
+  document.getElementById('lap-semua').classList.add('hidden');
+  if(nisn==='__SEMUA__') return tampilkanLaporanKelas();
   if(!nisn){
     document.getElementById('lap-isi').classList.add('hidden');
     document.getElementById('lap-kosong').classList.remove('hidden');
@@ -5174,16 +5212,27 @@ function opsiTahunAjaranNilai(){
   return [...set].sort();
 }
 function taBerjalan(){ return `${tahunAjaranSekarang()}/${tahunAjaranSekarang()+1}`; }
-function saringPickerSiswa(p){
+// Opsi "Semua siswa" muncul di dropdown Pilih Siswa begitu sebuah kelas dipilih (Laporan Siswa, Rekap Nilai, Transkrip).
+const SEMUA_SISWA = '__SEMUA__';
+function opsiSemuaSiswaHtml(kelas, jumlah){
+  return (kelas && jumlah>0) ? `<option value="${SEMUA_SISWA}">★ Semua siswa Kelas ${esc2(kelas)} (${jumlah} siswa)</option>` : '';
+}
+function daftarPickerSiswa(p){
   const q = document.getElementById(p+'-cari').value.trim().toLowerCase();
+  const kelas = document.getElementById(p+'-kelas').value;
+  return daftarSiswaNilai.filter(s=>(!kelas || s.kelasRomawi===kelas) &&
+    (!q || String(s.nama).toLowerCase().includes(q) || String(s.nisn).toLowerCase().includes(q)));
+}
+function saringPickerSiswa(p){
   const kelas = document.getElementById(p+'-kelas').value;
   const sel = document.getElementById(p+'-siswa');
   const prev = sel.value;
-  const list = daftarSiswaNilai.filter(s=>(!kelas || s.kelasRomawi===kelas) &&
-    (!q || String(s.nama).toLowerCase().includes(q) || String(s.nisn).toLowerCase().includes(q)));
-  sel.innerHTML = '<option value="">— pilih siswa —</option>' +
+  const list = daftarPickerSiswa(p);
+  sel.innerHTML = '<option value="">— pilih siswa —</option>' + opsiSemuaSiswaHtml(kelas, list.length) +
     list.map(s=>`<option value="${esc2(s.nisn)}">${esc2(s.nama)} (${esc2(s.nisn)})${s.nonaktif?' — tidak aktif':''}</option>`).join('');
-  if(list.some(s=>s.nisn===prev)) sel.value = prev;
+  if(list.some(s=>s.nisn===prev) || (prev===SEMUA_SISWA && kelas && list.length)) sel.value = prev;
+  // Tampilan "Semua siswa" harus ikut berubah saat kelas/pencarian diganti
+  if(prev===SEMUA_SISWA) (p==='rn' ? renderRekapNilai : renderTranskrip)();
 }
 
 // ---------- perhitungan ----------
@@ -5245,9 +5294,38 @@ async function loadRekapNilai(){
   document.getElementById('rn-info-bobot').textContent = teksBobotNilai() + ' — ubah di menu Pengaturan Nilai.';
   renderRekapNilai();
 }
+function renderRekapNilaiSemua(){
+  const kosong = document.getElementById('rn-kosong'), isi = document.getElementById('rn-isi');
+  const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
+  const kelas = document.getElementById('rn-kelas').value;
+  const daftar = daftarPickerSiswa('rn').map(s=>({ s, rows: susunNilaiSiswa(s.nisn, ta, smt) })).filter(x=>x.rows.length);
+  if(!daftar.length){
+    isi.classList.add('hidden'); kosong.classList.remove('hidden');
+    kosong.textContent = `Belum ada nilai final tersimpan untuk siswa Kelas ${kelas} pada filter yang dipilih.`; return;
+  }
+  kosong.classList.add('hidden'); isi.classList.remove('hidden');
+  const cel = v => v==null ? '<span class="muted">-</span>' : fmtN(v);
+  const rataSiswa = daftar.map(x=>{ const n = x.rows.map(r=>r.na).filter(v=>v!=null); return n.length ? rataRata(n) : null; }).filter(v=>v!=null);
+  document.getElementById('rn-nama').textContent = `Semua siswa Kelas ${kelas}`;
+  document.getElementById('rn-nisn').textContent = '-';
+  document.getElementById('rn-jumlah').textContent = `${daftar.length} siswa`;
+  document.getElementById('rn-rata').textContent = rataSiswa.length ? fmtN(rataRata(rataSiswa)) : '-';
+  document.getElementById('rn-max').textContent = rataSiswa.length ? fmtN(Math.max(...rataSiswa)) : '-';
+  document.getElementById('rn-min').textContent = rataSiswa.length ? fmtN(Math.min(...rataSiswa)) : '-';
+  document.getElementById('rn-body').innerHTML = daftar.map((x,i)=>{
+    const belum = x.rows.filter(r=>r.tuntas===false).length;
+    return `<tr style="background:#F0EDE2;"><td colspan="11"><b>${i+1}. ${esc2(x.s.nama)}</b> <span class="muted">(${esc2(x.s.nisn)})</span>${belum?` &bull; <span style="color:#b3261e;">${belum} mapel belum tuntas KKM</span>`:''}</td></tr>` +
+      x.rows.map(r=>`<tr${r.tuntas===false?' style="background:#FBEEEC;"':''}>
+        <td>${esc2(r.mapel)}</td><td>${esc2(labelSmt(r.smt))}<br><span class="muted">${esc2(r.ta)}</span></td><td>${esc2(r.kelas)}</td>
+        <td>${cel(r.uh)}</td><td>${cel(r.uts)}</td><td>${cel(r.uas)}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
+        <td><b>${r.na==null?'-':fmtN(r.na)}</b></td><td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td></tr>`).join('');
+  }).join('');
+  document.getElementById('rn-catatan').innerHTML = '<span class="muted">Ringkasan di atas = rata-rata dari rata-rata Nilai Akhir tiap siswa. Pilih satu siswa untuk melihat sikap &amp; kehadiran.</span>';
+}
 function renderRekapNilai(){
   const nisn = document.getElementById('rn-siswa').value;
   const kosong = document.getElementById('rn-kosong'), isi = document.getElementById('rn-isi');
+  if(nisn===SEMUA_SISWA) return renderRekapNilaiSemua();
   if(!nisn){ isi.classList.add('hidden'); kosong.classList.remove('hidden'); kosong.textContent = 'Pilih siswa terlebih dahulu.'; return; }
   const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
   const rows = susunNilaiSiswa(nisn, ta, smt);
@@ -5301,6 +5379,7 @@ function peringkatRaporSemester(nisn, ta, smt, kelas, program){
 async function cetakRaporSemester(){
   const nisn = document.getElementById('rn-siswa').value;
   if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  if(nisn===SEMUA_SISWA) return alert('Rapor dicetak per siswa. Pilih satu siswa dari kelas ini (Excel dan tampilan layar sudah mendukung semua siswa).');
   const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
   if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
   if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
@@ -5385,6 +5464,19 @@ async function cetakRaporSemester(){
 function unduhRekapNilaiSiswa(){
   const nisn = document.getElementById('rn-siswa').value;
   if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  if(nisn===SEMUA_SISWA){
+    const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
+    const kelas = document.getElementById('rn-kelas').value;
+    const aoa = [[`REKAP NILAI SISWA — KELAS ${kelas}`], [teksBobotNilai()], [],
+      ['No','Nama','NISN','Tahun Ajaran','Semester','Kelas','Mata Pelajaran','Ulangan Harian (rata-rata)','Jumlah UH','UTS','UAS','Tugas','Praktik','Nilai Akhir','Predikat','KKM','Keterangan']];
+    let no = 0;
+    daftarPickerSiswa('rn').forEach(s=>susunNilaiSiswa(s.nisn, ta, smt).forEach(r=>aoa.push([++no, s.nama, s.nisn, r.ta, labelSmt(r.smt), r.kelas, r.mapel, bulat1(r.uh), r.uhList.length, bulat1(r.uts), bulat1(r.uas), bulat1(r.tugas), bulat1(r.praktik), bulat1(r.na), r.na==null?'':predikatNilai(r.na), r.kkm, ketTuntas(r.tuntas)])));
+    if(!no) return alert('Tidak ada nilai untuk diunduh.');
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [5,30,14,12,18,8,34,14,10,8,8,8,8,11,20,7,14].map(w=>({ wch:w }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rekap Nilai');
+    return XLSX.writeFile(wb, `rekap-nilai-kelas-${namaFileAman(kelas)}.xlsx`);
+  }
   const rows = susunNilaiSiswa(nisn, document.getElementById('rn-ta').value, document.getElementById('rn-smt').value);
   if(!rows.length) return alert('Tidak ada nilai untuk diunduh.');
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
@@ -5560,9 +5652,25 @@ function susunTranskrip(nisn){
   const semuaNA = rows.map(r=>r.na).filter(x=>x!=null);
   return { blok, rataKeseluruhan: rataRata(semuaNA), jumlahMapel: rows.length, belumTuntas: rows.filter(r=>r.tuntas===false).length };
 }
+function renderTranskripSemua(){
+  const kosong = document.getElementById('tk-kosong'), isi = document.getElementById('tk-isi');
+  const kelas = document.getElementById('tk-kelas').value;
+  const daftar = daftarPickerSiswa('tk').map(s=>({ s, T: susunTranskrip(s.nisn) })).filter(x=>x.T.blok.length);
+  if(!daftar.length){
+    isi.classList.add('hidden'); kosong.classList.remove('hidden');
+    kosong.textContent = `Belum ada nilai final tersimpan untuk siswa Kelas ${kelas}.`; return;
+  }
+  kosong.classList.add('hidden'); isi.classList.remove('hidden');
+  isi.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin-bottom:2px;">Ringkasan Transkrip — Semua siswa Kelas ${esc2(kelas)}</h3>
+    <p class="muted" style="margin:0 0 8px;">${daftar.length} siswa. Pilih satu siswa untuk melihat dan mencetak transkrip lengkapnya; tombol Unduh Excel memuat semua siswa.</p>
+    <table><thead><tr><th>No</th><th>Nama</th><th>NISN</th><th>Semester Tercatat</th><th>Jumlah Mapel</th><th>Rata-rata Nilai Akhir</th><th>Belum Tuntas KKM</th></tr></thead><tbody>
+    ${daftar.map((x,i)=>`<tr><td>${i+1}</td><td>${esc2(x.s.nama)}</td><td>${esc2(x.s.nisn)}</td><td>${x.T.blok.length}</td><td>${x.T.jumlahMapel}</td><td><b>${fmtN(x.T.rataKeseluruhan)}</b></td><td>${x.T.belumTuntas?`<span style="color:#b3261e;">${x.T.belumTuntas}</span>`:'-'}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
 function renderTranskrip(){
   const nisn = document.getElementById('tk-siswa').value;
   const kosong = document.getElementById('tk-kosong'), isi = document.getElementById('tk-isi');
+  if(nisn===SEMUA_SISWA) return renderTranskripSemua();
   if(!nisn){ isi.classList.add('hidden'); kosong.classList.remove('hidden'); kosong.textContent = 'Pilih siswa terlebih dahulu.'; return; }
   const T = susunTranskrip(nisn);
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
@@ -5588,6 +5696,21 @@ function renderTranskrip(){
 function unduhTranskripExcel(){
   const nisn = document.getElementById('tk-siswa').value;
   if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  if(nisn===SEMUA_SISWA){
+    const kelas = document.getElementById('tk-kelas').value;
+    const aoa = [[`TRANSKRIP NILAI — KELAS ${kelas}`], [teksBobotNilai()], [],
+      ['Nama','NISN','Tahun Ajaran','Semester','Kelas','No','Mata Pelajaran','Ulangan Harian (rata-rata)','UTS','UAS','Tugas','Praktik','Nilai Akhir','Predikat','KKM','Keterangan']];
+    let ada = false;
+    daftarPickerSiswa('tk').forEach(s=>{
+      const T = susunTranskrip(s.nisn);
+      T.blok.forEach(bk=>{ bk.mapel.forEach((m,i)=>{ ada = true; aoa.push([s.nama, s.nisn, bk.ta, labelSmt(bk.smt), bk.kelas, i+1, m.mapel, bulat1(m.uh), bulat1(m.uts), bulat1(m.uas), bulat1(m.tugas), bulat1(m.praktik), bulat1(m.na), m.na==null?'':predikatNilai(m.na), m.kkm, ketTuntas(m.tuntas)]); }); });
+    });
+    if(!ada) return alert('Belum ada nilai untuk diunduh.');
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [30,14,12,18,8,5,40,14,8,8,8,8,11,20,7,14].map(w=>({ wch:w }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Transkrip');
+    return XLSX.writeFile(wb, `transkrip-kelas-${namaFileAman(kelas)}.xlsx`);
+  }
   const T = susunTranskrip(nisn);
   if(!T.blok.length) return alert('Belum ada nilai untuk diunduh.');
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
@@ -5607,6 +5730,7 @@ function unduhTranskripExcel(){
 async function cetakTranskrip(){
   const nisn = document.getElementById('tk-siswa').value;
   if(!nisn) return alert('Pilih siswa terlebih dahulu.');
+  if(nisn===SEMUA_SISWA) return alert('Transkrip dicetak per siswa. Pilih satu siswa dari kelas ini (Excel dan tampilan layar sudah mendukung semua siswa).');
   const T = susunTranskrip(nisn);
   if(!T.blok.length) return alert('Belum ada nilai untuk dicetak.');
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
