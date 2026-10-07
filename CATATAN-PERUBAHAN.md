@@ -30,3 +30,21 @@
    - Paket kelas X-XII (Paket C) bisa diatur **Khusus IPA / Khusus IPS** lewat pilihan di header kolom. Siswa jurusan lain melihat "-" dan tidak dihitung. Jurusan siswa dibaca dari nama kelas di absensi (mis. "11 IPS 1").
    - Hitungan "Belum X dari N" memakai N = ujian yang berlaku untuk siswa itu. Ekspor Excel dan Cetak Daftar ikut memuat Susulan.
    - Sebelum migrasi dijalankan, menu tetap jalan seperti v10; hanya fitur baru ini yang nonaktif dengan pesan pengingat.
+
+## Pembaruan keamanan & identitas sekolah (langkah 1–2)
+**Wajib dijalankan:** `migrasi-v11-keamanan.sql` di Supabase SQL Editor (tabel pembatas percobaan + identitas sekolah).
+
+**Variabel lingkungan baru (Vercel → Environment Variables), semuanya opsional:**
+| Key | Fungsi |
+|---|---|
+| `ADMIN_EMAILS` | Daftar email admin (pisahkan koma). Tanpa ini, bila belum ada admin, akun TERTUA otomatis jadi admin saat pertama membuka aplikasi. |
+| `KOLOM_PIN` | Kolom di tabel siswa yang dipakai sebagai PIN (mis. `tanggal_lahir`). **Sangat disarankan diisi**, supaya siswa tidak masuk hanya dengan NISN. |
+| `WAJIB_PIN` | `true` = ujian ditolak bila `KOLOM_PIN` belum diisi. |
+
+**Perubahan:**
+- `generate-soal` sekarang wajib login (sebelumnya terbuka untuk umum).
+- `kelola-user`: peran admin/guru. Hanya admin yang boleh melihat/menambah/menghapus user, reset sandi, ubah peran.
+- `mulai-ujian`: pembatas percobaan gagal (5x per NISN / 100x per IP dalam 10 menit; IP longgar karena satu kelas biasanya berbagi satu WiFi).
+- Menu baru **Pengaturan → Identitas Sekolah** (admin): nama, NPSN, alamat, kota TTD, jabatan, logo. Dipakai di kop soal, kartu, rapor, transkrip, leger, dan halaman ujian siswa.
+- Teks soal di cetakan kini di-escape (hanya tag b, i, u, sub, sup, br yang diizinkan).
+- Rancangan tahap berikutnya (multi-sekolah): lihat `RENCANA-MULTI-SEKOLAH.md`.

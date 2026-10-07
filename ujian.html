@@ -57,10 +57,10 @@
   <!-- LAYAR MASUK -->
   <div id="layar-masuk">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-      <img src="logo-pkbm.png" alt="Logo PKBM Nurul Islam" style="width:52px;height:52px;object-fit:contain;">
+      <img id="brand-logo" src="logo-pkbm.png" alt="Logo" style="width:52px;height:52px;object-fit:contain;">
       <div>
         <h1 style="margin:0;">Ujian Online</h1>
-        <p style="color:var(--ink-soft);margin:2px 0 0;">PKBM Nurul Islam</p>
+        <p id="brand-nama" style="color:var(--ink-soft);margin:2px 0 0;">PKBM Nurul Islam</p>
       </div>
     </div>
     <div class="card">
@@ -131,6 +131,7 @@
 </div>
 
 <script>
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ld2VpdmR2b3ZwY2dvbGF4enVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NjY3MDgsImV4cCI6MjEwNTM0MjcwOH0.bJyrKD7pnCcVizWbsBD5e0LrFl_8LdwU_5JRmyqkfV0'; // kunci publik (anon), aman di browser; hanya untuk membaca identitas sekolah
 const SUPABASE_URL = 'https://oeweivdvovpcgolaxzuc.supabase.co'; // dipakai hanya untuk cek data siswa via function
 
 let sesiData = null;
@@ -519,6 +520,17 @@ async function submitUjian(otomatis, alasanAkhir){
 function escapeHtml(str){
   return (str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// Identitas sekolah (nama & logo) dari pengaturan admin; bila gagal dimuat, tampilan bawaan tetap dipakai.
+(async function muatIdentitasSekolah(){
+  try{
+    const r = await fetch(SUPABASE_URL+'/rest/v1/pengaturan_sekolah?id=eq.1&select=nama_aplikasi,logo_url', { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY } });
+    if(!r.ok) return;
+    const d = (await r.json())[0]; if(!d) return;
+    if(d.nama_aplikasi){ document.getElementById('brand-nama').textContent = d.nama_aplikasi; document.title = 'Ujian Online — '+d.nama_aplikasi; }
+    if(d.logo_url && /^data:image\/|^https?:\/\//.test(d.logo_url)) document.getElementById('brand-logo').src = d.logo_url;
+  }catch(e){ /* abaikan */ }
+})();
 </script>
 </body>
 </html>

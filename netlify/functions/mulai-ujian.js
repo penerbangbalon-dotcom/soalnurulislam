@@ -2,6 +2,8 @@
 // Tidak pakai library npm apapun (langsung fetch ke Supabase REST API)
 // supaya deploy drag-and-drop tidak perlu proses build sama sekali.
 
+const { ipDari, hitungGagal, catatGagal } = require('../lib/ujian-core');
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Nama tabel & kolom siswa mengikuti aplikasi absensi. Bisa di-override lewat
@@ -11,6 +13,10 @@ const KOLOM_NISN = process.env.KOLOM_NISN || 'nisn';
 const KOLOM_NAMA_SISWA = process.env.KOLOM_NAMA_SISWA || 'nama';
 // Opsional: kolom PIN (mis. tanggal_lahir). Jika diisi, siswa wajib memasukkan PIN yang cocok.
 const KOLOM_PIN = process.env.KOLOM_PIN || '';
+// WAJIB_PIN=true: tolak ujian kalau KOLOM_PIN belum diatur (mencegah siswa masuk hanya dengan NISN).
+const WAJIB_PIN = String(process.env.WAJIB_PIN || '').toLowerCase() === 'true';
+// Pembatas percobaan gagal (anti tebak NISN / PIN / kode akses).
+const MAKS_GAGAL_NISN = 5, MAKS_GAGAL_IP = 100, JENDELA_MENIT = 10; // batas IP dibuat longgar karena satu kelas biasanya berbagi satu WiFi/IP
 
 function headers() {
   return {
@@ -51,11 +57,22 @@ exports.handler = async function (event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Kode akses dan NISN wajib diisi' }) };
   }
 
+  if (WAJIB_PIN && !KOLOM_PIN) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Server diatur WAJIB_PIN=true tetapi KOLOM_PIN belum diisi. Hubungi admin.' }) };
+  }
+  const ip = ipDari(event);
+  const kunciNisn = `nisn:${String(nisn).trim()}`, kunciIp = `ip:${ip}`;
+  const [gagalNisn, gagalIp] = await Promise.all([hitungGagal(kunciNisn, JENDELA_MENIT), hitungGagal(kunciIp, JENDELA_MENIT)]);
+  if (gagalNisn >= MAKS_GAGAL_NISN || gagalIp >= MAKS_GAGAL_IP) {
+    return { statusCode: 429, body: JSON.stringify({ error: `Terlalu banyak percobaan gagal. Coba lagi ${JENDELA_MENIT} menit lagi atau hubungi guru.` }) };
+  }
+
   try {
     // 1. Cari paket ujian
     const paketList = await sb(`paket_ujian?kode_akses=eq.${encodeURIComponent(kode_akses.trim())}&status=eq.siap&select=*`);
     const paket = paketList && paketList[0];
     if (!paket) {
+      await catatGagal(kunciIp);
       return { statusCode: 404, body: JSON.stringify({ error: 'Kode akses tidak ditemukan atau ujian belum dibuka' }) };
     }
 
@@ -63,11 +80,13 @@ exports.handler = async function (event) {
     const siswaList = await sb(`${TABEL_SISWA}?${KOLOM_NISN}=eq.${encodeURIComponent(nisn.trim())}&select=${KOLOM_NISN},${KOLOM_NAMA_SISWA}${KOLOM_PIN ? ',' + KOLOM_PIN : ''}${TABEL_SISWA === 'students' ? '&status=eq.AKTIF' : ''}`);
     const siswa = siswaList && siswaList[0];
     if (!siswa) {
+      await catatGagal(kunciNisn, kunciIp);
       return { statusCode: 404, body: JSON.stringify({ error: 'NISN tidak ditemukan di data siswa' }) };
     }
     if (KOLOM_PIN) {
       const n = (v) => String(v == null ? '' : v).trim().toLowerCase();
       if (!n(pin) || n(pin) !== n(siswa[KOLOM_PIN])) {
+        await catatGagal(kunciNisn, kunciIp);
         return { statusCode: 401, body: JSON.stringify({ error: 'PIN salah. Tanyakan ke guru.' }) };
       }
     }

@@ -169,4 +169,91 @@ async function nilaiDanSimpanSesi({ sesi, paketInfo, jawabanRaw, jawabanTersimpa
   }
 }
 
-module.exports = { UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi };
+// ---------------------------------------------------------------------------
+// PERAN PENGGUNA (admin / guru)
+// Peran disimpan di app_metadata.role pada Supabase Auth. app_metadata HANYA bisa diubah dengan
+// service_role key (lewat fungsi kelola-user), jadi pengguna tidak bisa menaikkan perannya sendiri.
+// Seorang admin dikenali bila: (1) app_metadata.role === 'admin', atau (2) emailnya ada di env ADMIN_EMAILS
+// (dipisah koma), atau (3) BELUM ADA admin sama sekali dan pemanggil adalah akun tertua (bootstrap otomatis
+// supaya instalasi lama tidak terkunci). Akun lain = guru.
+// ---------------------------------------------------------------------------
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+
+async function authAdmin(path, opts = {}) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin${path}`, {
+    ...opts,
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error((data && (data.msg || data.message || data.error_description || data.error)) || `Supabase error (${res.status})`);
+  return data;
+}
+
+const peranDari = (u) => (u && u.app_metadata && u.app_metadata.role) || null;
+const emailAdmin = (u) => !!(u && u.email && ADMIN_EMAILS.includes(String(u.email).toLowerCase()));
+const adminLangsung = (u) => peranDari(u) === 'admin' || emailAdmin(u);
+
+// Mengembalikan { admin:boolean, dipromosikan:boolean }.
+async function tentukanPeran(pemanggil) {
+  if (!pemanggil) return { admin: false, dipromosikan: false };
+  if (peranDari(pemanggil) === 'admin') return { admin: true, dipromosikan: false };
+  let perluSimpan = emailAdmin(pemanggil);
+  if (!perluSimpan) {
+    const data = await authAdmin('/users?per_page=200');
+    const users = (data && data.users) || [];
+    if (users.some(adminLangsung)) return { admin: false, dipromosikan: false };
+    const tertua = users.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))[0];
+    perluSimpan = !!(tertua && tertua.id === pemanggil.id);
+  }
+  if (!perluSimpan) return { admin: false, dipromosikan: false };
+  await authAdmin(`/users/${pemanggil.id}`, { method: 'PUT', body: JSON.stringify({ app_metadata: { ...(pemanggil.app_metadata || {}), role: 'admin' } }) });
+  return { admin: true, dipromosikan: true };
+}
+
+// Guard siap pakai: { pemanggil } bila login, atau { error:response }.
+async function wajibLogin(event) {
+  const pemanggil = await pastikanLogin(event);
+  if (!pemanggil) return { error: { statusCode: 401, body: JSON.stringify({ error: 'Sesi login tidak valid. Silakan login ulang.' }) } };
+  return { pemanggil };
+}
+async function wajibAdmin(event) {
+  const g = await wajibLogin(event);
+  if (g.error) return g;
+  const peran = await tentukanPeran(g.pemanggil);
+  if (!peran.admin) return { error: { statusCode: 403, body: JSON.stringify({ error: 'Fitur ini hanya untuk admin.' }) } };
+  return { pemanggil: g.pemanggil, peran };
+}
+
+// ---------------------------------------------------------------------------
+// PEMBATAS PERCOBAAN MASUK SISWA (anti tebak NISN/PIN/kode)
+// Memakai tabel percobaan_masuk_siswa (lihat migrasi-v11-keamanan.sql). Kalau tabel belum dibuat,
+// pembatas dilewati diam-diam supaya ujian tidak ikut gagal.
+// ---------------------------------------------------------------------------
+function ipDari(event) {
+  const h = (event && event.headers) || {};
+  const x = h['x-forwarded-for'] || h['X-Forwarded-For'] || h['x-real-ip'] || '';
+  return String(x).split(',')[0].trim() || 'tak-dikenal';
+}
+async function hitungGagal(kunci, menit) {
+  try {
+    const sejak = new Date(Date.now() - menit * 60000).toISOString();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/percobaan_masuk_siswa?kunci=eq.${encodeURIComponent(kunci)}&waktu=gte.${encodeURIComponent(sejak)}&select=id`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Prefer: 'count=exact', Range: '0-0' },
+    });
+    if (!res.ok) return 0;
+    const m = String(res.headers.get('content-range') || '').match(/\/(\d+)$/);
+    return m ? parseInt(m[1], 10) : 0;
+  } catch (e) { return 0; }
+}
+async function catatGagal(...daftarKunci) {
+  try {
+    await sb('percobaan_masuk_siswa', { method: 'POST', body: JSON.stringify(daftarKunci.filter(Boolean).map((kunci) => ({ kunci }))) });
+    if (Math.random() < 0.02) await sb(`percobaan_masuk_siswa?waktu=lt.${encodeURIComponent(new Date(Date.now() - 86400000).toISOString())}`, { method: 'DELETE' });
+  } catch (e) { /* tabel belum ada: abaikan */ }
+}
+
+module.exports = {
+  UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi,
+  authAdmin, tentukanPeran, wajibLogin, wajibAdmin, peranDari, adminLangsung, ipDari, hitungGagal, catatGagal,
+};

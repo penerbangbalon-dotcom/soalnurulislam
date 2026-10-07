@@ -146,10 +146,10 @@
 <div id="login-screen" class="login-wrap">
   <div class="login-box">
     <div style="text-align:center;margin-bottom:14px;">
-      <img src="logo-pkbm.png" alt="Logo PKBM Nurul Islam" style="width:64px;height:64px;object-fit:contain;" />
+      <img class="brand-logo" src="logo-pkbm.png" alt="Logo" style="width:64px;height:64px;object-fit:contain;" />
     </div>
     <h1 style="text-align:center;">Aplikasi Ujian</h1>
-    <p class="muted" style="text-align:center;">PKBM Nurul Islam &mdash; Login Guru</p>
+    <p class="muted" style="text-align:center;"><span id="brand-login-nama">PKBM Nurul Islam</span> &mdash; Login Guru</p>
     <div class="field"><label>Email</label><input type="email" id="login-email" /></div>
     <div class="field"><label>Kata sandi</label><input type="password" id="login-pass" /></div>
     <button class="btn" style="width:100%;justify-content:center" onclick="login()">Masuk</button>
@@ -160,10 +160,10 @@
 <div id="app" class="hidden">
   <nav class="sidebar">
     <div class="brand" style="display:flex;align-items:center;gap:10px;">
-      <img src="logo-pkbm.png" alt="Logo PKBM Nurul Islam" style="width:40px;height:40px;object-fit:contain;flex-shrink:0;" />
+      <img class="brand-logo" src="logo-pkbm.png" alt="Logo" style="width:40px;height:40px;object-fit:contain;flex-shrink:0;" />
       <div>
         <h1 style="font-size:17px;">Aplikasi Ujian</h1>
-        <small>PKBM Nurul Islam</small>
+        <small id="brand-side-nama">PKBM Nurul Islam</small>
       </div>
     </div>
     <div class="logout" onclick="logout()" role="button" tabindex="0">&#x21AA; Keluar</div>
@@ -209,7 +209,8 @@
         <div class="item" data-tab="pengnilai" onclick="showTab('pengnilai')">Pengaturan Nilai</div>
         <div class="item" data-tab="mapel" onclick="showTab('mapel')">Mata Pelajaran</div>
         <div class="item" data-tab="ttd" onclick="showTab('ttd')">Tanda Tangan</div>
-        <div class="item" data-tab="user" onclick="showTab('user')">Manajemen User</div>
+        <div class="item admin-only hidden" data-tab="sekolah" onclick="showTab('sekolah')">Identitas Sekolah</div>
+        <div class="item admin-only hidden" data-tab="user" onclick="showTab('user')">Manajemen User</div>
       </div>
     </div>
   </nav>
@@ -912,14 +913,15 @@
     <!-- ===== TAB: MANAJEMEN USER ===== -->
     <section id="tab-user" class="hidden">
       <h2>Manajemen User</h2>
-      <p class="muted">Kelola akun login guru/admin untuk aplikasi ini. Setiap akun yang dibuat di sini punya akses
-        penuh yang sama seperti akun Anda (Bank Soal, Paket Ujian, Laporan, dst).</p>
+      <p class="muted">Kelola akun login. <b>Admin</b> boleh mengelola user dan identitas sekolah; <b>Guru</b> memakai semua fitur ujian dan nilai
+        tetapi tidak bisa mengelola user atau identitas sekolah.</p>
 
       <div class="card">
         <h3 style="margin-top:0;" id="user-form-title">Tambah User Baru</h3>
         <div class="grid2">
           <div class="field"><label>Email</label><input type="email" id="user-email" placeholder="guru@contoh.com" /></div>
           <div class="field"><label>Kata Sandi</label><input type="password" id="user-password" placeholder="Minimal 6 karakter" /></div>
+          <div class="field"><label>Peran</label><select id="user-role"><option value="guru">Guru</option><option value="admin">Admin</option></select></div>
         </div>
         <div class="toolbar" style="justify-content:flex-end;">
           <span class="muted" id="user-status"></span>
@@ -933,9 +935,41 @@
           <button class="btn outline" onclick="loadDaftarUser()">Muat Ulang</button>
         </div>
         <table>
-          <thead><tr><th>Email</th><th>Dibuat</th><th>Login Terakhir</th><th></th></tr></thead>
-          <tbody id="user-body"><tr><td colspan="4" class="muted">Memuat...</td></tr></tbody>
+          <thead><tr><th>Email</th><th>Peran</th><th>Dibuat</th><th>Login Terakhir</th><th></th></tr></thead>
+          <tbody id="user-body"><tr><td colspan="5" class="muted">Memuat...</td></tr></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ===== TAB: IDENTITAS SEKOLAH (khusus admin) ===== -->
+    <section id="tab-sekolah" class="hidden">
+      <h2>Identitas Sekolah</h2>
+      <p class="muted">Data ini dipakai di kop surat soal, kartu ujian, rapor, transkrip, leger, dan tanda tangan. Mengubahnya tidak perlu mengedit kode.</p>
+      <div class="card">
+        <div class="grid2">
+          <div class="field"><label>Nama Yayasan (baris 1 kop)</label><input type="text" id="sk-nama_yayasan" /></div>
+          <div class="field"><label>Nama Lembaga (baris 2 kop)</label><input type="text" id="sk-nama_lembaga" /></div>
+          <div class="field"><label>Nama Singkat / Judul Besar (baris 3 kop)</label><input type="text" id="sk-nama_singkat" /></div>
+          <div class="field"><label>Nama Aplikasi (header, kartu, laporan)</label><input type="text" id="sk-nama_aplikasi" /></div>
+          <div class="field"><label>NPSN</label><input type="text" id="sk-npsn" /></div>
+          <div class="field"><label>SK Kemenhukam / Pendirian</label><input type="text" id="sk-sk_pendirian" /></div>
+        </div>
+        <div class="field"><label>Ijin Operasional (tanpa awalan &quot;Ijin Operasional No.&quot;)</label><input type="text" id="sk-ijin_operasional" /></div>
+        <div class="field"><label>Alamat</label><input type="text" id="sk-alamat" /></div>
+        <div class="grid2">
+          <div class="field"><label>Kota untuk tanda tangan (mis. Karawang)</label><input type="text" id="sk-kota_ttd" /></div>
+          <div class="field"><label>Jabatan penandatangan (mis. Kepala PKBM ...)</label><input type="text" id="sk-jabatan_kepala" /></div>
+        </div>
+        <div class="field"><label>Logo (PNG/JPG, maksimal 300 KB). Kosongkan untuk memakai logo bawaan.</label>
+          <div class="toolbar" style="margin:0;">
+            <img id="sk-logo-preview" alt="Logo" style="width:64px;height:64px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;">
+            <input type="file" id="sk-logo-file" accept="image/png,image/jpeg" onchange="pilihLogoSekolah(this)">
+            <button class="btn outline" onclick="hapusLogoSekolah()">Pakai logo bawaan</button>
+          </div></div>
+        <div class="toolbar" style="justify-content:flex-end;margin-bottom:0;">
+          <span class="muted" id="sk-status"></span>
+          <button class="btn" onclick="simpanSekolah()">Simpan Identitas</button>
+        </div>
       </div>
     </section>
   </main>
@@ -1116,9 +1150,78 @@ async function logout(){
   }
   location.reload();
 }
+// ---------- IDENTITAS SEKOLAH & PERAN ----------
+// Nilai bawaan = data PKBM Nurul Islam, dipakai bila tabel pengaturan_sekolah belum dibuat (jalankan migrasi-v11-keamanan.sql).
+const SEKOLAH_DEFAULT = {
+  nama_yayasan:'YAYASAN NURUL ISLAM SINDANGPALAY', nama_lembaga:'PUSAT KEGIATAN BELAJAR MASYARAKAT (PKBM)', nama_singkat:'NURUL ISLAM',
+  nama_aplikasi:'PKBM Nurul Islam', npsn:'P9934650', sk_pendirian:'AHU-0011701.AH.01.04',
+  ijin_operasional:'503/3278/23/IMPBM/VIII/DPMPTSP/2020-No. SK. Penyelenggaraan : 421.9/SK-IO-PKBM-001.2/PAUD-DIKMAS',
+  alamat:'Dusun Sindangpalay RT. 009 RW. 003 Desa Pasirmukti Kec. Telagasari Kab. Karawang . 41381',
+  kota_ttd:'Karawang', jabatan_kepala:'Kepala PKBM Nurul Islam', logo_url:''
+};
+let SEKOLAH = { ...SEKOLAH_DEFAULT };
+let ADALAH_ADMIN = false;
+let logoSekolahBaru = null; // data URL logo yang baru dipilih (belum disimpan)
+function logoSekolah(){ return SEKOLAH.logo_url || (location.origin + '/logo.png'); }
+function kopBaris(){
+  const S = SEKOLAH;
+  return [['l1',S.nama_yayasan],['l2',S.nama_lembaga],['l3',S.nama_singkat],
+    ['l4',S.npsn?'NPSN : '+S.npsn:''],['l5',S.sk_pendirian?'SK Kemenhukam No : '+S.sk_pendirian:''],
+    ['l6',S.ijin_operasional?'Ijin Operasional No. '+S.ijin_operasional:''],['l7',S.alamat]].filter(x=>x[1]);
+}
+function tglTtd(){ return (SEKOLAH.kota_ttd ? escapeHtml(SEKOLAH.kota_ttd)+', ' : '') + fmtTglSekarang(); }
+function terapkanBrandingSekolah(){
+  const nama = SEKOLAH.nama_aplikasi || 'Aplikasi Ujian';
+  document.title = 'Aplikasi Ujian — ' + nama;
+  const a = document.getElementById('brand-login-nama'); if(a) a.textContent = nama;
+  const b = document.getElementById('brand-side-nama'); if(b) b.textContent = nama;
+  if(SEKOLAH.logo_url) document.querySelectorAll('img.brand-logo').forEach(i=>{ i.src = SEKOLAH.logo_url; });
+}
+async function loadSekolah(){
+  try{
+    const { data } = await supa.from('pengaturan_sekolah').select('*').eq('id',1).maybeSingle();
+    if(data) SEKOLAH = Object.fromEntries(Object.keys(SEKOLAH_DEFAULT).map(k=>[k, data[k] ?? '']));
+  }catch(e){ /* tabel belum ada: pakai nilai bawaan */ }
+  terapkanBrandingSekolah();
+}
+const FIELD_SEKOLAH = ['nama_yayasan','nama_lembaga','nama_singkat','nama_aplikasi','npsn','sk_pendirian','ijin_operasional','alamat','kota_ttd','jabatan_kepala'];
+function isiFormSekolah(){
+  FIELD_SEKOLAH.forEach(k=>{ document.getElementById('sk-'+k).value = SEKOLAH[k] || ''; });
+  logoSekolahBaru = null; document.getElementById('sk-logo-file').value = '';
+  document.getElementById('sk-logo-preview').src = SEKOLAH.logo_url || 'logo-pkbm.png';
+  document.getElementById('sk-status').textContent = '';
+}
+function pilihLogoSekolah(inp){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  if(f.size > 300*1024){ alert('Ukuran logo maksimal 300 KB.'); inp.value=''; return; }
+  const fr = new FileReader();
+  fr.onload = ()=>{ logoSekolahBaru = fr.result; document.getElementById('sk-logo-preview').src = fr.result; };
+  fr.readAsDataURL(f);
+}
+function hapusLogoSekolah(){ logoSekolahBaru = ''; document.getElementById('sk-logo-file').value=''; document.getElementById('sk-logo-preview').src = 'logo-pkbm.png'; }
+async function simpanSekolah(){
+  const st = document.getElementById('sk-status'); st.textContent = 'Menyimpan...';
+  const baris = { id:1, updated_at:new Date().toISOString() };
+  FIELD_SEKOLAH.forEach(k=>{ baris[k] = document.getElementById('sk-'+k).value.trim() || null; });
+  baris.logo_url = logoSekolahBaru !== null ? (logoSekolahBaru || null) : (SEKOLAH.logo_url || null);
+  const { error } = await supa.from('pengaturan_sekolah').upsert(baris, { onConflict:'id' });
+  if(error){ st.textContent = 'Gagal: '+error.message+' (pastikan migrasi-v11-keamanan.sql sudah dijalankan dan Anda admin).'; return; }
+  await loadSekolah(); isiFormSekolah();
+  document.getElementById('sk-status').textContent = 'Identitas sekolah tersimpan.';
+}
+async function tentukanPeranSaya(){
+  try{
+    const r = await panggilKelolaUser({ action:'saya' });
+    ADALAH_ADMIN = !!r.admin;
+    if(r.dipromosikan) await supa.auth.refreshSession(); // supaya token baru memuat peran admin (dipakai kebijakan database)
+  }catch(e){ ADALAH_ADMIN = false; console.warn('Gagal membaca peran:', e.message); }
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden', !ADALAH_ADMIN));
+}
 async function boot(){
+  await loadSekolah();
   const { data:{ session } } = await supa.auth.getSession();
   if(!session){ return; }
+  await tentukanPeranSaya();
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   isiOpsiKelasMapel();
@@ -1150,7 +1253,7 @@ function fmtTglJam(iso){
 }
 async function loadDaftarUser(){
   const body = document.getElementById('user-body');
-  body.innerHTML = '<tr><td colspan="4" class="muted">Memuat...</td></tr>';
+  body.innerHTML = '<tr><td colspan="5" class="muted">Memuat...</td></tr>';
   try{
     const { users } = await panggilKelolaUser({ action:'list' });
     const { data:{ session } } = await supa.auth.getSession();
@@ -1158,15 +1261,17 @@ async function loadDaftarUser(){
     body.innerHTML = users.map(u=>`
       <tr>
         <td>${escapeHtml(u.email)}${u.email===emailSaya?' <span class="badge siap">Anda</span>':''}</td>
+        <td><span class="badge ${u.role==='admin'?'ai':'manual'}">${u.role==='admin'?'Admin':'Guru'}</span></td>
         <td>${fmtTglJam(u.created_at)}</td>
         <td>${fmtTglJam(u.last_sign_in_at)}</td>
         <td style="white-space:nowrap;">
+          ${u.dariEnv ? '' : `<button class="btn outline" style="padding:5px 10px;" onclick="ubahPeranUser('${u.id}','${u.role==='admin'?'guru':'admin'}')">${u.role==='admin'?'Jadikan Guru':'Jadikan Admin'}</button>`}
           <button class="btn outline" style="padding:5px 10px;" onclick="resetPasswordUser('${u.id}','${escapeHtml(u.email)}')">Ganti Sandi</button>
           ${u.id!==session?.user?.id ? `<button class="btn danger" style="padding:5px 10px;" onclick="hapusUser('${u.id}','${escapeHtml(u.email)}')">Hapus</button>` : ''}
         </td>
-      </tr>`).join('') || '<tr><td colspan="4" class="muted">Belum ada user.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="5" class="muted">Belum ada user.</td></tr>';
   }catch(err){
-    body.innerHTML = `<tr><td colspan="4" class="error">${escapeHtml(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="error">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 async function tambahUser(){
@@ -1176,7 +1281,7 @@ async function tambahUser(){
   if(!email || !password){ status.textContent = 'Email dan kata sandi wajib diisi.'; return; }
   status.textContent = 'Menyimpan...';
   try{
-    await panggilKelolaUser({ action:'create', email, password });
+    await panggilKelolaUser({ action:'create', email, password, role: document.getElementById('user-role').value });
     document.getElementById('user-email').value = '';
     document.getElementById('user-password').value = '';
     status.textContent = 'User berhasil ditambahkan.';
@@ -1195,6 +1300,15 @@ async function resetPasswordUser(userId, email){
     alert('Gagal: '+err.message);
   }
 }
+async function ubahPeranUser(userId, peranBaru){
+  if(!confirm(`Ubah peran akun ini menjadi ${peranBaru==='admin'?'Admin':'Guru'}?`)) return;
+  try{
+    await panggilKelolaUser({ action:'set-role', user_id:userId, role:peranBaru });
+    loadDaftarUser();
+  }catch(err){
+    alert('Gagal: '+err.message);
+  }
+}
 async function hapusUser(userId, email){
   if(!confirm(`Hapus akun ${email}? Tindakan ini tidak bisa dibatalkan.`)) return;
   try{
@@ -1207,8 +1321,9 @@ async function hapusUser(userId, email){
 
 // ---------- NAV ----------
 function showTab(tab){
+  if((tab==='user' || tab==='sekolah') && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user'].forEach(t=>{
+  ['bank','paket','daftar','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1233,6 +1348,7 @@ function showTab(tab){
   if(tab==='arsip') loadArsipNilai();
   if(tab==='paket' && document.getElementById('pk-mapel').value) loadSoalUntukPaket();
   if(tab==='ttd') loadTabTtd();
+  if(tab==='sekolah') isiFormSekolah();
   if(tab==='user') loadDaftarUser();
 }
 
@@ -1679,10 +1795,10 @@ function renderBankSoal(){
   body.innerHTML = bankSoalTampil.slice(mulai, mulai+BANK_PER_HALAMAN).map(s=>`
     <tr>
       <td><input type="checkbox" class="bank-cek" value="${s.id}" onchange="updateInfoMassal()"></td>
-      <td>${s.mata_pelajaran?.nama || '-'}</td>
+      <td>${escapeHtml(s.mata_pelajaran?.nama || '-')}</td>
       <td>${labelJenis(s.jenis)}</td>
       <td style="max-width:340px;">${escapeHtml(s.pertanyaan).slice(0,140)}${s.pertanyaan.length>140?'…':''}</td>
-      <td>${s.topik || '-'}</td>
+      <td>${escapeHtml(s.topik || '-')}</td>
       <td><span class="badge ${s.sumber==='ai'?'ai':'manual'}">${s.sumber==='ai'?'AI':'Manual'}</span>${terpakai.has(s.id)?`<br><span class="badge" style="background:#e8eef7;color:#2b4a7a;margin-top:4px;display:inline-block;" title="${escapeHtml(terpakai.get(s.id).join(', '))}">Dipakai di ${terpakai.get(s.id).length} paket</span>`:''}</td>
       <td>
         <button class="btn outline" style="padding:4px 10px;" onclick="bukaEditSoal('${s.id}')">Edit</button>
@@ -2168,8 +2284,9 @@ function bagiBatchAI(komposisi){
   return batches;
 }
 async function panggilBatchAI(payload){
+  const { data:{ session } } = await supa.auth.getSession();
   const res = await fetch('/api/generate-soal', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}`}, body: JSON.stringify(payload)
   });
   const txt = await res.text();
   let data; try{ data = JSON.parse(txt); }catch(e){ data = { error: `Server tidak merespons dengan benar (HTTP ${res.status}). Kemungkinan waktu tunggu habis.` }; }
@@ -2594,7 +2711,7 @@ function renderDaftarPaket(){
   if(!data.length){ body.innerHTML = `<tr><td colspan="6" class="muted">${kata.length?'Tidak ada paket yang cocok dengan pencarian.':'Belum ada paket ujian.'}</td></tr>`; return; }
   body.innerHTML = data.map(p=>`
     <tr>
-      <td>${escapeHtml(p.judul)}<br><span class="muted">${p.mata_pelajaran?.nama||''}</span></td>
+      <td>${escapeHtml(p.judul)}<br><span class="muted">${escapeHtml(p.mata_pelajaran?.nama||'')}</span></td>
       <td>${p.jenis_ujian}</td>
       <td>${p.kelas||'-'} / ${p.program||'-'}</td>
       <td><span class="badge ${p.status==='siap'?'siap':'draft'}">${p.diarsipkan?'diarsipkan':p.status}</span></td>
@@ -2702,7 +2819,7 @@ async function cetakWord(id){
   const addImg = d=>{ const m = /^data:(image\/[\w+.-]+);base64,(.*)$/.exec(d||''); if(!m) return '';
     const nm = `img${imgs.length+1}.${m[1].split('/')[1].replace('jpeg','jpg')}`; imgs.push({ nm, type:m[1], b64:m[2] }); return 'file:///C:/'+nm; };
   let logo = '';
-  try{ const b = await (await fetch('/logo.png')).blob();
+  try{ const b = await (await fetch(logoSekolah())).blob();
     logo = addImg(await new Promise(r=>{ const fr = new FileReader(); fr.onload = ()=>r(fr.result); fr.readAsDataURL(b); })); }catch(e){}
   const esc = x=>escapeHtml(x||'').replace(/\n/g,'<br>');
   const garis = n=>Array.from({length:n},()=>'<p style="border-bottom:1px solid #000;margin:0;height:22px">&nbsp;</p>').join('');
@@ -2720,7 +2837,7 @@ async function cetakWord(id){
 <style>@page{size:21cm 29.7cm;margin:1.6cm 2cm;} body{font-family:'Times New Roman',serif;font-size:12pt;} td{font-family:Arial;font-size:11pt;}</style></head><body>
 <table width="100%" cellspacing="0" style="border-bottom:4px double #000;"><tr>
 <td width="110" valign="middle">${logo?`<img src="${logo}" width="100">`:''}</td>
-<td align="center">${p('font-size:13pt;font-weight:bold;','YAYASAN NURUL ISLAM SINDANGPALAY')}${p('font-size:14pt;font-weight:bold;','PUSAT KEGIATAN BELAJAR MASYARAKAT (PKBM)')}${p('font-size:26pt;font-weight:bold;','NURUL ISLAM')}${p('font-size:11pt;font-weight:bold;','NPSN : P9934650')}${p('font-size:9pt;','SK Kemenhukam No : AHU-0011701.AH.01.04')}${p('font-size:6.5pt;','Ijin Operasional No. 503/3278/23/IMPBM/VIII/DPMPTSP/2020-No. SK. Penyelenggaraan : 421.9/SK-IO-PKBM-001.2/PAUD-DIKMAS')}${p('font-size:8.5pt;','Dusun Sindangpalay RT. 009 RW. 003 Desa Pasirmukti Kec. Telagasari Kab. Karawang . 41381')}</td></tr></table>
+<td align="center">${kopBaris().map(([k,t])=>p({l1:'font-size:13pt;font-weight:bold;',l2:'font-size:14pt;font-weight:bold;',l3:'font-size:26pt;font-weight:bold;',l4:'font-size:11pt;font-weight:bold;',l5:'font-size:9pt;',l6:'font-size:6.5pt;',l7:'font-size:8.5pt;'}[k], esc(t))).join('')}</td></tr></table>
 <table width="100%" cellspacing="0" style="margin-top:8px;border-bottom:2px solid #777;"><tr><td valign="top" width="62%">
 <b>SOAL ${paket.jenis_ujian} &mdash; ${esc(paket.judul)}</b><br>
 <b>Jenjang</b> : ${jenjang}<br><b>Mata Pelajaran</b> : ${esc(paket.mata_pelajaran?.nama)}<br><b>Kurikulum</b> : Kurikulum Merdeka<br>
@@ -2761,7 +2878,7 @@ async function cetakPaket(id, versi='A'){
   const bagian = judulBagian();
   const win = window.open('', '_blank');
   win.document.write(`
-    <html><head><title>${paket.judul}</title>
+    <html><head><title>${escapeHtml(paket.judul)}</title>
     <style>
       body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:30px auto;color:#111;}
       .kop{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;border-bottom:4px double #000;padding-bottom:6px;font-family:Arial,sans-serif;text-align:center;line-height:1.25;}
@@ -2780,18 +2897,7 @@ async function cetakPaket(id, versi='A'){
       @media print{ button{display:none;} }
     </style></head><body>
     <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
-    <div class="kop">
-      <img src="${location.origin}/logo.png" alt="Logo">
-      <div class="t">
-        <div class="l1">YAYASAN NURUL ISLAM SINDANGPALAY</div>
-        <div class="l2">PUSAT KEGIATAN BELAJAR MASYARAKAT (PKBM)</div>
-        <div class="l3">NURUL ISLAM</div>
-        <div class="l4">NPSN : P9934650</div>
-        <div class="l5">SK Kemenhukam No : AHU-0011701.AH.01.04</div>
-        <div class="l6">Ijin Operasional No. 503/3278/23/IMPBM/VIII/DPMPTSP/2020-No. SK. Penyelenggaraan : 421.9/SK-IO-PKBM-001.2/PAUD-DIKMAS</div>
-        <div class="l7">Dusun Sindangpalay RT. 009 RW. 003 Desa Pasirmukti Kec. Telagasari Kab. Karawang . 41381</div>
-      </div>
-    </div>
+    ${kopSekolahHTML()}
     <div class="info">
       <table>
         <tr><td class="k" colspan="3">SOAL ${paket.jenis_ujian} &mdash; ${escapeHtml(paket.judul)}${versi==='B'?' (Versi B)':''}</td></tr>
@@ -2810,18 +2916,18 @@ async function cetakPaket(id, versi='A'){
       const s = item.s;
       let opsi = '';
       if(s.jenis==='pilihan_ganda'){
-        opsi = `<div class="opsi">A. ${s.opsi_a||''}<br>B. ${s.opsi_b||''}<br>C. ${s.opsi_c||''}<br>D. ${s.opsi_d||''}${s.opsi_e?'<br>E. '+s.opsi_e:''}</div>`;
+        opsi = `<div class="opsi">A. ${soalHtmlAman(s.opsi_a)}<br>B. ${soalHtmlAman(s.opsi_b)}<br>C. ${soalHtmlAman(s.opsi_c)}<br>D. ${soalHtmlAman(s.opsi_d)}${s.opsi_e?'<br>E. '+soalHtmlAman(s.opsi_e):''}</div>`;
       } else if(s.jenis==='isian_singkat'){
         opsi = `<div class="garis-jawab"></div>`;
       } else {
         // essay: sediakan beberapa baris kosong untuk jawaban panjang
         opsi = `<div class="garis-jawab"></div><div class="garis-jawab"></div><div class="garis-jawab"></div><div class="garis-jawab"></div>`;
       }
-      return bagian(s.jenis)+`<div class="soal"><strong>${item.nomor}.</strong> ${s.pertanyaan}${s.gambar?`<div><img src="${s.gambar}" style="max-width:60%;margin:6px 0"></div>`:''}${opsi}</div>`;
+      return bagian(s.jenis)+`<div class="soal"><strong>${item.nomor}.</strong> ${soalHtmlAman(s.pertanyaan)}${srcGambarAman(s.gambar)?`<div><img src="${srcGambarAman(s.gambar)}" style="max-width:60%;margin:6px 0"></div>`:''}${opsi}</div>`;
     }).join('')}
     <div style="page-break-before:always;"></div>
     <h3>Kunci Jawaban (Guru)</h3>
-    ${list.map(item=>`<div style="margin-bottom:4px">${item.nomor}. ${item.s.kunci_jawaban||'-'}${item.s.pembahasan?` &mdash; <i>${item.s.pembahasan}</i>`:''}</div>`).join('')}
+    ${list.map(item=>`<div style="margin-bottom:4px">${item.nomor}. ${soalHtmlAman(item.s.kunci_jawaban||'-')}${item.s.pembahasan?` &mdash; <i>${soalHtmlAman(item.s.pembahasan)}</i>`:''}</div>`).join('')}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"><\/script><script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"><\/script>
     </body></html>
   `);
@@ -3061,8 +3167,8 @@ function cetakKartuUjian(){
   const kartu = daftarCetak.map(s=>`
     <div class="kartu">
       <div class="kartu-kop">
-        <img src="${location.origin}/logo.png">
-        <div><div class="t1">KARTU PESERTA UJIAN</div><div class="t2">PKBM Nurul Islam</div></div>
+        <img src="${escapeHtml(logoSekolah())}">
+        <div><div class="t1">KARTU PESERTA UJIAN</div><div class="t2">${escapeHtml(SEKOLAH.nama_aplikasi)}</div></div>
       </div>
       <div class="kartu-isi">
         <table class="kartu-tabel">
@@ -4087,7 +4193,7 @@ function cetakBelumUjian(){
     table{width:100%;border-collapse:collapse;} th,td{border:1px solid #444;padding:5px 7px;text-align:left;vertical-align:top;font-size:10.5pt;}
     th{background:#eee;} td.c{text-align:center;} tr{page-break-inside:avoid;}</style></head><body>
     <h2>Daftar Siswa Belum Mengikuti Ujian</h2>
-    <div class="kecil">PKBM Nurul Islam &bull; ${escapeHtml(periode)} &bull; Dicetak ${fmtTglSekarang()}</div>
+    <div class="kecil">${escapeHtml(SEKOLAH.nama_aplikasi)} &bull; ${escapeHtml(periode)} &bull; Dicetak ${fmtTglSekarang()}</div>
     ${tabel}</body></html>`);
   win.document.close();
   win.focus();
@@ -4482,16 +4588,8 @@ async function hitungPeringkatKelas(kelas, program, ta, smt, nisnTarget){
 
 function kopSekolahHTML(logoSize){
   return `<div class="kop">
-    <img src="${location.origin}/logo.png" alt="Logo" style="${logoSize?`width:${logoSize}px;`:''}">
-    <div class="t">
-      <div class="l1">YAYASAN NURUL ISLAM SINDANGPALAY</div>
-      <div class="l2">PUSAT KEGIATAN BELAJAR MASYARAKAT (PKBM)</div>
-      <div class="l3">NURUL ISLAM</div>
-      <div class="l4">NPSN : P9934650</div>
-      <div class="l5">SK Kemenhukam No : AHU-0011701.AH.01.04</div>
-      <div class="l6">Ijin Operasional No. 503/3278/23/IMPBM/VIII/DPMPTSP/2020-No. SK. Penyelenggaraan : 421.9/SK-IO-PKBM-001.2/PAUD-DIKMAS</div>
-      <div class="l7">Dusun Sindangpalay RT. 009 RW. 003 Desa Pasirmukti Kec. Telagasari Kab. Karawang . 41381</div>
-    </div>
+    <img src="${escapeHtml(logoSekolah())}" alt="Logo" style="${logoSize?`width:${logoSize}px;`:''}">
+    <div class="t">${kopBaris().map(([k,t])=>`<div class="${k}">${escapeHtml(t)}</div>`).join('')}</div>
   </div>`;
 }
 
@@ -4616,8 +4714,8 @@ async function cetakRapor(){
       <tbody><tr><td>${rekapHadir.hadir} hari</td><td>${rekapHadir.sakit} hari</td><td>${rekapHadir.izin} hari</td><td>${rekapHadir.alpa} hari</td><td>${rekapHadir.persen!=null?rekapHadir.persen.toFixed(1)+'%':'-'}</td></tr></tbody></table>
     <div class="catatan">${escapeHtml(rekapHadir.ket)}</div>` : ''}
     <div class="ttd">
-      <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
-      <div class="kolom">&nbsp;<br>${blokTtd('Kepala PKBM Nurul Islam', ttdKepala)}</div>
+      <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
+      <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
     </div>
     </body></html>`);
   win.document.close();
@@ -4731,7 +4829,7 @@ async function cetakPiagam(){
         ${peringkat ? ` &nbsp;&mdash;&nbsp; <b>Peringkat ke-${peringkat.peringkat} dari ${peringkat.total} siswa</b>` : ''}
       </div>
       <div class="ttd">
-        <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Kepala PKBM Nurul Islam', ttdKepala)}</div>
+        <div class="kolom">${tglTtd()}<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
       </div>
     </div></div>
     </body></html>`);
@@ -5078,8 +5176,8 @@ async function cetakRaporSemester(){
       <b>Catatan Wali Kelas:</b> ${catatanWali(cat) ? esc2(catatanWali(cat)) : '-'}</div>
     <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${rows.some(r=>r.na==null)?' Tanda "-" berarti nilai belum final.':''}</div>
     <div class="ttd">
-      <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
-      <div class="kolom">&nbsp;<br>${blokTtd('Kepala PKBM Nurul Islam', ttdKepala)}</div>
+      <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
+      <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
     </div>
     </body></html>`);
   win.document.close();
@@ -5189,7 +5287,7 @@ function unduhLeger(){
   if(!L.mapel.length || !L.baris.length) return alert('Belum ada mata pelajaran atau siswa untuk kelas dan periode ini.');
   const nM = L.mapel.length, nk = L.kolom.length;
   const judul = [
-    ['LEGER NILAI SISWA'], ['PKBM NURUL ISLAM'],
+    ['LEGER NILAI SISWA'], [String(SEKOLAH.nama_aplikasi||'').toUpperCase()],
     [`Jenjang: ${L.program}  |  Kelas: ${L.kelas}  |  ${labelSmt(L.smt)}  |  Tahun Ajaran ${L.ta}`],
     [teksBobotNilai()], []
   ];
@@ -5360,8 +5458,8 @@ async function cetakTranskrip(){
     <div class="ringkasan"><b>Jumlah mata pelajaran tercatat:</b> ${T.jumlahMapel} &nbsp;&bull;&nbsp; <b>Rata-rata keseluruhan:</b> ${cel(T.rataKeseluruhan)}${T.rataKeseluruhan!=null?' ('+esc2(predikatNilai(T.rataKeseluruhan))+')':''} &nbsp;&bull;&nbsp; <b>Belum tuntas KKM:</b> ${T.belumTuntas}</div>
     <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.</div>
     <div class="ttd">
-      <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
-      <div class="kolom">&nbsp;<br>${blokTtd('Kepala PKBM Nurul Islam', ttdKepala)}</div>
+      <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
+      <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
     </div>
     </body></html>`);
   win.document.close();
@@ -5581,6 +5679,12 @@ async function simpanPengaturanNilai(){
 
 
 // ---------- UTIL ----------
+// Untuk teks soal yang dicetak: semua HTML di-escape, kecuali tag format sederhana (b, i, u, sub, sup, br).
+// Mencegah skrip nyasar (mis. dari hasil AI atau impor Excel) berjalan di jendela cetak.
+function soalHtmlAman(str){
+  return escapeHtml(String(str==null?'':str)).replace(/&lt;(\/?)(b|i|u|sub|sup)&gt;/gi, '<$1$2>').replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+}
+function srcGambarAman(g){ return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=]+$/.test(String(g||'')) ? g : ''; }
 function escapeHtml(str){
   return (str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }

@@ -198,10 +198,18 @@ function bersihkanSoal(arr, tingkatDefault) {
     .filter((s) => s.jenis !== 'pilihan_ganda' || (s.opsi_a && s.opsi_b));
 }
 
+const { adaKonfigurasi, wajibLogin } = require('../lib/ujian-core');
+
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
+  // Hanya guru/admin yang sudah login yang boleh memakai kuota AI.
+  if (!adaKonfigurasi()) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum diset di Vercel Environment Variables.' }) };
+  }
+  const guard = await wajibLogin(event);
+  if (guard.error) return guard.error;
 
   const kandidat = bangunKandidat();
   if (!kandidat.length) {

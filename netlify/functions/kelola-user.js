@@ -1,120 +1,97 @@
-// Netlify Function: kelola-user
-// Mengelola akun login guru/admin (Supabase Auth) dari menu "Manajemen User"
-// di index.html. Tidak pakai library npm apapun (langsung fetch ke Supabase
-// REST/Auth API), supaya deploy drag-and-drop tidak perlu proses build.
+// Netlify/Vercel Function: kelola-user
+// Mengelola akun login guru/admin (Supabase Auth) dari menu "Manajemen User" di index.html.
+// Semua aksi butuh service_role key (JANGAN taruh di frontend!), makanya lewat function ini.
 //
-// Semua aksi di sini butuh service_role key (JANGAN taruh di frontend!),
-// makanya harus lewat function ini. Yang boleh pakai function ini hanya
-// pengguna yang sudah login (guru/admin) — dicek dengan memvalidasi token
-// sesi yang dikirim dari browser ke Supabase Auth.
+// HAK AKSES (lihat tentukanPeran di ../lib/ujian-core.js):
+//   - aksi "saya"     : semua yang sudah login (untuk mengetahui apakah dirinya admin)
+//   - aksi lainnya    : HANYA admin (list, create, reset-password, delete, set-role)
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-// Anon key tidak rahasia (sudah ada di index.html), dipakai di sini hanya untuk
-// memvalidasi token sesi pemanggil. Boleh di-override lewat env var kalau perlu.
-const ANON_KEY = process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ld2VpdmR2b3ZwY2dvbGF4enVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NjY3MDgsImV4cCI6MjEwNTM0MjcwOH0.bJyrKD7pnCcVizWbsBD5e0LrFl_8LdwU_5JRmyqkfV0';
+const {
+  adaKonfigurasi, wajibLogin, tentukanPeran, authAdmin, peranDari, adminLangsung,
+} = require('../lib/ujian-core');
 
-async function pastikanLogin(event) {
-  const auth = event.headers.authorization || event.headers.Authorization || '';
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) return null;
-  return res.json(); // { id, email, ... }
-}
-
-async function adminFetch(path, opts = {}) {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin${path}`, {
-    ...opts,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      ...(opts.headers || {}),
-    },
-  });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new Error((data && (data.msg || data.message || data.error_description || data.error)) || `Supabase error (${res.status})`);
-  return data;
-}
+const resp = (statusCode, obj) => ({ statusCode, body: JSON.stringify(obj) });
 
 exports.handler = async function (event) {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum diset di Vercel Environment Variables.' }) };
-  }
+  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (!adaKonfigurasi()) return resp(500, { error: 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum diset di Vercel Environment Variables.' });
 
-  const pemanggil = await pastikanLogin(event);
-  if (!pemanggil) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Sesi login tidak valid. Silakan login ulang.' }) };
-  }
+  const guard = await wajibLogin(event);
+  if (guard.error) return guard.error;
+  const pemanggil = guard.pemanggil;
 
   let body;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch (e) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Body tidak valid' }) };
-  }
+  try { body = JSON.parse(event.body || '{}'); } catch (e) { return resp(400, { error: 'Body tidak valid' }); }
   const { action } = body;
 
   try {
+    const peran = await tentukanPeran(pemanggil);
+
+    if (action === 'saya') {
+      return resp(200, { admin: peran.admin, dipromosikan: peran.dipromosikan, email: pemanggil.email });
+    }
+    if (!peran.admin) return resp(403, { error: 'Fitur ini hanya untuk admin.' });
+
+    const semuaUser = async () => ((await authAdmin('/users?per_page=200')).users || []);
+    const jumlahAdmin = (users) => users.filter((u) => adminLangsung(u)).length;
+
     if (action === 'list') {
-      const data = await adminFetch('/users?per_page=200');
-      const users = (data.users || []).map((u) => ({
-        id: u.id,
-        email: u.email,
-        created_at: u.created_at,
-        last_sign_in_at: u.last_sign_in_at,
+      const users = (await semuaUser()).map((u) => ({
+        id: u.id, email: u.email, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at,
+        role: adminLangsung(u) ? 'admin' : 'guru',
+        dariEnv: peranDari(u) !== 'admin' && adminLangsung(u),
       })).sort((a, b) => (a.email || '').localeCompare(b.email || ''));
-      return { statusCode: 200, body: JSON.stringify({ users }) };
+      return resp(200, { users });
     }
 
     if (action === 'create') {
       const email = (body.email || '').trim();
       const password = body.password || '';
-      if (!email || !password) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Email dan kata sandi wajib diisi' }) };
-      }
-      if (password.length < 6) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Kata sandi minimal 6 karakter' }) };
-      }
-      const user = await adminFetch('/users', {
+      const role = body.role === 'admin' ? 'admin' : 'guru';
+      if (!email || !password) return resp(400, { error: 'Email dan kata sandi wajib diisi' });
+      if (password.length < 6) return resp(400, { error: 'Kata sandi minimal 6 karakter' });
+      const user = await authAdmin('/users', {
         method: 'POST',
-        body: JSON.stringify({ email, password, email_confirm: true }),
+        body: JSON.stringify({ email, password, email_confirm: true, app_metadata: { role } }),
       });
-      return { statusCode: 200, body: JSON.stringify({ ok: true, user }) };
+      return resp(200, { ok: true, user });
+    }
+
+    if (action === 'set-role') {
+      const { user_id } = body;
+      const role = body.role === 'admin' ? 'admin' : 'guru';
+      if (!user_id) return resp(400, { error: 'Data tidak lengkap' });
+      const users = await semuaUser();
+      const target = users.find((u) => u.id === user_id);
+      if (!target) return resp(404, { error: 'User tidak ditemukan' });
+      if (role === 'guru' && adminLangsung(target) && jumlahAdmin(users) <= 1) {
+        return resp(400, { error: 'Tidak bisa menurunkan satu-satunya admin. Jadikan akun lain admin dulu.' });
+      }
+      if (role === 'guru' && target.email && adminLangsung(target) && peranDari(target) !== 'admin') {
+        return resp(400, { error: 'Akun ini admin karena terdaftar di ADMIN_EMAILS (pengaturan server). Hapus dulu dari variabel itu.' });
+      }
+      await authAdmin(`/users/${user_id}`, { method: 'PUT', body: JSON.stringify({ app_metadata: { ...(target.app_metadata || {}), role } }) });
+      return resp(200, { ok: true });
     }
 
     if (action === 'reset-password') {
       const { user_id, password } = body;
-      if (!user_id || !password) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Data tidak lengkap' }) };
-      }
-      if (password.length < 6) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Kata sandi minimal 6 karakter' }) };
-      }
-      await adminFetch(`/users/${user_id}`, { method: 'PUT', body: JSON.stringify({ password }) });
-      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+      if (!user_id || !password) return resp(400, { error: 'Data tidak lengkap' });
+      if (password.length < 6) return resp(400, { error: 'Kata sandi minimal 6 karakter' });
+      await authAdmin(`/users/${user_id}`, { method: 'PUT', body: JSON.stringify({ password }) });
+      return resp(200, { ok: true });
     }
 
     if (action === 'delete') {
       const { user_id } = body;
-      if (!user_id) return { statusCode: 400, body: JSON.stringify({ error: 'Data tidak lengkap' }) };
-      if (user_id === pemanggil.id) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Tidak bisa menghapus akun yang sedang login.' }) };
-      }
-      await adminFetch(`/users/${user_id}`, { method: 'DELETE' });
-      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+      if (!user_id) return resp(400, { error: 'Data tidak lengkap' });
+      if (user_id === pemanggil.id) return resp(400, { error: 'Tidak bisa menghapus akun yang sedang login.' });
+      await authAdmin(`/users/${user_id}`, { method: 'DELETE' });
+      return resp(200, { ok: true });
     }
 
-    return { statusCode: 400, body: JSON.stringify({ error: 'Aksi tidak dikenali' }) };
+    return resp(400, { error: 'Aksi tidak dikenali' });
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return resp(500, { error: err.message });
   }
 };
