@@ -249,6 +249,7 @@
       <div id="bank-dup-panel"></div>
       <div id="bank-massal" class="toolbar hidden" style="margin-bottom:10px;background:#f7f5ef;border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;">
         <b id="bank-massal-info"></b>
+        <button class="btn" style="padding:5px 12px;" onclick="bukaMasukkanKePaket()" title="Tambahkan soal yang dicentang ke paket ujian yang sudah ada di Daftar Paket Ujian">+ Masukkan ke Paket Ujian</button>
         <select id="bank-massal-tingkat"><option value="sangat_mudah">Sangat Mudah</option><option value="mudah">Mudah</option><option value="sedang" selected>Sedang</option><option value="sulit">Sulit</option></select>
         <button class="btn outline" style="padding:5px 12px;" onclick="ubahTingkatTerpilih()">Ubah tingkat kesulitan</button>
         <button class="btn danger" style="padding:5px 12px;" onclick="hapusBankTerpilih()">Hapus terpilih</button>
@@ -1010,6 +1011,21 @@
   </div>
 </div>
 
+<!-- MODAL: Bank Soal - Masukkan soal terpilih ke Paket Ujian -->
+<div class="modal-bg hidden" id="modal-ke-paket">
+  <div class="modal" style="max-width:560px;">
+    <h2>Masukkan Soal ke Paket Ujian</h2>
+    <p class="muted" id="kp-info"></p>
+    <div class="field"><label>Pilih paket ujian tujuan</label>
+      <select id="kp-paket"></select></div>
+    <p class="muted" id="kp-catatan" style="font-size:12.5px;"></p>
+    <div class="toolbar" style="margin:0;justify-content:flex-end;">
+      <button class="btn outline" onclick="closeModal('modal-ke-paket')">Batal</button>
+      <button class="btn" id="kp-simpan" onclick="simpanMasukkanKePaket()">Masukkan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Monitoring - Tambah Waktu -->
 <div class="modal-bg hidden" id="modal-mon-waktu">
   <div class="modal" style="max-width:400px;">
@@ -1700,6 +1716,78 @@ async function ubahTingkatTerpilih(){
     if(error) return alert('Gagal mengubah: '+error.message);
   }
   loadBankSoal();
+}
+// ---- Masukkan soal terpilih di Bank Soal ke paket ujian yang SUDAH ada ----
+let kpSoalIds = [], kpMapelId = null;
+async function bukaMasukkanKePaket(){
+  const ids = idBankDipilih(); if(!ids.length) return;
+  const soal = [];
+  for(let i=0;i<ids.length;i+=100){
+    const { data, error } = await supa.from('bank_soal').select('id, mapel_id, poin').in('id', ids.slice(i,i+100));
+    if(error) return alert('Gagal membaca soal: '+error.message);
+    soal.push(...(data||[]));
+  }
+  const mapelSet = [...new Set(soal.map(x=>x.mapel_id))];
+  if(mapelSet.length!==1) return alert('Soal yang dipilih berasal dari lebih dari satu mata pelajaran. Pilih soal dari SATU mata pelajaran saja (gunakan filter mata pelajaran di atas).');
+  kpSoalIds = ids; kpMapelId = mapelSet[0];
+  const { data: paket, error } = await supa.from('paket_ujian')
+    .select('id, judul, jenis_ujian, kelas, program, semester, tahun_ajaran, status')
+    .eq('mapel_id', kpMapelId).eq('diarsipkan', false).order('id', { ascending:false });
+  if(error) return alert('Gagal memuat paket ujian: '+error.message);
+  if(!(paket||[]).length) return alert('Belum ada paket ujian untuk mata pelajaran ini. Buat dulu lewat menu Paket Ujian → Buat Paket Ujian.');
+  // Paket yang sudah dikerjakan siswa dikunci (susunan soal tidak boleh berubah).
+  const dikunci = new Set();
+  const idPaket = paket.map(x=>x.id);
+  for(let i=0;i<idPaket.length;i+=100){
+    const { data: ses } = await supa.from('sesi_ujian').select('paket_ujian_id').in('paket_ujian_id', idPaket.slice(i,i+100));
+    (ses||[]).forEach(r=>dikunci.add(r.paket_ujian_id));
+  }
+  document.getElementById('kp-info').innerHTML = `<b>${ids.length}</b> soal dipilih akan ditambahkan di urutan paling akhir pada paket yang Anda pilih.`;
+  document.getElementById('kp-paket').innerHTML = paket.map(x=>{
+    const label = `${x.judul} — ${x.jenis_ujian||''}, Kelas ${x.kelas||'-'} ${x.program||''} (${x.status||'draft'})`;
+    return dikunci.has(x.id)
+      ? `<option value="${x.id}" disabled>${escapeHtml(label)} — sudah dikerjakan siswa, terkunci</option>`
+      : `<option value="${x.id}">${escapeHtml(label)}</option>`;
+  }).join('');
+  const bisaPilih = paket.some(x=>!dikunci.has(x.id));
+  document.getElementById('kp-simpan').disabled = !bisaPilih;
+  document.getElementById('kp-catatan').textContent = bisaPilih
+    ? 'Soal yang sudah ada di paket tersebut, atau sudah dipakai di paket lain, otomatis dilewati.'
+    : 'Semua paket mata pelajaran ini sudah dikerjakan siswa sehingga terkunci. Buat paket baru.';
+  document.getElementById('modal-ke-paket').classList.remove('hidden');
+}
+async function simpanMasukkanKePaket(){
+  const paketId = document.getElementById('kp-paket').value;
+  if(!paketId) return;
+  const btn = document.getElementById('kp-simpan'); btn.disabled = true; btn.textContent = 'Memproses...';
+  try{
+    // cek ulang kunci paket (jaga-jaga ada siswa yang baru mulai)
+    const { count: nSesi } = await supa.from('sesi_ujian').select('id', { count:'exact', head:true }).eq('paket_ujian_id', paketId);
+    if(nSesi>0) return alert('Paket ini baru saja dikerjakan siswa, jadi susunan soalnya terkunci.');
+    const { data: rel, error: eRel } = await supa.from('paket_soal').select('soal_id, nomor').eq('paket_ujian_id', paketId);
+    if(eRel) return alert('Gagal membaca paket: '+eRel.message);
+    const sudahDiPaket = new Set((rel||[]).map(r=>r.soal_id));
+    const { peta, error: ePeta } = await petaSoalTerpakai(paketId);
+    if(ePeta) return alert('Gagal memeriksa pemakaian soal: '+ePeta.message);
+    const baru = kpSoalIds.filter(id=>!sudahDiPaket.has(id) && !peta.has(id));
+    const sudahAda = kpSoalIds.filter(id=>sudahDiPaket.has(id)).length;
+    const dipakaiLain = kpSoalIds.filter(id=>!sudahDiPaket.has(id) && peta.has(id)).length;
+    if(!baru.length) return alert('Tidak ada soal yang bisa dimasukkan.'+(sudahAda?`\n${sudahAda} soal sudah ada di paket ini.`:'')+(dipakaiLain?`\n${dipakaiLain} soal sudah dipakai di paket lain.`:''));
+    const poinMap = new Map();
+    for(let i=0;i<baru.length;i+=100){
+      const { data } = await supa.from('bank_soal').select('id, poin').in('id', baru.slice(i,i+100));
+      (data||[]).forEach(x=>poinMap.set(x.id, x.poin));
+    }
+    let nomor = (rel||[]).reduce((m,r)=>Math.max(m, r.nomor||0), 0);
+    const rows = baru.map(id=>({ paket_ujian_id:paketId, soal_id:id, nomor:++nomor, poin:parseFloat(poinMap.get(id))||1 }));
+    const { error } = await supa.from('paket_soal').insert(rows);
+    if(error) return alert('Gagal memasukkan soal: '+error.message);
+    closeModal('modal-ke-paket');
+    alert(`${rows.length} soal berhasil dimasukkan ke paket ujian.`+(sudahAda?`\n${sudahAda} soal dilewati (sudah ada di paket ini).`:'')+(dipakaiLain?`\n${dipakaiLain} soal dilewati (sudah dipakai di paket lain).`:''));
+    loadBankSoal();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Masukkan';
+  }
 }
 async function hapusBankTerpilih(){
   const ids = idBankDipilih(); if(!ids.length) return;
@@ -4083,10 +4171,12 @@ async function tampilkanLaporanSiswa(){
   // Kalau paket ujiannya sudah dihapus, sesi ikut tidak relevan lagi — abaikan.
   // Ulangan Harian tidak ikut Laporan Siswa/Rapor (ditampilkan di Rekap Nilai Siswa, Leger, dan Transkrip).
   // Paket yang sudah DIARSIPKAN juga tidak ikut (nilainya tetap ada di menu Hasil Ujian & Arsip).
-  const sesiValid = (sesiData||[]).filter(s=>s.paket_ujian && s.paket_ujian.jenis_ujian!=='Ulangan Harian' && !s.paket_ujian.diarsipkan);
+  // Ulangan Harian ikut dimuat supaya bisa dipilih lewat filter Jenis Ujian (mis. cetak kartu UH),
+  // tetapi TIDAK tampil saat filter "Semua Jenis Ujian" (lihat ambilBarisTerfilter) agar Rapor tetap UTS/UAS saja.
+  const sesiValid = (sesiData||[]).filter(s=>s.paket_ujian && !s.paket_ujian.diarsipkan);
   // Paket ujian sesuai kelas & program siswa saat ini yang BELUM ia kerjakan
   // (UTS ataupun UAS) tetap dimasukkan sebagai baris "Tidak Mengerjakan".
-  const paketRelevanFormal = (paketRelevan||[]).filter(p=>p.jenis_ujian!=='Ulangan Harian');
+  const paketRelevanFormal = (paketRelevan||[]);
   const sudahDikerjakanIds = new Set(sesiValid.map(s=>s.paket_ujian_id));
   const namaSiswa = siswaInfo ? siswaInfo.nama : (sesiValid[0]?.siswa_nama || '-');
   const virtualRows = paketRelevanFormal
@@ -4135,7 +4225,9 @@ async function tampilkanLaporanSiswa(){
   const taStandar = []; for(let i=0;i<5;i++){ const y = mulaiTA+i; taStandar.push(`${y}/${y+1}`); }
   const taDariData = [...new Set(dataLaporanSiswa.map(s=>s.paket_ujian.tahun_ajaran).filter(Boolean))];
   const taSet = [...new Set([...taStandar, ...taDariData])];
-  const jenisSet = [...new Set(dataLaporanSiswa.map(s=>s.paket_ujian.jenis_ujian).filter(Boolean))];
+  // Pilihan Jenis Ujian dibuat tetap (tidak bergantung data yang sudah ada) supaya UTS, UAS, dan
+  // Ulangan Harian selalu bisa dipilih, termasuk untuk mencetak kartu ujian khusus salah satunya.
+  const jenisSet = ['UTS','UAS','Ulangan Harian'];
   document.getElementById('lap-filter-ta').innerHTML = '<option value="">Semua Tahun Ajaran</option>' + taSet.map(t=>`<option>${escapeHtml(t)}</option>`).join('');
   document.getElementById('lap-filter-jenis').innerHTML = '<option value="">Semua Jenis Ujian</option>' + jenisSet.map(t=>`<option>${escapeHtml(t)}</option>`).join('');
 
@@ -4157,7 +4249,8 @@ function ambilBarisTerfilter(){
   const ta = document.getElementById('lap-filter-ta').value;
   const smt = document.getElementById('lap-filter-smt').value;
   const jenis = document.getElementById('lap-filter-jenis').value;
-  return dataLaporanSiswa.filter(s => (!ta || s.paket_ujian.tahun_ajaran===ta) && (!smt || s.paket_ujian.semester===smt) && (!jenis || s.paket_ujian.jenis_ujian===jenis));
+  return dataLaporanSiswa.filter(s => (!ta || s.paket_ujian.tahun_ajaran===ta) && (!smt || s.paket_ujian.semester===smt)
+    && (jenis ? s.paket_ujian.jenis_ujian===jenis : s.paket_ujian.jenis_ujian!=='Ulangan Harian'));
 }
 
 // Menentukan label "Jenis Ujian" untuk judul Rapor & Piagam: kalau guru sudah memilih
@@ -4241,7 +4334,7 @@ function ikutiUjianDariLaporan(i){
 // ---------- KARTU UJIAN DARI LAPORAN SISWA ----------
 // Mencetak SATU kartu untuk siswa yang sedang dipilih, berisi SEMUA paket ujian di kelas/program
 // siswa yang belum ia ikuti (status paket "siap" = sudah dibuka, "draft" = akan dibuka), lengkap
-// dengan kode akses & QR link ujian. Paket Ulangan Harian tidak ikut (sama seperti Laporan/Rapor),
+// dengan kode akses & QR link ujian. Paket Ulangan Harian hanya ikut bila dipilih lewat filter Jenis Ujian,
 // paket ditutup/diarsipkan juga tidak ikut. Mengikuti filter Tahun Ajaran/Semester/Jenis di toolbar.
 function normSemesterTA(semester, ta){
   if(ta) return { semester: semester||null, tahun_ajaran: ta };
@@ -4270,7 +4363,7 @@ async function cetakKartuUjianSiswa(){
     .filter(r=>r.paket_ujian_id && r.status!=='tidak_mengerjakan' && r.status!=='belum_dibuat')
     .map(r=>r.paket_ujian_id));
   const daftar = (data||[])
-    .filter(p=>p.jenis_ujian!=='Ulangan Harian' && p.kode_akses && !sudahIkut.has(p.id))
+    .filter(p=>(jenis || p.jenis_ujian!=='Ulangan Harian') && p.kode_akses && !sudahIkut.has(p.id))
     .map(p=>({ ...p, ...normSemesterTA(p.semester, p.tahun_ajaran) }))
     .filter(p=>(!ta || p.tahun_ajaran===ta) && (!smt || p.semester===smt) && (!jenis || p.jenis_ujian===jenis))
     .sort((a,b)=>(a.mata_pelajaran?.nama||'').localeCompare(b.mata_pelajaran?.nama||'','id') || String(a.jenis_ujian).localeCompare(String(b.jenis_ujian)));
@@ -4644,6 +4737,22 @@ let dbV7Tersedia = true, sudahPeringatV7 = false;
 const NAMA_KOMP = { uh:'Ulangan Harian', uts:'UTS', uas:'UAS', tugas:'Tugas', praktik:'Praktik' };
 const SINGKAT_KOMP = { uh:'UH', uts:'UTS', uas:'UAS', tugas:'TGS', praktik:'PRK' };
 const NAMA_SIKAP = { A:'Sangat Baik', B:'Baik', C:'Cukup', D:'Kurang' };
+// Catatan Wali Kelas OTOMATIS berdasarkan Sikap. Dipakai hanya bila kolom "Catatan wali kelas"
+// di Input Nilai Tambahan dikosongkan; kalau guru mengetik catatan sendiri, catatan itu yang dipakai.
+// Silakan ubah kalimatnya di sini sesuai kebutuhan.
+const CATATAN_SIKAP = {
+  A:'{nama} menunjukkan sikap yang sangat baik. Pertahankan kedisiplinan, kesopanan, dan semangat belajarnya.',
+  B:'{nama} menunjukkan sikap yang baik. Tingkatkan lagi konsistensi dan keaktifan dalam belajar.',
+  C:'Sikap {nama} cukup. Perlu meningkatkan kedisiplinan dan kesungguhan dalam belajar.',
+  D:'Sikap {nama} perlu perbaikan. Diharapkan lebih disiplin, bersungguh-sungguh, dan berkoordinasi dengan wali kelas.'
+};
+// {nama} otomatis diganti nama siswa (juga berlaku bila guru mengetik {nama} di catatan manual).
+function catatanWali(c){
+  if(!c) return '';
+  const nama = c.siswa_nama || 'Siswa';
+  const teks = (c.catatan && String(c.catatan).trim()) ? c.catatan : ((c.sikap && CATATAN_SIKAP[c.sikap]) || '');
+  return teks.replace(/\{nama\}/gi, nama);
+}
 
 function esc2(v){ return escapeHtml(String(v==null ? '' : v)); }
 function fmtN(n){ return (n==null || isNaN(n)) ? '-' : (Math.round(Number(n)*10)/10).toString(); }
@@ -4808,7 +4917,8 @@ function teksCatatan(c){
   const bagian = [];
   if(c.sikap) bagian.push(`Sikap: ${c.sikap} (${NAMA_SIKAP[c.sikap]})`);
   bagian.push((c.hadir!=null ? `Hadir ${c.hadir} · ` : '') + `Sakit ${c.sakit||0} · Izin ${c.izin||0} · Alpa ${c.alpa||0}`);
-  if(c.catatan) bagian.push(`Catatan: ${c.catatan}`);
+  const cw = catatanWali(c);
+  if(cw) bagian.push(`Catatan: ${cw}`);
   return bagian.join(' — ');
 }
 
@@ -4952,7 +5062,7 @@ async function cetakRaporSemester(){
         : '<tr><td colspan="5" class="c">Data kehadiran belum tersedia</td></tr>'}</tbody>
     </table>
     <div class="kotak"><b>Sikap:</b> ${cat && cat.sikap ? esc2(cat.sikap)+' ('+esc2(NAMA_SIKAP[cat.sikap])+')' : '-'}<br>
-      <b>Catatan Wali Kelas:</b> ${cat && cat.catatan ? esc2(cat.catatan) : '-'}</div>
+      <b>Catatan Wali Kelas:</b> ${catatanWali(cat) ? esc2(catatanWali(cat)) : '-'}</div>
     <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${rows.some(r=>r.na==null)?' Tanda "-" berarti nilai belum final.':''}</div>
     <div class="ttd">
       <div class="kolom">Karawang, ${fmtTglSekarang()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
