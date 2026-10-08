@@ -167,6 +167,7 @@ exports.handler = async function (event) {
         tambahan_menit: Number(sesi.tambahan_menit) || 0,
         dikunci: !!sesi.dikunci,
         pesan_id: Number(sesi.pesan_id) || 0,
+        pelanggaran: Number(sesi.pelanggaran) || 0,
         jawaban_tersimpan: sesi.jawaban_sementara || {},
         server_time: Date.now(),
         soal: finalSoal,

@@ -1,5 +1,18 @@
 # Perubahan terbaru
 
+## v12.4 — Perbaikan tombol Reset + tombol "Aktifkan Kembali" di Monitoring Ujian
+Tanpa migrasi SQL. 4 file yang berubah: `index.html`, `ujian.html`, `netlify/functions/sudahi-ujian.js`, `netlify/functions/mulai-ujian.js` (adapter di folder `api/` tidak berubah). Unggah ke GitHub, Vercel deploy otomatis.
+1. **Perbaikan tombol Reset yang "tidak berfungsi"**. Penyebab: nama siswa disisipkan ke atribut `onclick`. Nama berapostrof (Ma'ruf, Sa'adah, Ni'matul, dst.) memutus string JavaScript sehingga klik tidak melakukan apa pun, tanpa pesan galat. Kini tombol hanya membawa id sesi, nama dicari dari data di layar. Reset juga memberi pesan jelas bila tidak ada baris yang terhapus.
+2. **Tombol baru "Aktifkan Kembali"** pada siswa berstatus Selesai (termasuk yang sudah dinilai) di Monitoring Ujian. Siswa **melanjutkan dari jawaban terakhir**, tidak mengulang dari awal:
+   - Jawaban dipulihkan dari hasil penilaian ke cadangan jawaban siswa; sesi dibuka lagi (berlangsung).
+   - Guru mengisi sisa waktu minimal (menit); saran otomatis = sisa waktu asli (minimal 10 menit).
+   - Nilai sementara & detail penilaian lama dihapus (termasuk nilai essay yang sudah diberi guru) dan dihitung ulang saat siswa mengumpulkan lagi. Arsip Nilai tetap menyimpan nilai lama sampai siswa mengumpulkan ulang.
+   - Siswa membuka ulang halaman ujian dan masuk lagi (kode akses + NISN). Paket harus berstatus Siap.
+   - Tidak berlaku untuk nilai input manual (ujian cetak).
+3. **Perbaikan bug serupa di menu User**: tombol Ganti Sandi/Hapus bagi email yang mengandung apostrof.
+4. **Siswa yang ujiannya berakhir karena melanggar aturan** (pelanggaran mencapai batas) kini ikut bisa dilanjutkan: saat diaktifkan kembali hitungan pelanggarannya direset ke 0 (tanpa ini ujian langsung ditutup lagi pada detak pertama). Halaman siswa kini memakai hitungan pelanggaran dari server (`mulai-ujian` mengirim `pelanggaran`), jadi hasil reset tidak tertimpa data lama di HP siswa. Server tetap menyimpan nilai tertinggi, sehingga memuat ulang halaman tidak bisa menghapus pelanggaran.
+5. Pembedaan di layar: **Aktifkan Kembali** = lanjutkan; **Reset** = hapus total dan mulai dari awal.
+
 ## v12.3 — Nilai remedial masuk ke Laporan Siswa, Rapor & Piagam
 Tanpa migrasi SQL baru (cukup v14 & v15 yang sudah ada). Hanya mengubah index.html.
 - Laporan Siswa sebelumnya sengaja menyaring semua sesi paket Remedial, sehingga nilai remedial tidak tampil. Kini nilai remedial terbaik diterapkan ke baris UH/UTS/UAS yang sesuai (mapel, kelas, program, semester, tahun ajaran sama), memakai aturan Pengaturan Nilai (maks KKM / tertinggi / rata-rata / nonaktif) seperti di Leger & Transkrip.

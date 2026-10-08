@@ -515,7 +515,14 @@ function tampilkanUjian(){
     </div>`;
   }).join('');
 
-  try{ pelanggaran = parseInt(localStorage.getItem('ujian_pel_'+sesiData.sesi_id)||0)||0; }catch(e){}
+  // Acuan hitungan pelanggaran = data server (supaya guru bisa mengaktifkan kembali siswa dengan hitungan 0).
+  // Server tetap menyimpan nilai tertinggi, jadi memuat ulang halaman tidak bisa dipakai menghapus pelanggaran.
+  if(Number.isFinite(sesiData.pelanggaran)){
+    pelanggaran = sesiData.pelanggaran;
+    try{ localStorage.setItem('ujian_pel_'+sesiData.sesi_id, pelanggaran); }catch(e){}
+  } else {
+    try{ pelanggaran = parseInt(localStorage.getItem('ujian_pel_'+sesiData.sesi_id)||0)||0; }catch(e){}
+  }
   mulaiUjianEpoch = Date.now();
   if(pelanggaran>0){ const b=document.getElementById('badge-pel'); b.textContent='Pelanggaran: '+pelanggaran; b.classList.remove('hidden'); }
   if(window.renderMathInElement) renderMathInElement(wrap, KATEX_OPT);

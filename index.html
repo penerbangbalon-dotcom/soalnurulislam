@@ -385,7 +385,7 @@
       <h2>Monitoring Ujian</h2>
       <p class="muted">Pantau siswa yang sedang mengerjakan ujian online secara langsung: siapa yang online, progres jawaban,
         sisa waktu, dan berapa kali berpindah tab. Dari sini guru bisa mengirim pesan/peringatan, menambah waktu, mengunci
-        sementara, mengakhiri (sudahi) ujian, atau mereset siswa. Halaman siswa mengirim &ldquo;detak&rdquo; tiap ±20 detik,
+        sementara, mengakhiri (sudahi) ujian, <b>mengaktifkan kembali</b> siswa yang sudah selesai (ia melanjutkan dari jawaban terakhir, tanpa mengulang), atau mereset siswa (hapus total, mulai dari awal). Halaman siswa mengirim &ldquo;detak&rdquo; tiap ±20 detik,
         jadi siswa yang tidak ada detak &gt;45 detik ditandai <b>Terputus</b>.</p>
       <div class="toolbar">
         <select id="mon-filter-kelas" onchange="terapkanFilterMonitorKelas()">
@@ -1604,8 +1604,8 @@ async function loadDaftarUser(){
         <td>${fmtTglJam(u.last_sign_in_at)}</td>
         <td style="white-space:nowrap;">
           ${u.dariEnv ? '' : `<select style="padding:5px 8px;" onchange="ubahPeranUser('${u.id}',this.value)">${['guru','admin','superadmin'].map(r=>`<option value="${r}" ${r===u.role?'selected':''}>${NAMA_PERAN[r]}</option>`).join('')}</select>`}
-          <button class="btn outline" style="padding:5px 10px;" onclick="resetPasswordUser('${u.id}','${escapeHtml(u.email)}')">Ganti Sandi</button>
-          ${u.id!==session?.user?.id ? `<button class="btn danger" style="padding:5px 10px;" onclick="hapusUser('${u.id}','${escapeHtml(u.email)}')">Hapus</button>` : ''}
+          <button class="btn outline" style="padding:5px 10px;" onclick="resetPasswordUser('${u.id}',${jsq(u.email)})">Ganti Sandi</button>
+          ${u.id!==session?.user?.id ? `<button class="btn danger" style="padding:5px 10px;" onclick="hapusUser('${u.id}',${jsq(u.email)})">Hapus</button>` : ''}
         </td>
       </tr>`).join('') || '<tr><td colspan="5" class="muted">Belum ada user.</td></tr>';
   }catch(err){
@@ -4220,7 +4220,7 @@ async function muatMonitor(paksa){
   monSedangMuat = true;
   try{
     const { data, error } = await supa.from('sesi_ujian')
-      .select('id, siswa_nisn, siswa_nama, status, waktu_mulai, total_skor, pelanggaran, terakhir_aktif, progres, total_soal, tambahan_menit, dikunci')
+      .select('id, siswa_nisn, siswa_nama, status, mode_ujian, waktu_mulai, waktu_selesai, total_skor, pelanggaran, terakhir_aktif, progres, total_soal, tambahan_menit, dikunci')
       .eq('paket_ujian_id', monPaket.id);
     if(error) throw error;
     const sesiMap = new Map((data||[]).map(x=>[x.siswa_nisn, x]));
@@ -4281,14 +4281,17 @@ function renderMonitor(){
     const sisa = aktif ? fmtSisa(new Date(s.waktu_mulai).getTime() + ((monPaket.durasi_menit||90) + (s.tambahan_menit||0))*60000 - now) : '-';
     const tambah = aktif && s.tambahan_menit ? ` <span class="muted" title="Waktu tambahan dari guru">(+${s.tambahan_menit})</span>` : '';
     const pel = s.pelanggaran ? `<span style="color:${s.pelanggaran>=3?'#b3261e':'#7A5300'};font-weight:600;">⚠ ${s.pelanggaran}x</span>` : '<span class="muted">0</span>';
-    const nama = escapeHtml(s.siswa_nama).replace(/'/g,'&#39;');
+    // Catatan: nama siswa SENGAJA tidak disisipkan ke atribut onclick (nama berapostrof seperti Ma'ruf
+    // merusak string JavaScript sehingga tombol diam saja). Fungsi mencari nama dari id sesi.
+    const bisaAktifkan = !aktif && s.mode_ujian !== 'manual';
     const aksi = !s.id ? '' : (aktif
       ? `<button class="btn outline" onclick="monAksi('pesan',['${s.id}'])">Pesan</button>
          <button class="btn outline" onclick="monAksi('waktu',['${s.id}'])">+Waktu</button>
          <button class="btn outline" onclick="monAksi('${s.dikunci?'buka':'kunci'}',['${s.id}'])">${s.dikunci?'Buka':'Kunci'}</button>
          <button class="btn danger" onclick="monAksi('sudahi',['${s.id}'])">Sudahi</button>
-         <button class="btn danger" onclick="monReset('${s.id}','${nama}')">Reset</button>`
-      : `<button class="btn danger" onclick="monReset('${s.id}','${nama}')">Reset</button>`);
+         <button class="btn danger" onclick="monReset('${s.id}')">Reset</button>`
+      : `${bisaAktifkan ? `<button class="btn" title="Buka lagi ujian siswa ini; ia melanjutkan dari jawaban terakhir" onclick="monAktifkan('${s.id}')">Aktifkan Kembali</button>` : ''}
+         <button class="btn danger" title="Hapus sesi: jawaban & nilai hilang, siswa mulai dari awal" onclick="monReset('${s.id}')">Reset</button>`);
     return `<tr>
       <td>${aktif?`<input type="checkbox" style="width:auto;" ${monTerpilih.has(s.id)?'checked':''} onchange="monPilih('${s.id}',this.checked)">`:''}</td>
       <td>${escapeHtml(s.siswa_nama)}<br><span class="muted">${escapeHtml(s.siswa_nisn||'')}</span></td>
@@ -4381,12 +4384,43 @@ async function monSudahi(ids){
     muatMonitor(true);
   }catch(e){ alert('Gagal mengakhiri ujian: '+e.message); }
 }
-async function monReset(id, nama){
-  if(!confirm(`Reset sesi ${nama}?\n\nSemua jawaban & nilai siswa ini DIHAPUS dan ia harus masuk ulang dari awal (waktu dihitung ulang).`)) return;
-  const { error } = await supa.from('sesi_ujian').delete().eq('id', id);
+async function monReset(id){
+  const r = monRows.find(x=>x.id===id);
+  const nama = r ? r.siswa_nama : 'siswa ini';
+  if(!confirm(`Reset sesi ${nama}?\n\nSemua jawaban & nilai siswa ini DIHAPUS dan ia harus masuk ulang dari awal (waktu dihitung ulang).\n\nTip: kalau siswa hanya perlu MELANJUTKAN, batalkan ini lalu pakai tombol "Aktifkan Kembali".`)) return;
+  // .select('id') supaya kelihatan kalau tidak ada baris yang terhapus (mis. izin database menolak tanpa pesan galat)
+  const { data, error } = await supa.from('sesi_ujian').delete().eq('id', id).select('id');
   if(error) return alert('Gagal reset: '+error.message);
+  if(!data || !data.length) return alert('Reset tidak menghapus apa pun. Sesi mungkin sudah dihapus, atau izin hapus di database belum aktif (jalankan migrasi-lengkap.sql). Klik Refresh lalu coba lagi.');
   monTerpilih.delete(id);
   muatMonitor(true);
+}
+async function monAktifkan(id){
+  const r = monRows.find(x=>x.id===id);
+  if(!r) return alert('Data siswa tidak ditemukan. Klik Refresh lalu coba lagi.');
+  const durasi = (monPaket && monPaket.durasi_menit) || 90;
+  const mulai = new Date(r.waktu_mulai).getTime();
+  const selesai = r.waktu_selesai ? new Date(r.waktu_selesai).getTime() : Date.now();
+  const sisaAsli = Math.ceil((mulai + (durasi + (r.tambahan_menit||0))*60000 - selesai)/60000);
+  const saran = Math.max(10, Math.min(180, sisaAsli));
+  const jawab = prompt(`Aktifkan kembali ujian ${r.siswa_nama}?\n\n• Jawaban yang sudah dikerjakan DIPULIHKAN; siswa melanjutkan tanpa mengulang dari awal.\n• Nilai sementara (termasuk nilai essay yang sudah dinilai) dihapus dan dihitung ulang saat siswa mengumpulkan lagi.\n• Siswa harus membuka ulang halaman ujian dan masuk lagi dengan kode akses + NISN.\n\nSisa waktu minimal yang diberikan (menit, 1-180):`, String(saran));
+  if(jawab === null) return;
+  const menit = parseInt(jawab,10);
+  if(!menit || menit < 1 || menit > 180) return alert('Isi jumlah menit antara 1 sampai 180.');
+  try{
+    const { data:{ session } } = await supa.auth.getSession();
+    const res = await fetch('/api/sudahi-ujian', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}` },
+      body: JSON.stringify({ sesi_ids:[id], aktifkan:true, menit })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || `Gagal (${res.status})`);
+    const h = (data.hasil||[])[0];
+    if(!h || !h.ok) throw new Error((h && h.error) || 'Gagal mengaktifkan kembali');
+    alert(`Ujian ${r.siswa_nama} diaktifkan kembali.\n${h.jawaban_dipulihkan} jawaban terisi dipulihkan.${h.pelanggaran_direset ? '\nHitungan pelanggaran direset ke 0.' : ''}\nMinta siswa membuka ulang halaman ujian dan masuk lagi untuk melanjutkan.` + (h.peringatan ? `\n\n⚠ ${h.peringatan}` : ''));
+    muatMonitor(true);
+  }catch(e){ alert('Gagal mengaktifkan kembali: '+e.message); }
 }
 function aturAutoMonitor(){
   if(monTimer){ clearInterval(monTimer); monTimer = null; }
@@ -6925,6 +6959,8 @@ function soalHtmlAman(str){
   return escapeHtml(String(str==null?'':str)).replace(/&lt;(\/?)(b|i|u|sub|sup)&gt;/gi, '<$1$2>').replace(/&lt;br\s*\/?&gt;/gi, '<br>');
 }
 function srcGambarAman(g){ return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=]+$/.test(String(g||'')) ? g : ''; }
+// Untuk menyisipkan teks bebas (nama, email) ke atribut onclick dengan aman: hasilnya string JavaScript ber-kutip ganda yang di-escape HTML.
+function jsq(v){ return escapeHtml(JSON.stringify(String(v==null?'':v))); }
 function escapeHtml(str){
   return (str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }

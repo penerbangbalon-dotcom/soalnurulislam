@@ -3,8 +3,75 @@
 // Jawaban yang sudah tersimpan di server (jawaban_sementara, dikirim halaman siswa lewat heartbeat)
 // langsung dinilai memakai mesin penilaian yang sama dengan submit-ujian.
 // Hanya guru yang sudah login yang boleh memakai function ini.
+//
+// Mode aktifkan=true ("Aktifkan Kembali"): membuka lagi sesi yang sudah berstatus selesai/dinilai
+// (mis. tidak sengaja disudahi, terkumpul otomatis karena waktu habis/pelanggaran, atau HP siswa bermasalah)
+// supaya siswa MELANJUTKAN dari jawaban terakhirnya, bukan mengulang dari awal.
+//  - Jawaban dipulihkan dari detail_jawaban ke jawaban_sementara (cadangan yang dibaca halaman siswa).
+//  - Nilai lama & detail penilaian dihapus; nilai dihitung ulang saat siswa mengumpulkan lagi.
+//  - Waktu: sisa waktu siswa dijamin minimal `menit` menit (lewat tambahan_menit).
 
-const { adaKonfigurasi, sb, pastikanLogin, nilaiDanSimpanSesi, UUID } = require('../lib/ujian-core');
+const { adaKonfigurasi, sb, pastikanLogin, nilaiDanSimpanSesi, UUID, BATAS_PELANGGARAN } = require('../lib/ujian-core');
+
+async function aktifkanKembali(id, menitBeri) {
+  const [sesi] = await sb(`sesi_ujian?id=eq.${id}&select=*`);
+  if (!sesi) return { id, ok: false, error: 'Sesi tidak ditemukan' };
+  if (sesi.status === 'berlangsung') return { id, ok: false, error: 'Sesi masih berlangsung (tidak perlu diaktifkan)' };
+  if (sesi.mode_ujian === 'manual') return { id, ok: false, error: 'Nilai input manual (ujian cetak) tidak bisa diaktifkan kembali' };
+
+  const [paket] = await sb(`paket_ujian?id=eq.${sesi.paket_ujian_id}&select=durasi_menit,status`);
+  if (!paket) return { id, ok: false, error: 'Paket ujian tidak ditemukan' };
+
+  // Pulihkan jawaban dari hasil penilaian sebelumnya
+  const detail = (await sb(`detail_jawaban?sesi_ujian_id=eq.${id}&select=soal_id,jawaban&limit=1000`)) || [];
+  const cadangan = {};
+  let terjawab = 0;
+  for (const d of detail) {
+    const v = d.jawaban == null ? '' : String(d.jawaban);
+    cadangan[d.soal_id] = v;
+    if (v.trim()) terjawab++;
+  }
+
+  // Sisa waktu minimal `menitBeri` menit dari sekarang (tambahan_menit tidak pernah negatif)
+  const mulai = new Date(sesi.waktu_mulai).getTime();
+  const durasi = Number(paket.durasi_menit) || 0;
+  const tambahanBaru = Math.max(0, Math.ceil((Date.now() + menitBeri * 60000 - mulai) / 60000) - durasi);
+
+  // Bila ujian dulu berakhir karena pelanggaran (mencapai batas), hitungan pelanggaran dikembalikan ke 0.
+  // Kalau tidak, detak pertama siswa langsung menutup ujiannya lagi.
+  const pelanggaranBaru = (BATAS_PELANGGARAN > 0 && (Number(sesi.pelanggaran) || 0) >= BATAS_PELANGGARAN) ? 0 : (Number(sesi.pelanggaran) || 0);
+
+  // Buka sesi secara atomik (hanya bila masih selesai/dinilai)
+  const buka = await sb(`sesi_ujian?id=eq.${id}&status=in.(selesai,dinilai)`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      status: 'berlangsung', waktu_selesai: null, total_skor: null,
+      jawaban_sementara: cadangan, progres: terjawab, tambahan_menit: tambahanBaru,
+      dikunci: false, terakhir_aktif: null, pelanggaran: pelanggaranBaru,
+    }),
+  });
+  if (!buka || !buka.length) return { id, ok: false, error: 'Sesi sedang diproses pihak lain, coba lagi' };
+
+  // Hapus detail penilaian lama supaya tidak dobel saat siswa mengumpulkan lagi
+  try {
+    await sb(`detail_jawaban?sesi_ujian_id=eq.${id}`, { method: 'DELETE' });
+  } catch (err) {
+    await sb(`sesi_ujian?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: sesi.status, waktu_selesai: sesi.waktu_selesai, total_skor: sesi.total_skor,
+        jawaban_sementara: sesi.jawaban_sementara || null, progres: sesi.progres || 0,
+        tambahan_menit: sesi.tambahan_menit || 0, dikunci: !!sesi.dikunci, terakhir_aktif: sesi.terakhir_aktif || null,
+         pelanggaran: Number(sesi.pelanggaran) || 0,
+      }),
+    }).catch(() => {});
+    return { id, ok: false, error: 'Gagal membersihkan nilai lama: ' + err.message };
+  }
+
+  const hasil = { id, ok: true, jawaban_dipulihkan: terjawab, total_jawaban: detail.length, pelanggaran_direset: pelanggaranBaru !== (Number(sesi.pelanggaran) || 0) };
+  if (paket.status !== 'siap') hasil.peringatan = `Paket ujian berstatus "${paket.status}". Siswa baru bisa masuk setelah paket dibuka (status Siap).`;
+  return hasil;
+}
 
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -23,9 +90,16 @@ exports.handler = async function (event) {
   // (muncul di menu Perlu Dinilai dengan "0 soal"). Sesi dibuka sebentar lalu dinilai ulang dari cadangan
   // jawaban di server; waktu selesai aslinya dikembalikan.
   const pulihkan = body.pulihkan === true;
+  const aktifkan = body.aktifkan === true;
+  const menitBeri = Math.max(1, Math.min(180, parseInt(body.menit, 10) || 15));
   const hasil = [];
   const cachePaket = {};
   for (const id of ids) {
+    if (aktifkan) {
+      try { hasil.push(await aktifkanKembali(id, menitBeri)); }
+      catch (err) { hasil.push({ id, ok: false, error: err.message }); }
+      continue;
+    }
     let waktuAsli = null, dibuka = false;
     try {
       let [sesi] = await sb(`sesi_ujian?id=eq.${id}&select=*`);
