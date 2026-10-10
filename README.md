@@ -120,6 +120,7 @@ generator-soal/
 ├── ujian.html                     # Ujian online siswa
 ├── netlify.toml                   # Konfigurasi Netlify
 ├── logo.png                       # Logo untuk kop soal cetak
+├── migrasi-v17-cp-tp.sql          # Jalankan sekali: tabel CP & TP + tautan ke Bank Soal
 ├── migrasi-v7.sql                 # Jalankan sekali: Ulangan Harian, pengaturan nilai/KKM, nilai tambahan
 ├── migrasi-lengkap.sql                 # Jalankan sekali di Supabase (izin tombol Reset, kolom Kelas, dll)
 ├── supabase-schema.sql            # Skema database
@@ -178,6 +179,15 @@ Ulangan Harian: pilihan baru di *Buat Paket Ujian → Jenis Ujian*. Ulangan Hari
 
 Soal terpakai: saat menyimpan paket, aplikasi memeriksa ulang ke database dan MENOLAK bila ada soal yang sudah dipakai di paket lain
 (berlaku walau centang "Sembunyikan soal yang sudah dipakai" dimatikan). Paket lama yang sudah berisi soal bersama tetap bisa diedit.
+
+## Versi 14 — CP & TP per Mapel (Kurikulum Merdeka)
+
+**Instalasi lama**: jalankan `migrasi-v17-cp-tp.sql` SEKALI di Supabase SQL Editor (aman diulang), lalu deploy ulang.
+Menu **Bank Soal → CP & TP per Mapel**: kelola Capaian Pembelajaran (CP) dan Tujuan Pembelajaran (TP) tiap mata pelajaran
+(manual, tempel teks, Upload Excel, atau Generate dengan AI). Soal di **Bank Soal → Generate dengan AI** dapat dibuat
+berdasarkan CP/TP terpilih dan tersimpan terkait CP/TP itu; **Rapor Semester** mencantumkan CP, TP, dan deskripsi capaian
+per mapel. Rincian lengkap ada di `CATATAN-PERUBAHAN.md` (bagian v14.0). Rumusan CP dari AI hanya draf — cocokkan dengan
+dokumen CP resmi sebelum dipakai di rapor.
 
 ## Riwayat Perbaikan
 

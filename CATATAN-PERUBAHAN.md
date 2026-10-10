@@ -1,5 +1,28 @@
 # Perubahan terbaru
 
+## v14.0 — Menu CP & TP per Mapel, terhubung ke Bank Soal (generate soal berdasarkan CP) dan Rapor
+**Wajib jalankan `migrasi-v17-cp-tp.sql`** di Supabase SQL Editor (sekali; aman diulang), lalu unggah semua file ke GitHub (Vercel deploy otomatis). Data lama tidak berubah. Sebelum migrasi dijalankan, semua menu lama tetap normal dan menu CP & TP menampilkan petunjuk migrasi. **Tidak ada fungsi serverless baru** (tetap 10; batas Hobby 12).
+
+**1. Menu baru: Bank Soal → CP & TP per Mapel.** Filter Jenjang / Kelas / Mata Pelajaran; tiap mapel berisi beberapa CP (per elemen), tiap CP berisi beberapa TP (dengan semester Ganjil/Genap). Fase otomatis dari kelas (Paket B VII-IX = Fase D; Paket C X = Fase E, XI-XII = Fase F). Tersedia jumlah soal terkait per CP/TP, daftar "mapel yang belum punya CP", dan tombol pintas **CP & TP** di menu Mata Pelajaran. Tiga cara mengisi:
+- **Manual**: Tambah CP, + TP, Edit, Hapus (kode otomatis CP-1, 1.1, ... bila dikosongkan).
+- **Input Cepat (tempel teks)**: salin CP/TP dari dokumen, tulis `CP:` / `TP:` / `Elemen:` (butir `-` atau `1.` di bawah CP otomatis jadi TP; baris tanpa awalan = lanjutan baris sebelumnya; `(Ganjil)`/`(Genap)` di akhir TP mengisi semester). Ada konfirmasi jumlah sebelum disimpan.
+- **Upload Excel/CSV** (+ Unduh Template, + Ekspor Excel): kolom `cp_kode, elemen, cp_deskripsi, tp_kode, tp_deskripsi, semester`.
+- **Generate dengan AI**: "CP baru + TP-nya" (jumlah CP maks 6, TP per CP maks 8, semester, catatan cakupan materi) atau "TP baru untuk CP yang sudah ada" (tombol *TP dgn AI* pada tiap CP; TP yang sudah ada tidak diulang). Hasil tampil sebagai **draft yang bisa disunting dan dicentang** sebelum disimpan. Memakai rantai AI cadangan yang sama dengan generate soal (Gemini -> Groq -> Cerebras -> Mistral -> OpenRouter).
+  > Penting: CP resmi Kurikulum Merdeka ditetapkan pemerintah (BSKAP). Rumusan CP dari AI hanyalah draf; **cocokkan dengan dokumen CP resmi** mapel & fase terkait sebelum dipakai di rapor. Cara paling aman: tempel/unggah CP resmi lewat Input Cepat atau Excel, lalu minta AI menyusun TP-nya saja.
+
+**2. Soal di-generate berdasarkan CP/TP.** Di *Bank Soal → Generate dengan AI* ada pilihan **Capaian Pembelajaran (CP)** dan kotak centang **TP**. Soal dibuat mengukur CP/TP yang dipilih, dibagi rata ke TP yang dicentang, dan tiap soal otomatis tersimpan **terkait CP & TP**-nya (AI diminta menyebut TP yang diukur; bila hanya satu TP dicentang, otomatis ke TP itu). Topik/Materi menjadi opsional bila CP dipilih. Tombol **✦ Buat Soal** pada tiap CP dan **✦ Soal** pada tiap TP di menu CP & TP langsung membuka Generate AI dengan pilihan terisi.
+
+**3. CP/TP juga terhubung di bagian lain Bank Soal.**
+- Tambah/Edit Soal Manual: pilihan CP dan TP.
+- Daftar Bank Soal: lencana CP/TP pada tiap soal dan filter **CP** (muncul setelah memilih mapel; ada "Soal tanpa CP").
+- Import Excel Bank Soal: kolom opsional `cp_kode` & `tp_kode` (template dan ekspor ikut diperbarui; kode tidak ditemukan -> soal tetap masuk tanpa tautan, dengan peringatan).
+- Buat Paket Ujian: filter **CP** pada daftar pilihan soal (dengan jumlah soal per CP), sehingga paket bisa disusun per CP.
+
+**4. Rapor Semester mencantumkan CP & TP.** Setelah tabel nilai, muncul bagian **Capaian Pembelajaran (CP) & Tujuan Pembelajaran (TP)** per mapel (hanya mapel yang punya CP). Bila siswa punya skor pada soal yang terkait TP (ujian berstatus dinilai pada tahun ajaran & semester itu, termasuk remedial), tertulis deskripsi otomatis: *"Ananda telah mampu ..."* (TP dengan penguasaan >= KKM mapel) dan *"Ananda perlu bimbingan/penguatan pada ..."* (di bawah KKM). TP yang belum punya data tidak dinilai (ditulis "n TP lain belum diukur"). Bila belum ada soal terkait TP, rapor menampilkan CP dan daftar TP semester itu. Berlaku untuk cetak satu siswa maupun massal. Kegagalan bagian ini tidak menggagalkan cetak rapor.
+> Agar deskripsi capaian di rapor terisi: (a) isi CP/TP, (b) buat soal yang terkait TP (via Generate AI berdasarkan CP/TP atau manual), (c) pakai soal itu di paket ujian. Soal yang sudah ada sebelumnya bisa dikaitkan lewat Edit Soal atau impor ulang dengan kolom `cp_kode`/`tp_kode`.
+
+**File berubah/baru:** `index.html`, `netlify/functions/generate-soal.js` (adapter `api/generate-soal.js` tidak berubah), baru: `migrasi-v17-cp-tp.sql`. Tabel baru: `capaian_pembelajaran`, `tujuan_pembelajaran`; kolom baru `bank_soal.cp_id`, `bank_soal.tp_id` (hapus CP/TP tidak menghapus soal, hanya melepas tautan).
+
 ## v13.1 — Pencarian lebih pintar di Daftar & Cetak (dan menu lain), kelas "X" tidak lagi membawa XI/XII
 Tanpa migrasi SQL. Hanya `index.html` yang berubah.
 **Masalah yang diperbaiki:** pencarian memakai "mengandung huruf", sehingga mengetik `X` ikut menampilkan kelas XI, XII, dan semua kata yang memuat huruf x (kode akses, Eksak, dst.). Kini:

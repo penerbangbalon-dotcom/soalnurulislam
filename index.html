@@ -147,6 +147,16 @@
   .kotak-cari .hapus-cari{position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--ink-soft);display:none;font-size:15px;}
   .quick-chip{border:1px solid var(--line);background:#F5F8FD;border-radius:12px;padding:4px 10px;font-size:12.5px;cursor:pointer;}
   .quick-chip:hover{background:#E3ECF9;}
+  .cp-mapel{margin-bottom:16px;}
+  .cp-mapel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:4px;}
+  .cp-item{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-top:10px;background:#FCFCF9;}
+  .cp-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;}
+  .cp-btn{display:flex;gap:5px;flex-wrap:wrap;} .cp-btn .btn,.tp-btn .btn{padding:3px 9px;font-size:12px;}
+  .cp-desk{margin:8px 0 6px;font-size:14px;line-height:1.5;}
+  .cp-tp{border-top:1px dashed var(--line);margin-top:6px;}
+  .tp-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13.5px;}
+  .tp-isi{flex:1;} .tp-btn{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+  .tp-draft{display:flex;gap:6px;align-items:flex-start;margin-top:6px;} .tp-draft input[type=checkbox]{width:auto;margin-top:8px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -185,6 +195,7 @@
       <div class="subs">
         <div class="item active" data-tab="bank" onclick="showTab('bank')">Bank Soal</div>
         <div class="item" data-tab="rekap" onclick="showTab('rekap')">Rekap Bank Soal</div>
+        <div class="item" data-tab="cptp" onclick="showTab('cptp')">CP &amp; TP per Mapel</div>
       </div>
     </div>
     <div class="group" data-group="paketg">
@@ -251,7 +262,8 @@
           <option value="Paket C">Paket C</option>
         </select>
         <select id="filter-kelas" onchange="terapkanFilterMapelDropdown()"><option value="">Semua Kelas</option></select>
-        <select id="filter-mapel" onchange="loadBankSoal()"><option value="">Semua mata pelajaran</option></select>
+        <select id="filter-mapel" onchange="isiFilterCpBank();loadBankSoal()"><option value="">Semua mata pelajaran</option></select>
+        <select id="filter-cp" class="hidden" onchange="loadBankSoal()" title="Filter soal berdasarkan Capaian Pembelajaran"></select>
         <select id="filter-jenis" onchange="loadBankSoal()">
           <option value="">Semua jenis</option>
           <option value="pilihan_ganda">Pilihan Ganda</option>
@@ -297,6 +309,30 @@
       </div>
     </section>
 
+    <!-- ===== TAB: CP & TP ===== -->
+    <section id="tab-cptp" class="hidden">
+      <h2>CP &amp; TP per Mata Pelajaran</h2>
+      <p class="muted">Capaian Pembelajaran (CP) dan Tujuan Pembelajaran (TP) tiap mata pelajaran. CP/TP dipakai untuk
+        <b>membuat soal</b> (Bank Soal &rarr; Generate dengan AI, atau tombol <i>Buat Soal</i> di bawah) dan dicantumkan pada
+        <b>Rapor Semester</b>. Isi manual, tempel teks, unggah Excel, atau minta AI membuat drafnya.</p>
+      <div class="toolbar">
+        <select id="cp-filter-jenjang" onchange="cpFilterBerubah()"><option value="">Semua Jenjang</option><option value="Paket B">Paket B</option><option value="Paket C">Paket C</option></select>
+        <select id="cp-filter-kelas" onchange="cpFilterBerubah()"><option value="">Semua Kelas</option></select>
+        <select id="cp-filter-mapel" onchange="renderCpTp()" style="min-width:260px;"><option value="">Semua mata pelajaran</option></select>
+      </div>
+      <div class="toolbar" id="cp-aksi">
+        <button class="btn" onclick="bukaFormCp()">+ Tambah CP</button>
+        <button class="btn outline" onclick="bukaInputCepat()" title="Tempel teks CP/TP hasil salin dari dokumen">Input Cepat (tempel teks)</button>
+        <button class="btn outline" onclick="cpEl('cp-file').click()">Upload Excel/CSV</button>
+        <button class="btn outline" onclick="unduhTemplateCpTp()">Unduh Template</button>
+        <button class="btn outline" onclick="eksporCpTp()">Ekspor Excel</button>
+        <input type="file" id="cp-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="importCpTp(this)">
+        <button class="btn gold" onclick="bukaGenerateCpTp('cp_tp')">✦ Generate CP &amp; TP dengan AI</button>
+      </div>
+      <div class="ringkas" id="cp-info" style="margin-bottom:12px;"></div>
+      <div id="cp-daftar"></div>
+    </section>
+
     <!-- ===== TAB: PAKET UJIAN ===== -->
     <section id="tab-paket" class="hidden">
       <h2 id="paket-form-title">Buat Paket Ujian</h2>
@@ -330,6 +366,8 @@
         <p class="muted">Pilih mata pelajaran di atas dulu untuk memuat daftar soal.</p>
         <label class="checkline" style="margin:6px 0 4px;"><input type="checkbox" id="pk-sembunyi-terpakai" checked onchange="ubahSembunyiTerpakai()"><span><b>Sembunyikan soal yang sudah dipakai di paket lain</b> (soal tidak bisa dipakai dua kali)</span></label>
         <p class="muted" id="pk-info-terpakai" style="margin:0 0 8px;"></p>
+        <div class="field hidden" id="pk-cp-wrap" style="max-width:520px;"><label>Filter soal berdasarkan Capaian Pembelajaran (CP)</label>
+          <select id="pk-cp" onchange="loadSoalUntukPaket()"><option value="">Semua soal</option></select></div>
         <div id="pk-pilih-panel"></div>
         <div id="pk-soal-list" style="max-height:340px;overflow:auto;border:1px solid var(--line);padding:8px 12px;border-radius:var(--radius);"></div>
 
@@ -1337,7 +1375,7 @@
 <div class="modal-bg hidden" id="modal-tambah-soal">
   <div class="modal">
     <h2 id="ts-modal-title">Tambah Soal Manual</h2>
-    <div class="field"><label>Mata Pelajaran</label><select id="ts-mapel"></select></div>
+    <div class="field"><label>Mata Pelajaran</label><select id="ts-mapel" onchange="isiCpTpModalSoal()"></select></div>
     <div class="grid2">
       <div class="field"><label>Jenis Soal</label>
         <select id="ts-jenis" onchange="toggleOpsiSoal()">
@@ -1350,6 +1388,10 @@
         <select id="ts-tingkat"><option value="sangat_mudah">Sangat Mudah</option><option value="mudah">Mudah</option><option value="sedang" selected>Sedang</option><option value="sulit">Sulit</option></select>
       </div>
     </div>
+    <div id="ts-cptp-wrap"><div class="grid2">
+      <div class="field"><label>Capaian Pembelajaran (CP)</label><select id="ts-cp" onchange="isiTpModalSoal()"></select></div>
+      <div class="field"><label>Tujuan Pembelajaran (TP)</label><select id="ts-tp"></select></div>
+    </div></div>
     <div class="field"><label>Topik</label><input type="text" id="ts-topik" /></div>
     <div class="field"><label>Pertanyaan (rumus: tulis di antara $ ... $, contoh $x^2+3x$)</label><textarea id="ts-pertanyaan"></textarea></div>
     <div class="field"><label>Gambar (opsional)</label><input type="file" accept="image/*" onchange="pilihGambar(this)"><div id="ts-gambar-prev"></div></div>
@@ -1481,7 +1523,14 @@
       <div class="field"><label>Jenjang / Kelas</label><input type="text" id="ai-program" readonly style="background:#f2f1ea;" /></div>
     </div>
     <div class="field"><label class="chk"><input type="checkbox" id="ai-remedial"> Simpan sebagai soal <b>Khusus Remedial</b> (untuk Paket Remedial)</label></div>
-    <div class="field"><label>Topik / Materi</label><input type="text" id="ai-topik" placeholder="Contoh: Pecahan, Sistem Pencernaan, Teks Deskripsi" /></div>
+    <div id="ai-cptp-wrap">
+      <div class="field"><label>Capaian Pembelajaran (CP) — soal dibuat mengacu CP/TP yang dipilih, dan tersimpan terkait CP/TP itu</label>
+        <select id="ai-cp" onchange="isiTpAi()"></select>
+        <p class="muted hidden" id="ai-cp-kosong" style="margin:4px 0 0;">Mapel ini belum punya CP. Buat dulu di menu <b>CP &amp; TP per Mapel</b>.</p>
+        <div id="ai-tp-wrap" class="hidden" style="margin-top:6px;max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);padding:6px 10px;"></div>
+      </div>
+    </div>
+    <div class="field"><label id="ai-topik-label">Topik / Materi</label><input type="text" id="ai-topik" placeholder="Contoh: Pecahan, Sistem Pencernaan, Teks Deskripsi" /></div>
     <div class="field"><label>Jenis Soal (bisa pilih lebih dari satu, digabung dalam 1 lembar)</label>
       <div class="jenis-komposisi">
         <div class="jenis-row">
@@ -1508,6 +1557,70 @@
       <span class="muted" id="ai-status"></span>
     </div>
     <div id="ai-hasil"></div>
+  </div>
+</div>
+
+<!-- MODAL: CP & TP -->
+<div class="modal-bg hidden" id="modal-cp">
+  <div class="modal" style="max-width:640px;">
+    <h2 id="cp-modal-title">Tambah Capaian Pembelajaran (CP)</h2>
+    <p class="muted" id="cp-modal-mapel"></p>
+    <div class="grid2">
+      <div class="field"><label>Kode CP</label><input type="text" id="cp-kode" placeholder="CP-1 (kosongkan = otomatis)" /></div>
+      <div class="field"><label>Elemen / Ruang Lingkup</label><input type="text" id="cp-elemen" placeholder="mis. Bilangan" /></div>
+    </div>
+    <div class="field"><label>Deskripsi CP</label><textarea id="cp-deskripsi" rows="6" placeholder="Pada akhir fase ..., peserta didik mampu ..."></textarea></div>
+    <div class="toolbar" style="justify-content:flex-end;"><button class="btn outline" onclick="closeModal('modal-cp')">Batal</button><button class="btn" onclick="simpanCp()">Simpan</button></div>
+  </div>
+</div>
+<div class="modal-bg hidden" id="modal-tp">
+  <div class="modal" style="max-width:640px;">
+    <h2 id="tp-modal-title">Tambah Tujuan Pembelajaran (TP)</h2>
+    <p class="muted" id="tp-modal-cp"></p>
+    <div class="grid2">
+      <div class="field"><label>Kode TP</label><input type="text" id="tp-kode" placeholder="1.1 (kosongkan = otomatis)" /></div>
+      <div class="field"><label>Semester</label><select id="tp-semester"><option value="">Tidak ditentukan</option><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select></div>
+    </div>
+    <div class="field"><label>Deskripsi TP</label><textarea id="tp-deskripsi" rows="4" placeholder="Peserta didik dapat ..."></textarea></div>
+    <div class="toolbar" style="justify-content:flex-end;"><button class="btn outline" onclick="closeModal('modal-tp')">Batal</button><button class="btn" onclick="simpanTp()">Simpan</button></div>
+  </div>
+</div>
+<div class="modal-bg hidden" id="modal-cp-cepat">
+  <div class="modal" style="max-width:720px;">
+    <h2>Input Cepat CP &amp; TP</h2>
+    <p class="muted">Tempel teks (mis. hasil salin dari dokumen CP/modul ajar). Awali tiap CP dengan <code>CP:</code> dan tiap TP dengan <code>TP:</code>.
+      Baris tanpa awalan dianggap lanjutan baris sebelumnya; butir <code>-</code> atau <code>1.</code> di bawah sebuah CP dianggap TP.
+      Tambahkan <code>(Ganjil)</code>/<code>(Genap)</code> di akhir TP untuk mengisi semester.</p>
+<pre style="background:#f7f5ef;border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;font-size:12.5px;white-space:pre-wrap;">CP-1: Pada akhir fase D, peserta didik mampu ...
+Elemen: Bilangan
+TP 1.1: Peserta didik dapat membandingkan bilangan bulat (Ganjil)
+TP 1.2: Peserta didik dapat menyelesaikan operasi hitung bilangan bulat (Ganjil)
+CP-2: Pada akhir fase D, peserta didik mampu ...
+- Peserta didik dapat menyederhanakan bentuk aljabar (Genap)</pre>
+    <div class="field"><textarea id="cepat-teks" rows="12" placeholder="Tempel teks di sini..."></textarea></div>
+    <div class="toolbar" style="justify-content:flex-end;"><button class="btn outline" onclick="closeModal('modal-cp-cepat')">Batal</button><button class="btn" onclick="prosesInputCepat()">Baca &amp; Simpan</button></div>
+  </div>
+</div>
+<div class="modal-bg hidden" id="modal-cp-ai">
+  <div class="modal" style="max-width:820px;">
+    <h2>✦ Generate CP &amp; TP dengan AI</h2>
+    <p class="muted" id="cpai-mapel" style="font-weight:600;"></p>
+    <div class="grid2">
+      <div class="field"><label>Yang dibuat AI</label><select id="cpai-mode" onchange="cpAiModeBerubah()"><option value="cp_tp">CP baru + TP-nya</option><option value="tp">TP baru untuk CP yang sudah ada</option></select></div>
+      <div class="field hidden" id="cpai-cp-wrap"><label>CP</label><select id="cpai-cp"></select></div>
+    </div>
+    <div class="grid3">
+      <div class="field" id="cpai-jmlcp-wrap"><label>Jumlah CP (maks 6)</label><input type="number" id="cpai-jml-cp" value="3" min="1" max="6" /></div>
+      <div class="field"><label>TP per CP (maks 8)</label><input type="number" id="cpai-tp-per-cp" value="4" min="1" max="8" /></div>
+      <div class="field"><label>Semester TP</label><select id="cpai-smt"><option value="">Bagi Ganjil &amp; Genap</option><option value="Ganjil">Semua Ganjil</option><option value="Genap">Semua Genap</option></select></div>
+    </div>
+    <div class="field"><label>Catatan / cakupan materi (opsional)</label><textarea id="cpai-catatan" rows="3" placeholder="Tempel daftar elemen/materi yang ingin dicakup, atau potongan CP resmi sebagai acuan"></textarea></div>
+    <div class="toolbar">
+      <button class="btn gold" id="cpai-btn" onclick="jalankanCpAi()">Generate</button>
+      <span class="muted" id="cpai-status"></span>
+    </div>
+    <div id="cpai-hasil"></div>
+    <div class="toolbar" style="justify-content:flex-end;margin-top:10px;"><button class="btn outline" onclick="closeModal('modal-cp-ai')">Tutup</button></div>
   </div>
 </div>
 
@@ -1859,7 +1972,7 @@ function showTab(tab){
   if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','tugas','nilaitugas','syaratrapor','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
+  ['bank','cptp','tugas','nilaitugas','syaratrapor','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1867,6 +1980,7 @@ function showTab(tab){
     g.classList.toggle('has-active', aktif);
     if(aktif) g.classList.add('open');
   });
+  if(tab==='cptp') loadCpTp();
   if(tab==='tugas') loadTugasGuru();
   if(tab==='nilaitugas') loadPenilaianTugas();
   if(tab==='syaratrapor') loadSyaratRapor();
@@ -2124,12 +2238,14 @@ function terapkanFilterMapelDropdown(){
   sel.innerHTML = '<option value="">Semua mata pelajaran</option>' +
     filtered.map(m=>`<option value="${m.id}">${labelMapel(m)}</option>`).join('');
   sel.value = filtered.some(m=>m.id===prevValue) ? prevValue : '';
+  isiFilterCpBank();
   loadBankSoal();
 }
 async function loadMapelList(){
   const { data, error } = await supa.from('mata_pelajaran').select('*')
     .order('program').order('kelas').order('nama');
   currentMapelList = data || [];
+  await muatCacheCpTp();     // CP & TP (v17); aman bila migrasi belum dijalankan
   // filter-mapel (Bank Soal) dibangun terpisah lewat terapkanFilterMapelDropdown(),
   // supaya tetap menghormati filter Jenjang/Kelas yang sedang aktif.
   ['pk-mapel','ts-mapel','ai-mapel'].forEach(id=>{
@@ -2142,6 +2258,7 @@ async function loadMapelList(){
       <td>${escapeHtml(m.nama)}</td><td>${m.program}</td><td>${m.kelas || '<span class="muted">belum diisi</span>'}</td>
       <td>${m.tidak_diujikan ? '<span class="muted">Tidak diujikan</span>' : 'Ya'}</td>
       <td style="white-space:nowrap;">
+        <button class="btn outline" style="padding:4px 10px;" onclick="bukaCpTpMapel('${m.id}')" title="Kelola Capaian & Tujuan Pembelajaran mapel ini">CP &amp; TP${cpUntukMapel(m.id).length?` (${cpUntukMapel(m.id).length})`:''}</button>
         <button class="btn outline" style="padding:4px 10px;" onclick="editMapel('${m.id}')">Edit</button>
         <button class="btn outline" style="padding:4px 10px;" onclick="hapusMapel('${m.id}')">Hapus</button>
       </td>
@@ -2318,10 +2435,12 @@ async function loadBankSoal(){
   const jenis = document.getElementById('filter-jenis').value;
   const cari = document.getElementById('filter-cari').value.trim();
   const filterPakai = (document.getElementById('filter-pakai')||{}).value || '';
+  const filterCp = (document.getElementById('filter-cp')||{}).value || '';
   const bangun = ()=>{
     let q = supa.from('bank_soal').select('*, mata_pelajaran(nama)').order('created_at', { ascending:false }).order('id');
     if(mapelId) q = q.eq('mapel_id', mapelId);
     if(jenis) q = q.eq('jenis', jenis);
+    if(filterCp==='tanpa') q = q.is('cp_id', null); else if(filterCp) q = q.eq('cp_id', filterCp);
     if(cari) q = q.or(`pertanyaan.ilike.%${cari}%,topik.ilike.%${cari}%`);
     return q;
   };
@@ -2335,7 +2454,7 @@ async function loadBankSoal(){
   empty.classList.toggle('hidden', (data||[]).length>0);
   empty.textContent = cari || jenis || mapelId || filterPakai ? 'Tidak ada soal yang cocok dengan filter/pencarian.' : 'Belum ada soal.';
   // Halaman kembali ke 1 hanya kalau filter berubah (setelah edit/hapus tetap di halaman yang sama)
-  const kunciFilter = [mapelId, jenis, cari, filterPakai].join('|');
+  const kunciFilter = [mapelId, jenis, cari, filterPakai, filterCp].join('|');
   if(kunciFilter!==bankFilterKey){ bankFilterKey = kunciFilter; bankSoalHalaman = 1; }
   bankSoalTampil = data||[]; bankSoalPeta = terpakai;
   renderBankSoal();
@@ -2354,7 +2473,7 @@ function renderBankSoal(){
       <td>${escapeHtml(s.mata_pelajaran?.nama || '-')}</td>
       <td>${labelJenis(s.jenis)}</td>
       <td style="max-width:340px;">${escapeHtml(s.pertanyaan).slice(0,140)}${s.pertanyaan.length>140?'…':''}</td>
-      <td>${escapeHtml(s.topik || '-')}</td>
+      <td>${escapeHtml(s.topik || '-')}${infoCpTpSoal(s)}</td>
       <td><span class="badge ${s.sumber==='ai'?'ai':'manual'}">${s.sumber==='ai'?'AI':'Manual'}</span>${s.khusus_remedial?'<br><span class="badge" style="background:#fbe9d0;color:#8a4b00;margin-top:4px;display:inline-block;">Khusus Remedial</span>':''}${terpakai.has(s.id)?`<br><span class="badge" style="background:#e8eef7;color:#2b4a7a;margin-top:4px;display:inline-block;" title="${escapeHtml(terpakai.get(s.id).join(', '))}">Dipakai di ${terpakai.get(s.id).length} paket</span>`:''}</td>
       <td>
         <button class="btn outline" style="padding:4px 10px;" onclick="bukaEditSoal('${s.id}')">Edit</button>
@@ -2486,9 +2605,9 @@ function eksporBankSoal(){
   const data = bankSoalTampil;
   if(!data.length) return alert('Tidak ada soal untuk diekspor (sesuai filter saat ini).');
   const wb = XLSX.utils.book_new();
-  const hdrPg = ['pertanyaan','opsi_a','opsi_b','opsi_c','opsi_d','opsi_e','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','mata_pelajaran'];
-  const hdr2 = ['pertanyaan','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','mata_pelajaran'];
-  const dasar = s=>[s.kunci_jawaban||'', s.poin ?? 1, s.topik||'', s.tingkat_kesulitan||'sedang', s.pembahasan||'', s.mata_pelajaran?.nama||''];
+  const hdrPg = ['pertanyaan','opsi_a','opsi_b','opsi_c','opsi_d','opsi_e','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','mata_pelajaran','cp_kode','tp_kode'];
+  const hdr2 = ['pertanyaan','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','mata_pelajaran','cp_kode','tp_kode'];
+  const dasar = s=>[s.kunci_jawaban||'', s.poin ?? 1, s.topik||'', s.tingkat_kesulitan||'sedang', s.pembahasan||'', s.mata_pelajaran?.nama||'', (cpDari(s.cp_id)||{}).kode||'', (tpDari(s.tp_id)||{}).kode||''];
   const lembar = [
     ['Pilihan Ganda','pilihan_ganda',hdrPg,s=>[s.pertanyaan,s.opsi_a||'',s.opsi_b||'',s.opsi_c||'',s.opsi_d||'',s.opsi_e||'',...dasar(s)]],
     ['Isian Singkat','isian_singkat',hdr2,s=>[s.pertanyaan,...dasar(s)]],
@@ -2615,6 +2734,8 @@ function unduhTemplateSoal(){
     ['6. Setelah diisi, unggah kembali file ini lewat tombol "Import Excel/CSV" pada Bank Soal.'],
     ['   Pastikan Mata Pelajaran (dan Kelas-nya) sudah dipilih dulu di filter Bank Soal sebelum impor.'],
     ['7. Boleh isi salah satu sheet saja (mis. hanya "Pilihan Ganda"), sheet lain boleh dikosongkan.'],
+    ['8. Kolom "cp_kode" dan "tp_kode" (opsional) mengaitkan soal ke Capaian/Tujuan Pembelajaran. Isi dengan kode yang sama persis'],
+    ['   dengan kode di menu "CP & TP per Mapel" (mis. CP-1 dan 1.1) untuk mapel yang dipilih.'],
   ];
   const wsPetunjuk = XLSX.utils.aoa_to_sheet(petunjuk);
   wsPetunjuk['!cols'] = [{ wch: 90 }];
@@ -2622,7 +2743,7 @@ function unduhTemplateSoal(){
 
   // --- Sheet Pilihan Ganda ---
   const pg = [
-    ['pertanyaan','opsi_a','opsi_b','opsi_c','opsi_d','opsi_e','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan'],
+    ['pertanyaan','opsi_a','opsi_b','opsi_c','opsi_d','opsi_e','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','cp_kode','tp_kode'],
     ['Ibu kota Indonesia adalah ...','Bandung','Jakarta','Surabaya','Medan','','B',1,'Geografi','mudah','Jakarta adalah ibu kota negara Indonesia'],
     ['Hasil dari 6 x 7 adalah ...','36','42','48','56','','B',1,'Matematika','mudah',''],
   ];
@@ -2632,7 +2753,7 @@ function unduhTemplateSoal(){
 
   // --- Sheet Isian Singkat ---
   const isian = [
-    ['pertanyaan','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan'],
+    ['pertanyaan','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','cp_kode','tp_kode'],
     ['Hasil dari 2 + 3 adalah ...','5|lima',1,'Matematika','mudah',''],
     ['Ibu kota Provinsi DKI Jakarta adalah ...','Jakarta|DKI Jakarta',1,'Geografi','mudah',''],
   ];
@@ -2642,7 +2763,7 @@ function unduhTemplateSoal(){
 
   // --- Sheet Essay ---
   const essay = [
-    ['pertanyaan','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan'],
+    ['pertanyaan','kunci_jawaban','poin','topik','tingkat_kesulitan','pembahasan','cp_kode','tp_kode'],
     ['Jelaskan pengertian demokrasi menurut pemahamanmu!','Pedoman: pemerintahan yang kekuasaannya berada di tangan rakyat',5,'PKn','sedang',''],
   ];
   const wsEssay = XLSX.utils.aoa_to_sheet(essay);
@@ -2658,6 +2779,7 @@ async function importSoal(inp){
   const wb = XLSX.read(await f.arrayBuffer()); inp.value = '';
   const jn = v=>{ v=String(v).toLowerCase(); return (v.includes('ganda')||v==='pg') ? 'pilihan_ganda' : (v.includes('essay')||v.includes('uraian')) ? 'essay' : (v.includes('isian')||v.includes('singkat')) ? 'isian_singkat' : ''; };
   let dilewati = 0;
+  const galatCp = { n:0 };
   const data = [];
   // Baca SEMUA sheet (kecuali sheet petunjuk/instruksi). Jenis soal ditentukan
   // dari nama sheet (template baru: "Pilihan Ganda"/"Isian Singkat"/"Essay"),
@@ -2675,11 +2797,11 @@ async function importSoal(inp){
       const tk = String(r.tingkat_kesulitan||'').toLowerCase();
       data.push({ mapel_id, jenis, pertanyaan:String(r.pertanyaan).trim(), opsi_a:o('a'), opsi_b:o('b'), opsi_c:o('c'), opsi_d:o('d'), opsi_e:o('e'),
         kunci_jawaban:String(r.kunci_jawaban||'').trim(), poin:parseFloat(r.poin)||1, topik:String(r.topik||'').trim(),
-        tingkat_kesulitan:['sangat_mudah','mudah','sedang','sulit'].includes(tk)?tk:'sedang', pembahasan:String(r.pembahasan||'').trim()||null, sumber:'manual' });
+        tingkat_kesulitan:['sangat_mudah','mudah','sedang','sulit'].includes(tk)?tk:'sedang', pembahasan:String(r.pembahasan||'').trim()||null, sumber:'manual', ...tautCpTpImpor(mapel_id, r, galatCp) });
     });
   });
   if(!data.length) return alert('Tidak ada baris soal terbaca. Pastikan ada kolom "pertanyaan" dan nama sheet sesuai template (Pilihan Ganda / Isian Singkat / Essay).');
-  const pesanLewat = dilewati ? `\n(${dilewati} baris dilewati karena jenis soal tidak terdeteksi.)` : '';
+  const pesanLewat = (dilewati ? `\n(${dilewati} baris dilewati karena jenis soal tidak terdeteksi.)` : '') + (galatCp.n ? `\n(${galatCp.n} baris punya cp_kode/tp_kode yang tidak ditemukan di menu CP & TP; soalnya tetap diimpor tanpa tautan itu.)` : '');
   if(!confirm(`Impor ${data.length} soal ke mapel terpilih?${pesanLewat}`)) return;
   const { error } = await supa.from('bank_soal').insert(data);
   if(error) return alert('Gagal impor: '+error.message);
@@ -2713,7 +2835,8 @@ function openTambahSoal(){
   document.getElementById('ts-remedial').checked = false; soalKhususAwal = false;
   document.getElementById('ts-jenis').value = 'pilihan_ganda';
   document.getElementById('ts-tingkat').value = 'sedang';
-  if(currentMapelList.length) document.getElementById('ts-mapel').value = currentMapelList[0].id;
+  if(currentMapelList.length){ const fm = document.getElementById('filter-mapel').value; document.getElementById('ts-mapel').value = (fm && currentMapelList.some(m=>m.id===fm)) ? fm : currentMapelList[0].id; }
+  isiCpTpModalSoal();
   document.getElementById('modal-tambah-soal').classList.remove('hidden');
   toggleOpsiSoal();
 }
@@ -2723,6 +2846,7 @@ async function bukaEditSoal(id){
   editingSoalId = id;
   document.getElementById('ts-modal-title').textContent = 'Edit Soal';
   document.getElementById('ts-mapel').value = s.mapel_id;
+  isiCpTpModalSoal(s.cp_id, s.tp_id);
   document.getElementById('ts-jenis').value = s.jenis;
   document.getElementById('ts-tingkat').value = s.tingkat_kesulitan || 'sedang';
   document.getElementById('ts-topik').value = s.topik || '';
@@ -2764,6 +2888,7 @@ async function simpanSoalManual(){
     pembahasan: document.getElementById('ts-pembahasan').value.trim() || null,
     gambar: gambarSoal,
   };
+  if(cpTpTersedia){ row.cp_id = document.getElementById('ts-cp').value || null; row.tp_id = document.getElementById('ts-tp').value || null; }
   // Kolom khusus_remedial hanya dikirim bila perlu, supaya tetap jalan sebelum migrasi-v15 dijalankan.
   const cekRem = document.getElementById('ts-remedial').checked;
   if(cekRem) row.khusus_remedial = true; else if(editingSoalId && soalKhususAwal) row.khusus_remedial = false;
@@ -2780,6 +2905,652 @@ async function simpanSoalManual(){
   loadBankSoal();
 }
 
+// ============================================================
+// CP & TP (CAPAIAN PEMBELAJARAN & TUJUAN PEMBELAJARAN) PER MATA PELAJARAN  (v17)
+// Butuh migrasi-v17-cp-tp.sql. Bila tabel belum ada, menu lain tetap normal (cpTpTersedia=false).
+// ============================================================
+let cpList = [], tpList = [], cpTpTersedia = true;
+let soalPerCp = new Map(), soalPerTp = new Map();
+const FASE_KELAS = { VII:'D', VIII:'D', IX:'D', X:'E', XI:'F', XII:'F' };   // Paket B = Fase D; Paket C: X = Fase E, XI-XII = Fase F
+const faseMapel = m => (m && FASE_KELAS[m.kelas]) || '';
+const cpEl = id => document.getElementById(id);
+const cpDari = id => cpList.find(c=>c.id===id);
+const tpDari = id => tpList.find(t=>t.id===id);
+const cpUntukMapel = mid => cpList.filter(c=>c.mapel_id===mid);
+const tpUntukCp = cid => tpList.filter(t=>t.cp_id===cid);
+const potong = (t,n)=>{ t = String(t||''); return t.length>n ? t.slice(0,n)+'…' : t; };
+const urutKode = (a,b)=> (a.urutan||0)-(b.urutan||0);
+
+async function muatCacheCpTp(){
+  const [a, b] = await Promise.all([
+    ambilSemuaBaris(()=>supa.from('capaian_pembelajaran').select('*').order('urutan').order('created_at').order('id')),
+    ambilSemuaBaris(()=>supa.from('tujuan_pembelajaran').select('*').order('urutan').order('created_at').order('id')),
+  ]);
+  if(a.error || b.error){ cpTpTersedia = false; cpList = []; tpList = []; return; }   // migrasi v17 belum dijalankan
+  cpTpTersedia = true; cpList = a.data||[]; tpList = b.data||[];
+}
+async function muatHitungSoalCp(){
+  soalPerCp = new Map(); soalPerTp = new Map();
+  if(!cpTpTersedia) return;
+  const { data } = await ambilSemuaBaris(()=>supa.from('bank_soal').select('id, cp_id, tp_id').not('cp_id','is',null).order('id'));
+  (data||[]).forEach(s=>{
+    soalPerCp.set(s.cp_id, (soalPerCp.get(s.cp_id)||0)+1);
+    if(s.tp_id) soalPerTp.set(s.tp_id, (soalPerTp.get(s.tp_id)||0)+1);
+  });
+}
+async function loadCpTp(){
+  await muatCacheCpTp();
+  isiFilterCp();
+  await muatHitungSoalCp();
+  renderCpTp();
+}
+
+// ---------- Filter tab CP & TP ----------
+function isiFilterCp(){
+  const jenjang = cpEl('cp-filter-jenjang').value;
+  const opsiKelas = jenjang ? (KELAS_PER_PROGRAM[jenjang]||[]) : ['VII','VIII','IX','X','XI','XII'];
+  const selK = cpEl('cp-filter-kelas'), kPrev = selK.value;
+  selK.innerHTML = '<option value="">Semua Kelas</option>' + opsiKelas.map(k=>`<option value="${k}">Kelas ${k}</option>`).join('');
+  selK.value = opsiKelas.includes(kPrev) ? kPrev : '';
+  const kelas = selK.value;
+  const daftar = currentMapelList.filter(m=>(!jenjang || m.program===jenjang) && (!kelas || m.kelas===kelas));
+  const selM = cpEl('cp-filter-mapel'), mPrev = selM.value;
+  selM.innerHTML = '<option value="">Semua mata pelajaran</option>' + daftar.map(m=>`<option value="${m.id}">${escapeHtml(labelMapel(m))}</option>`).join('');
+  selM.value = daftar.some(m=>m.id===mPrev) ? mPrev : '';
+}
+function cpFilterBerubah(){ isiFilterCp(); renderCpTp(); }
+function pilihMapelCp(id){ cpEl('cp-filter-mapel').value = id; renderCpTp(); }
+function bukaCpTpMapel(id){
+  const m = currentMapelList.find(x=>x.id===id); if(!m) return;
+  cpEl('cp-filter-jenjang').value = m.program;
+  isiFilterCp();
+  cpEl('cp-filter-kelas').value = m.kelas || '';
+  isiFilterCp();
+  cpEl('cp-filter-mapel').value = id;
+  showTab('cptp');
+}
+function mapelCpDipilih(){
+  const id = cpEl('cp-filter-mapel').value;
+  if(!id){ alert('Pilih dulu satu Mata Pelajaran pada filter di atas.'); return null; }
+  return currentMapelList.find(m=>m.id===id) || null;
+}
+
+// ---------- Tampilan daftar CP & TP ----------
+function renderCpTp(){
+  const info = cpEl('cp-info'), wrap = cpEl('cp-daftar');
+  cpEl('cp-aksi').classList.toggle('hidden', !cpTpTersedia);
+  if(!cpTpTersedia){
+    info.innerHTML = '';
+    wrap.innerHTML = `<div class="card"><b>Tabel CP &amp; TP belum dibuat di database.</b><p class="muted" style="margin:6px 0 0;">Jalankan file <code>migrasi-v17-cp-tp.sql</code> sekali di Supabase SQL Editor, lalu muat ulang halaman ini. Menu lain tidak terpengaruh.</p></div>`;
+    return;
+  }
+  const j = cpEl('cp-filter-jenjang').value, k = cpEl('cp-filter-kelas').value, mid = cpEl('cp-filter-mapel').value;
+  const daftar = currentMapelList.filter(m=>(!j||m.program===j) && (!k||m.kelas===k) && (!mid||m.id===mid));
+  const denganCp = daftar.filter(m=>cpUntukMapel(m.id).length);
+  const tanpaCp = daftar.filter(m=>!cpUntukMapel(m.id).length);
+  const nCp = denganCp.reduce((a,m)=>a+cpUntukMapel(m.id).length, 0);
+  const nTp = denganCp.reduce((a,m)=>a+cpUntukMapel(m.id).reduce((x,c)=>x+tpUntukCp(c.id).length,0), 0);
+  const nSoal = denganCp.reduce((a,m)=>a+cpUntukMapel(m.id).reduce((x,c)=>x+(soalPerCp.get(c.id)||0),0), 0);
+  info.innerHTML = `<div class="kotak"><b>${denganCp.length}/${daftar.length}</b><span class="muted">Mapel punya CP</span></div>`+
+    `<div class="kotak"><b>${nCp}</b><span class="muted">CP</span></div>`+
+    `<div class="kotak"><b>${nTp}</b><span class="muted">TP</span></div>`+
+    `<div class="kotak"><b>${nSoal}</b><span class="muted">Soal terkait CP</span></div>`;
+  if(!daftar.length){ wrap.innerHTML = '<p class="muted">Belum ada mata pelajaran yang cocok. Tambah dulu di menu Pengaturan → Mata Pelajaran.</p>'; return; }
+  let html = '';
+  if(mid){
+    html = htmlMapelCp(daftar[0]);
+  } else {
+    html = denganCp.map(htmlMapelCp).join('');
+    if(tanpaCp.length){
+      html += `<div class="card"><b>${tanpaCp.length} mata pelajaran belum punya CP</b> <span class="muted">— klik untuk membuka dan mengisi:</span><div style="margin-top:8px;">`+
+        tanpaCp.map(m=>`<span class="fchip" onclick="pilihMapelCp('${m.id}')">${escapeHtml(m.nama)} <span class="muted">${m.program==='Paket B'?'B':'C'}-${m.kelas||'?'}</span></span>`).join('')+`</div></div>`;
+    }
+  }
+  wrap.innerHTML = html;
+}
+function htmlMapelCp(m){
+  const cps = cpUntukMapel(m.id).sort(urutKode);
+  const nTp = cps.reduce((a,c)=>a+tpUntukCp(c.id).length, 0);
+  const nSoal = cps.reduce((a,c)=>a+(soalPerCp.get(c.id)||0), 0);
+  return `<div class="card cp-mapel">
+    <div class="cp-mapel-head"><div><h3 style="margin:0;">${escapeHtml(m.nama)}</h3>
+      <span class="muted">${escapeHtml(m.program)} · Kelas ${escapeHtml(m.kelas||'?')} · Fase ${faseMapel(m)||'-'}</span></div>
+      <span class="muted">${cps.length} CP · ${nTp} TP · ${nSoal} soal terkait</span></div>
+    ${cps.map(htmlCp).join('') || '<p class="muted" style="margin:10px 0 0;">Belum ada CP untuk mapel ini. Tambah manual, tempel teks, upload Excel, atau generate dengan AI.</p>'}
+  </div>`;
+}
+function htmlCp(c){
+  const tps = tpUntukCp(c.id).sort(urutKode);
+  const n = soalPerCp.get(c.id)||0;
+  return `<div class="cp-item">
+    <div class="cp-head">
+      <div><span class="badge siap">${escapeHtml(c.kode||'CP')}</span>
+        ${c.elemen?`<span class="badge manual">${escapeHtml(c.elemen)}</span>`:''}
+        ${c.sumber==='ai'?'<span class="badge ai">AI</span>':''}
+        <span class="muted" style="font-size:12px;">${n} soal terkait</span></div>
+      <div class="cp-btn">
+        <button class="btn outline" onclick="bukaGenerateSoalDariCp('${c.id}')" title="Generate soal di Bank Soal berdasarkan CP ini">✦ Buat Soal</button>
+        <button class="btn outline" onclick="bukaFormTp('${c.id}')">+ TP</button>
+        <button class="btn outline" onclick="bukaGenerateCpTp('tp','${c.id}')" title="Minta AI menyusun TP untuk CP ini">✦ TP dgn AI</button>
+        <button class="btn outline" onclick="bukaFormCp('${c.id}')">Edit</button>
+        <button class="btn outline" onclick="hapusCp('${c.id}')">Hapus</button>
+      </div>
+    </div>
+    <p class="cp-desk">${escapeHtml(c.deskripsi)}</p>
+    ${tps.length ? `<div class="cp-tp">${tps.map(t=>{
+      const ns = soalPerTp.get(t.id)||0;
+      return `<div class="tp-row">
+        <div class="tp-isi"><b>${escapeHtml(t.kode||'TP')}</b> ${escapeHtml(t.deskripsi)}
+          ${t.semester?`<span class="badge draft" style="margin-left:4px;">${escapeHtml(t.semester)}</span>`:''}</div>
+        <div class="tp-btn"><span class="muted">${ns} soal</span>
+          <button class="btn outline" onclick="bukaGenerateSoalDariCp('${c.id}','${t.id}')" title="Generate soal untuk TP ini">✦ Soal</button>
+          <button class="btn outline" onclick="bukaFormTp('${c.id}','${t.id}')">Edit</button>
+          <button class="btn outline" onclick="hapusTp('${t.id}')">Hapus</button></div>
+      </div>`; }).join('')}</div>` : '<p class="muted" style="margin:6px 0 0;font-size:13px;">Belum ada TP untuk CP ini.</p>'}
+  </div>`;
+}
+
+// ---------- Tambah / edit CP ----------
+let cpEditId = null, cpFormMapelId = null;
+function bukaFormCp(id){
+  let m;
+  if(id){
+    const c = cpDari(id); if(!c) return;
+    cpEditId = id; cpFormMapelId = c.mapel_id; m = currentMapelList.find(x=>x.id===c.mapel_id);
+    cpEl('cp-kode').value = c.kode||''; cpEl('cp-elemen').value = c.elemen||''; cpEl('cp-deskripsi').value = c.deskripsi||'';
+    cpEl('cp-modal-title').textContent = 'Edit Capaian Pembelajaran (CP)';
+  } else {
+    m = mapelCpDipilih(); if(!m) return;
+    cpEditId = null; cpFormMapelId = m.id;
+    cpEl('cp-kode').value = ''; cpEl('cp-elemen').value = ''; cpEl('cp-deskripsi').value = '';
+    cpEl('cp-modal-title').textContent = 'Tambah Capaian Pembelajaran (CP)';
+  }
+  cpEl('cp-modal-mapel').textContent = m ? `${labelMapel(m)} · Fase ${faseMapel(m)||'-'}` : '';
+  cpEl('modal-cp').classList.remove('hidden');
+}
+async function simpanCp(){
+  const deskripsi = cpEl('cp-deskripsi').value.trim();
+  if(!deskripsi) return alert('Deskripsi CP wajib diisi.');
+  const kodeIn = cpEl('cp-kode').value.trim(), elemen = cpEl('cp-elemen').value.trim() || null;
+  const ada = cpUntukMapel(cpFormMapelId).filter(c=>c.id!==cpEditId);
+  let kode = kodeIn;
+  if(kode && ada.some(c=>(c.kode||'').toLowerCase()===kode.toLowerCase())) return alert(`Kode "${kode}" sudah dipakai CP lain pada mapel ini.`);
+  if(!kode){ let i = ada.length+1; while(ada.some(c=>(c.kode||'').toLowerCase()===`cp-${i}`)) i++; kode = `CP-${i}`; }
+  let error;
+  if(cpEditId) ({ error } = await supa.from('capaian_pembelajaran').update({ kode, elemen, deskripsi }).eq('id', cpEditId));
+  else ({ error } = await supa.from('capaian_pembelajaran').insert({ mapel_id: cpFormMapelId, kode, elemen, deskripsi, urutan: Math.max(0, ...ada.map(c=>c.urutan||0))+1, sumber:'manual' }));
+  if(error) return alert(error.message);
+  closeModal('modal-cp'); await loadCpTp();
+}
+async function hapusCp(id){
+  const c = cpDari(id); if(!c) return;
+  const nTp = tpUntukCp(id).length, nSoal = soalPerCp.get(id)||0;
+  if(!confirm(`Hapus ${c.kode||'CP'} beserta ${nTp} TP di dalamnya?\n\n${nSoal} soal di Bank Soal yang terkait TIDAK ikut terhapus (hanya tautan ke CP/TP-nya yang dilepas).`)) return;
+  const { error } = await supa.from('capaian_pembelajaran').delete().eq('id', id);
+  if(error) return alert(error.message);
+  await loadCpTp();
+}
+
+// ---------- Tambah / edit TP ----------
+let tpEditId = null, tpFormCpId = null;
+function bukaFormTp(cpId, tpId){
+  const c = cpDari(cpId); if(!c) return;
+  tpFormCpId = cpId; tpEditId = tpId || null;
+  const t = tpId ? tpDari(tpId) : null;
+  cpEl('tp-kode').value = t ? (t.kode||'') : '';
+  cpEl('tp-deskripsi').value = t ? (t.deskripsi||'') : '';
+  cpEl('tp-semester').value = t ? (t.semester||'') : '';
+  cpEl('tp-modal-title').textContent = t ? 'Edit Tujuan Pembelajaran (TP)' : 'Tambah Tujuan Pembelajaran (TP)';
+  cpEl('tp-modal-cp').textContent = `${c.kode||'CP'}${c.elemen?' — '+c.elemen:''}: ${potong(c.deskripsi, 160)}`;
+  cpEl('modal-tp').classList.remove('hidden');
+}
+async function simpanTp(){
+  const c = cpDari(tpFormCpId); if(!c) return;
+  const deskripsi = cpEl('tp-deskripsi').value.trim();
+  if(!deskripsi) return alert('Deskripsi TP wajib diisi.');
+  const semester = cpEl('tp-semester').value || null;
+  const ada = tpUntukCp(c.id).filter(t=>t.id!==tpEditId);
+  let kode = cpEl('tp-kode').value.trim();
+  if(kode && ada.some(t=>(t.kode||'').toLowerCase()===kode.toLowerCase())) return alert(`Kode "${kode}" sudah dipakai TP lain pada CP ini.`);
+  if(!kode){ const no = (String(c.kode||'').match(/\d+/)||[cpList.indexOf(c)+1])[0]; let i = ada.length+1; while(ada.some(t=>(t.kode||'')===`${no}.${i}`)) i++; kode = `${no}.${i}`; }
+  let error;
+  if(tpEditId) ({ error } = await supa.from('tujuan_pembelajaran').update({ kode, deskripsi, semester }).eq('id', tpEditId));
+  else ({ error } = await supa.from('tujuan_pembelajaran').insert({ cp_id: c.id, mapel_id: c.mapel_id, kode, deskripsi, semester, urutan: Math.max(0, ...ada.map(t=>t.urutan||0))+1, sumber:'manual' }));
+  if(error) return alert(error.message);
+  closeModal('modal-tp'); await loadCpTp();
+}
+async function hapusTp(id){
+  const t = tpDari(id); if(!t) return;
+  const n = soalPerTp.get(id)||0;
+  if(!confirm(`Hapus TP ${t.kode||''}?\n\n${n} soal terkait TIDAK ikut terhapus (tautan ke TP dilepas; tautan ke CP tetap).`)) return;
+  const { error } = await supa.from('tujuan_pembelajaran').delete().eq('id', id);
+  if(error) return alert(error.message);
+  await loadCpTp();
+}
+
+// ---------- Simpan struktur CP+TP sekaligus (dipakai Input Cepat, Upload Excel, dan AI) ----------
+// struktur = [{ kode, elemen, deskripsi, cpIdAda?, tp:[{kode, deskripsi, semester}] }]
+async function simpanStrukturCpTp(mapelId, struktur, sumber){
+  let nCp = 0, nTp = 0;
+  const cpAda = cpUntukMapel(mapelId);
+  let urutCp = Math.max(0, ...cpAda.map(c=>c.urutan||0));
+  const kodeCpPakai = new Set(cpAda.map(c=>(c.kode||'').toLowerCase()));
+  for(const c of struktur){
+    let cpId = c.cpIdAda, kodeCp, kodeDiganti = false;
+    if(cpId){ kodeCp = (cpDari(cpId)||{}).kode; }
+    else {
+      urutCp++;
+      let kode = String(c.kode||'').trim();
+      if(!kode || kodeCpPakai.has(kode.toLowerCase())){ let i = kodeCpPakai.size+1; while(kodeCpPakai.has(`cp-${i}`)) i++; if(kode) kodeDiganti = true; kode = `CP-${i}`; }
+      kodeCpPakai.add(kode.toLowerCase());
+      const { data, error } = await supa.from('capaian_pembelajaran')
+        .insert({ mapel_id: mapelId, kode, elemen: c.elemen||null, deskripsi: c.deskripsi, urutan: urutCp, sumber }).select('id, kode').single();
+      if(error) throw new Error(error.message);
+      cpId = data.id; kodeCp = data.kode; nCp++;
+    }
+    const tpAda = tpList.filter(t=>t.cp_id===cpId);
+    let urutTp = Math.max(0, ...tpAda.map(t=>t.urutan||0));
+    const kodeTpPakai = new Set(tpAda.map(t=>(t.kode||'').toLowerCase()));
+    const no = (String(kodeCp||'').match(/\d+/)||[cpList.length+nCp])[0];
+    const rows = (c.tp||[]).filter(t=>t && String(t.deskripsi||'').trim()).map(t=>{
+      urutTp++;
+      let kode = kodeDiganti ? '' : String(t.kode||'').trim();     // kode CP berubah otomatis -> nomor TP ikut disusun ulang
+      if(!kode || kodeTpPakai.has(kode.toLowerCase())){ let i = kodeTpPakai.size+1; while(kodeTpPakai.has(`${no}.${i}`)) i++; kode = `${no}.${i}`; }
+      kodeTpPakai.add(kode.toLowerCase());
+      return { cp_id: cpId, mapel_id: mapelId, kode, deskripsi: String(t.deskripsi).trim(), semester: (t.semester==='Ganjil'||t.semester==='Genap') ? t.semester : null, urutan: urutTp, sumber };
+    });
+    if(rows.length){
+      const { error } = await supa.from('tujuan_pembelajaran').insert(rows);
+      if(error) throw new Error(error.message);
+      nTp += rows.length;
+    }
+  }
+  return { nCp, nTp };
+}
+
+// ---------- Input Cepat: tempel teks CP/TP ----------
+function bukaInputCepat(){
+  if(!mapelCpDipilih()) return;
+  cpEl('cepat-teks').value = '';
+  cpEl('modal-cp-cepat').classList.remove('hidden');
+}
+// Format teks:  "CP: ...", "TP: ..." / "TP 1.1: ...", "Elemen: ...", baris tanpa awalan = lanjutan baris sebelumnya,
+// butir "-", "•", "1." di bawah sebuah CP dianggap TP. Akhiran (Ganjil)/(Genap) pada TP mengisi semester.
+function parseCpTpTeks(teks){
+  const hasil = []; let cp = null, terakhir = null;
+  const reCp = /^(?:CP|Capaian Pembelajaran)\s*-?\s*(\d+(?:\.\d+)*)?\s*[:.)\-–]\s*(.*)$/i;
+  const reTp = /^(?:TP|Tujuan Pembelajaran)\s*-?\s*(\d+(?:\.\d+)*)?\s*[:.)\-–]\s*(.*)$/i;
+  const reEl = /^Elemen\s*[:\-–]\s*(.+)$/i;
+  const reButir = /^(?:[-•*]|\d+(?:\.\d+)*[.)])\s+(.+)$/;
+  const tambahTp = (kode, isi)=>{
+    const t = { kode: kode||'', deskripsi: isi.trim(), semester: null };
+    cp.tp.push(t); terakhir = t;
+  };
+  for(const b of String(teks||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean)){
+    let m;
+    if((m = b.match(reCp))){ cp = { kode: m[1] ? `CP-${m[1]}` : '', elemen:'', deskripsi: m[2].trim(), tp:[] }; hasil.push(cp); terakhir = cp; continue; }
+    if((m = b.match(reTp))){ if(!cp) return { error:'Ada baris TP sebelum baris CP pertama. Mulai dengan baris "CP: ...".' }; tambahTp(m[1], m[2]); continue; }
+    if((m = b.match(reEl)) && cp && !cp.tp.length){ cp.elemen = m[1].trim(); continue; }
+    if((m = b.match(reButir)) && cp){ tambahTp('', m[1]); continue; }
+    if(terakhir) terakhir.deskripsi = (terakhir.deskripsi+' '+b).trim();       // lanjutan (hasil salin dari PDF/Word)
+    else return { error:'Baris pertama harus diawali "CP:".' };
+  }
+  // Penanda (Ganjil)/(Genap) dibaca SETELAH baris lanjutan digabung (teks salinan PDF sering terpotong ke baris berikutnya)
+  hasil.forEach(c=>c.tp.forEach(t=>{
+    t.deskripsi = t.deskripsi.replace(/\s*[\(\[]\s*(ganjil|genap)\s*[\)\]]\s*$/i, (_, x)=>{ t.semester = /genap/i.test(x) ? 'Genap' : 'Ganjil'; return ''; }).trim();
+  }));
+  const valid = hasil.filter(c=>c.deskripsi);
+  if(!valid.length) return { error:'Tidak ada CP yang terbaca. Awali tiap CP dengan "CP:".' };
+  return { struktur: valid };
+}
+async function prosesInputCepat(){
+  const m = mapelCpDipilih(); if(!m) return;
+  const r = parseCpTpTeks(cpEl('cepat-teks').value);
+  if(r.error) return alert(r.error);
+  const nTp = r.struktur.reduce((a,c)=>a+c.tp.length, 0);
+  if(!confirm(`Terbaca ${r.struktur.length} CP dan ${nTp} TP.\n\nSimpan ke "${labelMapel(m)}"?`)) return;
+  try{
+    const { nCp, nTp: nT } = await simpanStrukturCpTp(m.id, r.struktur, 'manual');
+    closeModal('modal-cp-cepat'); await loadCpTp();
+    alert(`Tersimpan: ${nCp} CP dan ${nT} TP.`);
+  }catch(e){ alert('Gagal menyimpan: '+e.message); await loadCpTp(); }
+}
+
+// ---------- Upload / template / ekspor Excel ----------
+const KOLOM_CPTP = ['cp_kode','elemen','cp_deskripsi','tp_kode','tp_deskripsi','semester'];
+function unduhTemplateCpTp(){
+  const wb = XLSX.utils.book_new();
+  const petunjuk = [
+    ['PETUNJUK TEMPLATE CP & TP'],[''],
+    ['1. Isi sheet "CP dan TP". Satu baris = satu TP. CP yang sama ditulis dengan cp_kode yang sama.'],
+    ['2. cp_deskripsi cukup diisi pada baris pertama tiap CP; baris berikutnya boleh dikosongkan (cp_kode tetap diisi).'],
+    ['3. CP tanpa TP boleh: kosongkan kolom tp_deskripsi.'],
+    ['4. semester TP: Ganjil / Genap (boleh kosong).'],
+    ['5. cp_kode / tp_kode boleh kosong (otomatis diberi nomor). Kode ini juga dipakai untuk mengaitkan soal saat impor Bank Soal (kolom cp_kode & tp_kode).'],
+    ['6. Pilih dulu Mata Pelajaran pada filter menu CP & TP sebelum mengunggah. Kolom mata_pelajaran (bila ada) diabaikan.'],
+  ];
+  const ws0 = XLSX.utils.aoa_to_sheet(petunjuk); ws0['!cols'] = [{ wch:100 }];
+  XLSX.utils.book_append_sheet(wb, ws0, 'Petunjuk');
+  const data = [KOLOM_CPTP,
+    ['CP-1','Bilangan','Pada akhir fase, peserta didik mampu ... (isi CP)','1.1','Peserta didik dapat membandingkan bilangan bulat','Ganjil'],
+    ['CP-1','','','1.2','Peserta didik dapat menyelesaikan operasi hitung bilangan bulat','Ganjil'],
+    ['CP-2','Aljabar','Pada akhir fase, peserta didik mampu ... (isi CP)','2.1','Peserta didik dapat menyederhanakan bentuk aljabar','Genap']];
+  const ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = [{wch:10},{wch:18},{wch:60},{wch:10},{wch:60},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws, 'CP dan TP');
+  XLSX.writeFile(wb, 'template-cp-tp.xlsx');
+}
+async function importCpTp(inp){
+  const f = inp.files[0]; if(!f) return;
+  const m = mapelCpDipilih(); if(!m){ inp.value=''; return; }
+  try{
+    const wb = XLSX.read(await f.arrayBuffer()); inp.value = '';
+    const nama = wb.SheetNames.find(n=>!/petunjuk|instruksi|panduan/i.test(n));
+    if(!nama) return alert('Sheet data tidak ditemukan.');
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[nama], { defval:'' });
+    const peta = new Map(); let kunciAkhir = null;
+    rows.forEach(r=>{
+      const baca = (...ks)=>{ for(const k of ks){ const key = Object.keys(r).find(x=>x.trim().toLowerCase()===k); if(key && String(r[key]).trim()) return String(r[key]).trim(); } return ''; };
+      const cpKode = baca('cp_kode','kode_cp'), cpDesk = baca('cp_deskripsi','deskripsi_cp','cp'), elemen = baca('elemen','elemen_cp');
+      const tpKode = baca('tp_kode','kode_tp'), tpDesk = baca('tp_deskripsi','deskripsi_tp','tp'), smt = baca('semester');
+      const kunci = cpKode || (cpDesk ? 'd:'+cpDesk : kunciAkhir);
+      if(!kunci) return;
+      if(!peta.has(kunci)) peta.set(kunci, { kode: cpKode, elemen:'', deskripsi:'', tp:[] });
+      kunciAkhir = kunci;
+      const c = peta.get(kunci);
+      if(!c.elemen && elemen) c.elemen = elemen;
+      if(!c.deskripsi && cpDesk) c.deskripsi = cpDesk;
+      if(tpDesk) c.tp.push({ kode: tpKode, deskripsi: tpDesk, semester: /genap/i.test(smt) ? 'Genap' : /ganjil/i.test(smt) ? 'Ganjil' : null });
+    });
+    const struktur = [...peta.values()].filter(c=>c.deskripsi);
+    const tanpaDesk = peta.size - struktur.length;
+    if(!struktur.length) return alert('Tidak ada CP terbaca. Pastikan kolom cp_deskripsi terisi (lihat template).');
+    const nTp = struktur.reduce((a,c)=>a+c.tp.length, 0);
+    if(!confirm(`Terbaca ${struktur.length} CP dan ${nTp} TP${tanpaDesk?` (${tanpaDesk} kelompok CP dilewati karena cp_deskripsi kosong)`:''}.\n\nSimpan ke "${labelMapel(m)}"?`)) return;
+    const { nCp, nTp: nT } = await simpanStrukturCpTp(m.id, struktur, 'upload');
+    await loadCpTp(); alert(`Tersimpan: ${nCp} CP dan ${nT} TP.`);
+  }catch(e){ inp.value=''; alert('Gagal mengimpor: '+e.message); await loadCpTp(); }
+}
+function eksporCpTp(){
+  const j = cpEl('cp-filter-jenjang').value, k = cpEl('cp-filter-kelas').value, mid = cpEl('cp-filter-mapel').value;
+  const daftar = currentMapelList.filter(m=>(!j||m.program===j) && (!k||m.kelas===k) && (!mid||m.id===mid));
+  const aoa = [[...KOLOM_CPTP, 'mata_pelajaran']];
+  daftar.forEach(m=>cpUntukMapel(m.id).sort(urutKode).forEach(c=>{
+    const tps = tpUntukCp(c.id).sort(urutKode);
+    if(!tps.length) aoa.push([c.kode||'', c.elemen||'', c.deskripsi, '', '', '', m.nama]);
+    tps.forEach((t,i)=>aoa.push([c.kode||'', i===0 ? (c.elemen||'') : '', i===0 ? c.deskripsi : '', t.kode||'', t.deskripsi, t.semester||'', m.nama]));
+  }));
+  if(aoa.length===1) return alert('Belum ada CP/TP untuk diekspor (sesuai filter).');
+  const wb = XLSX.utils.book_new(); const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:10},{wch:18},{wch:60},{wch:10},{wch:60},{wch:10},{wch:28}];
+  XLSX.utils.book_append_sheet(wb, ws, 'CP dan TP');
+  XLSX.writeFile(wb, 'cp-tp.xlsx');
+}
+
+// ---------- Generate CP & TP dengan AI ----------
+let cpDraft = [], cpAiMapelId = null, cpAiSibuk = false;
+function bukaGenerateCpTp(mode, cpId){
+  let m;
+  if(mode==='tp' && cpId){ const c = cpDari(cpId); m = c && currentMapelList.find(x=>x.id===c.mapel_id); }
+  else m = mapelCpDipilih();
+  if(!m) return;
+  cpAiMapelId = m.id; cpDraft = [];
+  cpEl('cpai-mapel').textContent = `${labelMapel(m)} · Fase ${faseMapel(m)||'-'}`;
+  cpEl('cpai-mode').value = mode==='tp' ? 'tp' : 'cp_tp';
+  const cps = cpUntukMapel(m.id).sort(urutKode);
+  cpEl('cpai-cp').innerHTML = cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}: ${escapeHtml(potong(c.deskripsi,70))}</option>`).join('');
+  if(cpId) cpEl('cpai-cp').value = cpId;
+  cpEl('cpai-catatan').value = '';
+  cpEl('cpai-hasil').innerHTML = ''; cpEl('cpai-status').textContent = '';
+  cpAiModeBerubah();
+  cpEl('modal-cp-ai').classList.remove('hidden');
+}
+function cpAiModeBerubah(){
+  const tp = cpEl('cpai-mode').value==='tp';
+  cpEl('cpai-cp-wrap').classList.toggle('hidden', !tp);
+  cpEl('cpai-jmlcp-wrap').classList.toggle('hidden', tp);
+  if(tp && !cpEl('cpai-cp').options.length){
+    cpEl('cpai-status').style.color = '#b3261e';
+    cpEl('cpai-status').textContent = 'Mapel ini belum punya CP. Pilih "CP baru + TP-nya", atau tambah CP dulu.';
+  } else if(cpEl('cpai-status').style.color){ cpEl('cpai-status').style.color=''; cpEl('cpai-status').textContent=''; }
+}
+async function jalankanCpAi(){
+  if(cpAiSibuk) return;
+  const m = currentMapelList.find(x=>x.id===cpAiMapelId); if(!m) return;
+  const mode = cpEl('cpai-mode').value;
+  const payload = { mode, mapel: m.nama, program: m.program, kelas: m.kelas, fase: faseMapel(m),
+    tp_per_cp: parseInt(cpEl('cpai-tp-per-cp').value,10)||4, semester: cpEl('cpai-smt').value, catatan: cpEl('cpai-catatan').value.trim() };
+  if(mode==='tp'){
+    const cp = cpDari(cpEl('cpai-cp').value); if(!cp) return alert('Pilih CP dulu.');
+    payload.cp = { kode: cp.kode, elemen: cp.elemen, deskripsi: cp.deskripsi };
+    payload.hindari = tpUntukCp(cp.id).map(t=>t.deskripsi);
+  } else {
+    payload.jumlah_cp = parseInt(cpEl('cpai-jml-cp').value,10)||3;
+    const sudah = cpUntukMapel(m.id).map(c=>c.elemen||potong(c.deskripsi,50));
+    if(sudah.length) payload.catatan = (payload.catatan ? payload.catatan+'\n' : '') + `Elemen/CP yang SUDAH ada (jangan diulang): ${sudah.join('; ')}`;
+  }
+  const btn = cpEl('cpai-btn'), st = cpEl('cpai-status');
+  cpAiSibuk = true; btn.disabled = true; st.style.color = ''; st.textContent = 'AI sedang menyusun... (bisa 10–25 detik)';
+  try{
+    let data, err;
+    for(let coba=1; coba<=2 && !data; coba++){
+      try{ data = await panggilBatchAI(payload); }catch(e){ err = e; if(coba<2) await new Promise(r=>setTimeout(r,2500)); }
+    }
+    if(!data) throw err;
+    if(mode==='tp'){
+      cpDraft = [{ cpIdAda: payload.cp && cpEl('cpai-cp').value, pilih:true, tp:(data.tp||[]).map(t=>({ ...t, pilih:true })) }];
+    } else {
+      cpDraft = (data.cp||[]).map(c=>({ ...c, pilih:true, tp:(c.tp||[]).map(t=>({ ...t, pilih:true })) }));
+    }
+    renderCpDraft();
+    const n = cpDraft.reduce((a,c)=>a+c.tp.length,0);
+    st.textContent = `${mode==='tp' ? '' : cpDraft.length+' CP dan '}${n} TP dibuat${data.provider?` (via ${data.provider})`:''}. Periksa dan sunting dulu sebelum disimpan.`;
+  }catch(e){
+    st.style.color = '#b3261e'; st.style.whiteSpace = 'pre-line'; st.textContent = e.message;
+  }
+  cpAiSibuk = false; btn.disabled = false;
+}
+function renderCpDraft(){
+  const w = cpEl('cpai-hasil');
+  if(!cpDraft.length){ w.innerHTML = ''; return; }
+  const semOpsi = v=>`<option value=""${!v?' selected':''}>Semester —</option><option value="Ganjil"${v==='Ganjil'?' selected':''}>Ganjil</option><option value="Genap"${v==='Genap'?' selected':''}>Genap</option>`;
+  w.innerHTML = `<div style="margin:12px 0 6px;background:#fff7e0;border:1px solid #e8d48b;border-radius:var(--radius);padding:8px 12px;font-size:13px;">
+      <b>Draft AI — wajib diperiksa guru.</b> CP resmi Kurikulum Merdeka ditetapkan pemerintah (BSKAP); cocokkan rumusan CP di bawah dengan dokumen CP resmi untuk mapel &amp; fase ini sebelum dipakai di rapor. Anda bebas menyunting teks atau membuang butir yang tidak sesuai.</div>`+
+    cpDraft.map((c,i)=>`<div class="card" style="margin-top:10px;">
+      ${c.cpIdAda ? `<div class="muted" style="margin-bottom:6px;">TP baru untuk <b>${escapeHtml((cpDari(c.cpIdAda)||{}).kode||'CP')}</b></div>` : `
+        <label class="chk"><input type="checkbox" ${c.pilih?'checked':''} onchange="cpDraft[${i}].pilih=this.checked"> <b>Simpan CP ini</b></label>
+        <div class="grid2" style="margin-top:6px;">
+          <div class="field"><label>Kode</label><input type="text" value="${escapeHtml(c.kode||'')}" oninput="cpDraft[${i}].kode=this.value"></div>
+          <div class="field"><label>Elemen</label><input type="text" value="${escapeHtml(c.elemen||'')}" oninput="cpDraft[${i}].elemen=this.value"></div>
+        </div>
+        <div class="field"><label>Deskripsi CP</label><textarea rows="3" oninput="cpDraft[${i}].deskripsi=this.value">${escapeHtml(c.deskripsi||'')}</textarea></div>`}
+      ${c.tp.map((t,j)=>`<div class="tp-draft">
+        <input type="checkbox" ${t.pilih?'checked':''} onchange="cpDraft[${i}].tp[${j}].pilih=this.checked" title="Simpan TP ini">
+        <input type="text" style="width:62px;" value="${escapeHtml(t.kode||'')}" oninput="cpDraft[${i}].tp[${j}].kode=this.value" title="Kode TP">
+        <textarea rows="2" style="flex:1;" oninput="cpDraft[${i}].tp[${j}].deskripsi=this.value">${escapeHtml(t.deskripsi||'')}</textarea>
+        <select style="width:110px;" onchange="cpDraft[${i}].tp[${j}].semester=this.value||null">${semOpsi(t.semester)}</select>
+      </div>`).join('')}
+    </div>`).join('')+
+    `<div class="toolbar" style="margin-top:14px;"><button class="btn" onclick="simpanCpDraft()">Simpan yang Dicentang</button></div>`;
+}
+async function simpanCpDraft(){
+  const struktur = cpDraft.filter(c=>c.pilih && (c.cpIdAda || String(c.deskripsi||'').trim()))
+    .map(c=>({ ...c, tp: c.tp.filter(t=>t.pilih && String(t.deskripsi||'').trim()) }))
+    .filter(c=>c.cpIdAda ? c.tp.length : true);
+  if(!struktur.length) return alert('Tidak ada yang dicentang untuk disimpan.');
+  const nTp = struktur.reduce((a,c)=>a+c.tp.length,0);
+  try{
+    const r = await simpanStrukturCpTp(cpAiMapelId, struktur, 'ai');
+    closeModal('modal-cp-ai'); cpDraft = []; await loadCpTp();
+    alert(`Tersimpan: ${r.nCp} CP dan ${r.nTp||nTp} TP.`);
+  }catch(e){ alert('Gagal menyimpan: '+e.message); await loadCpTp(); }
+}
+
+// ---------- Tautan CP/TP di Bank Soal, Generate Soal, dan Paket ----------
+function infoCpTpSoal(s){
+  if(!s.cp_id) return '';
+  const c = cpDari(s.cp_id), t = s.tp_id ? tpDari(s.tp_id) : null;
+  if(!c) return '';
+  return `<br><span class="badge" style="background:#e4efe4;color:#1f5f2e;margin-top:3px;" title="${escapeHtml(c.deskripsi)}${t?' | TP: '+escapeHtml(t.deskripsi):''}">${escapeHtml(c.kode||'CP')}${t?' · TP '+escapeHtml(t.kode||''):''}</span>`;
+}
+function isiFilterCpBank(){
+  const sel = cpEl('filter-cp'); if(!sel) return;
+  const mid = cpEl('filter-mapel').value;
+  const cps = (cpTpTersedia && mid) ? cpUntukMapel(mid).sort(urutKode) : [];
+  const prev = sel.value;
+  sel.classList.toggle('hidden', !cps.length);
+  sel.innerHTML = '<option value="">Semua CP</option>' + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}</option>`).join('') + '<option value="tanpa">(Soal tanpa CP)</option>';
+  sel.value = (prev==='tanpa' || cps.some(c=>c.id===prev)) ? prev : '';
+}
+// Modal Tambah/Edit Soal Manual
+function isiCpTpModalSoal(cpId, tpId){
+  const mid = cpEl('ts-mapel').value;
+  const cps = (cpTpTersedia && mid) ? cpUntukMapel(mid).sort(urutKode) : [];
+  const sel = cpEl('ts-cp');
+  cpEl('ts-cptp-wrap').classList.toggle('hidden', !cpTpTersedia);
+  sel.innerHTML = '<option value="">— Tidak dikaitkan ke CP —</option>' + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}: ${escapeHtml(potong(c.deskripsi,60))}</option>`).join('');
+  sel.value = (cpId && cps.some(c=>c.id===cpId)) ? cpId : '';
+  isiTpModalSoal(tpId);
+}
+function isiTpModalSoal(tpId){
+  const cid = cpEl('ts-cp').value;
+  const tps = cid ? tpUntukCp(cid).sort(urutKode) : [];
+  const sel = cpEl('ts-tp');
+  sel.innerHTML = '<option value="">— Seluruh CP (tanpa TP tertentu) —</option>' + tps.map(t=>`<option value="${t.id}">${escapeHtml(t.kode||'TP')} ${escapeHtml(potong(t.deskripsi,70))}</option>`).join('');
+  sel.value = (tpId && tps.some(t=>t.id===tpId)) ? tpId : '';
+}
+// Modal Generate Soal dengan AI
+function isiCpAi(cpPilih, tpPilih){
+  const wrap = cpEl('ai-cptp-wrap'); if(!wrap) return;
+  const mid = cpEl('ai-mapel').value;
+  const cps = (cpTpTersedia && mid) ? cpUntukMapel(mid).sort(urutKode) : [];
+  wrap.classList.toggle('hidden', !cpTpTersedia);
+  const sel = cpEl('ai-cp');
+  sel.innerHTML = '<option value="">— Tanpa CP (pakai Topik saja) —</option>' + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}: ${escapeHtml(potong(c.deskripsi,70))}</option>`).join('');
+  sel.value = (cpPilih && cps.some(c=>c.id===cpPilih)) ? cpPilih : '';
+  cpEl('ai-cp-kosong').classList.toggle('hidden', cps.length>0 || !mid);
+  isiTpAi(tpPilih);
+}
+function isiTpAi(tpPilih){
+  const cid = cpEl('ai-cp').value;
+  const tps = cid ? tpUntukCp(cid).sort(urutKode) : [];
+  const box = cpEl('ai-tp-wrap');
+  box.classList.toggle('hidden', !tps.length);
+  box.innerHTML = tps.length ? `<div class="muted" style="margin-bottom:4px;">Soal akan dibagi rata ke TP yang dicentang:</div>` + tps.map(t=>
+    `<label class="checkline" style="padding:4px 0;"><input type="checkbox" class="ai-tp-cek" value="${t.id}" ${(!tpPilih || !tpPilih.length || tpPilih.includes(t.id))?'checked':''}><span><b>${escapeHtml(t.kode||'TP')}</b> ${escapeHtml(t.deskripsi)}</span></label>`).join('') : '';
+  cpEl('ai-topik-label').textContent = cid ? 'Topik / Materi (opsional — CP sudah menjadi acuan)' : 'Topik / Materi';
+}
+function bukaGenerateSoalDariCp(cpId, tpId){
+  const c = cpDari(cpId); if(!c) return;
+  showTab('bank'); openGenerateAI();
+  cpEl('ai-mapel').value = c.mapel_id; syncAiProgramKelas();
+  isiCpAi(cpId, tpId ? [tpId] : []);
+}
+// Cocokkan kode TP dari AI ke id TP (soal diberi tautan TP yang diukurnya)
+function tpIdUntukSoal(s, ctx){
+  if(!ctx || !ctx.tpIds || !ctx.tpIds.length) return null;
+  const kode = String(s.tp_kode||'').trim().toLowerCase();
+  if(kode){
+    const t = ctx.tpIds.map(tpDari).find(x=>x && String(x.kode||'').trim().toLowerCase()===kode);
+    if(t) return t.id;
+  }
+  return ctx.tpIds.length===1 ? ctx.tpIds[0] : null;
+}
+// Filter CP pada pemilihan soal di Buat Paket Ujian
+function isiFilterCpPaket(mapelId, semuaSoal){
+  const sel = cpEl('pk-cp'); if(!sel) return '';
+  const cps = (cpTpTersedia && mapelId) ? cpUntukMapel(mapelId).sort(urutKode) : [];
+  const prev = sel.value;
+  const hit = new Map(); let tanpa = 0;
+  semuaSoal.forEach(s=>{ if(s.cp_id) hit.set(s.cp_id,(hit.get(s.cp_id)||0)+1); else tanpa++; });
+  cpEl('pk-cp-wrap').classList.toggle('hidden', !cps.length);
+  sel.innerHTML = '<option value="">Semua soal</option>' + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''} (${hit.get(c.id)||0} soal)</option>`).join('') + `<option value="tanpa">Soal tanpa CP (${tanpa})</option>`;
+  sel.value = (prev==='tanpa' || cps.some(c=>c.id===prev)) ? prev : '';
+  return cps.length ? sel.value : '';
+}
+
+// ---------- Rapor: Capaian Pembelajaran & Tujuan Pembelajaran per mapel ----------
+// Penguasaan TP dihitung dari skor soal yang bertautan ke TP (ujian dengan status dinilai pada TA & semester itu).
+async function hitungPenguasaanTp(nisn, ta, smt){
+  const peta = new Map();
+  let q = supa.from('sesi_ujian').select('id, paket_ujian_id, paket_ujian!inner(tahun_ajaran, semester)').eq('siswa_nisn', nisn).eq('status','dinilai');
+  if(ta) q = q.eq('paket_ujian.tahun_ajaran', ta);
+  if(smt) q = q.eq('paket_ujian.semester', smt);
+  const { data: sesi, error } = await q;
+  if(error || !sesi || !sesi.length) return peta;
+  const sesiIds = sesi.map(x=>x.id), paketIds = [...new Set(sesi.map(x=>x.paket_ujian_id))];
+  const [dj, ps] = await Promise.all([
+    ambilSemuaBaris(()=>supa.from('detail_jawaban').select('sesi_ujian_id, soal_id, skor').in('sesi_ujian_id', sesiIds).order('id')),
+    ambilSemuaBaris(()=>supa.from('paket_soal').select('paket_ujian_id, soal_id, poin, bank_soal(tp_id)').in('paket_ujian_id', paketIds).order('id')),
+  ]);
+  if(dj.error || ps.error) return peta;
+  const paketSesi = new Map(sesi.map(x=>[x.id, x.paket_ujian_id]));
+  const info = new Map();
+  (ps.data||[]).forEach(r=>{ const tp = r.bank_soal && r.bank_soal.tp_id; if(tp) info.set(r.paket_ujian_id+'|'+r.soal_id, { poin:Number(r.poin)||0, tp }); });
+  (dj.data||[]).forEach(d=>{
+    if(d.skor==null) return;                                   // essay belum dinilai tidak dihitung
+    const i = info.get(paketSesi.get(d.sesi_ujian_id)+'|'+d.soal_id);
+    if(!i || !i.poin) return;
+    const a = peta.get(i.tp) || { skor:0, maks:0 };
+    a.skor += Number(d.skor)||0; a.maks += i.poin; peta.set(i.tp, a);
+  });
+  return peta;
+}
+function ringkasTp(t){
+  let x = String(t.deskripsi||'').trim().replace(/[.;]+$/,'');
+  x = x.replace(/^(?:peserta didik|siswa|warga belajar)\s+(?:dapat|mampu|dapat\/mampu)\s+/i, '');
+  return x.charAt(0).toLowerCase()+x.slice(1);
+}
+async function htmlCapaianRapor(nisn, ta, smt, rows){
+  if(!cpTpTersedia || !cpList.length) return '';
+  try{
+    const peta = await hitungPenguasaanTp(nisn, ta, smt);
+    const baris = [];
+    rows.forEach(r=>{
+      const m = currentMapelList.find(x=>x.nama===r.mapel && x.program===r.program && x.kelas===r.kelas);
+      const cps = m ? cpUntukMapel(m.id).sort(urutKode) : [];
+      if(!cps.length) return;
+      const tpSemua = cps.flatMap(c=>tpUntukCp(c.id).sort(urutKode));
+      let tps = tpSemua.filter(t=>!t.semester || !smt || t.semester===smt);
+      if(!tps.length) tps = tpSemua;
+      const kkm = r.kkm!=null ? Number(r.kkm) : 70;
+      const tuntas = [], belum = []; let tanpaData = 0;
+      tps.forEach(t=>{
+        const a = peta.get(t.id);
+        if(a && a.maks>0) ((a.skor/a.maks*100) >= kkm ? tuntas : belum).push(t); else tanpaData++;
+      });
+      baris.push({ mapel:r.mapel, cps, tps, tuntas, belum, tanpaData });
+    });
+    if(!baris.length) return '';
+    const daftar = a=>a.map(ringkasTp).map(esc2).join('; ');
+    return `<div style="font-weight:bold;margin:8px 0 4px;font-size:13px;">CAPAIAN PEMBELAJARAN (CP) &amp; TUJUAN PEMBELAJARAN (TP)</div><table class="nilai">
+      <thead><tr><th class="c" style="width:28px;">No</th><th style="width:130px;">Mata Pelajaran</th><th>Capaian Pembelajaran (CP) &amp; Tujuan Pembelajaran (TP)</th></tr></thead>
+      <tbody>${baris.map((b,i)=>`<tr style="page-break-inside:avoid;"><td class="c">${i+1}</td><td><b>${esc2(b.mapel)}</b></td><td>
+        ${b.cps.map(c=>`<div><b>${esc2(c.kode||'CP')}${c.elemen?' ('+esc2(c.elemen)+')':''}:</b> ${esc2(c.deskripsi)}</div>`).join('')}
+        ${(b.tuntas.length || b.belum.length) ? `
+          ${b.tuntas.length ? `<div style="margin-top:4px;"><b>Ananda telah mampu</b> ${daftar(b.tuntas)}.</div>` : ''}
+          ${b.belum.length ? `<div style="margin-top:3px;"><b>Ananda perlu bimbingan/penguatan</b> pada ${daftar(b.belum)}.</div>` : ''}
+          ${b.tanpaData ? `<div class="catatan" style="margin:3px 0 0;">${b.tanpaData} TP lain belum diukur pada semester ini.</div>` : ''}
+        ` : `<div style="margin-top:4px;"><b>Tujuan Pembelajaran:</b> ${daftar(b.tps)}.</div>`}
+      </td></tr>`).join('')}</tbody></table>`;
+  }catch(e){ return ''; }   // kegagalan bagian CP/TP tidak boleh menggagalkan cetak rapor
+}
+
+// Impor Bank Soal: kolom opsional cp_kode / tp_kode (kode dari menu CP & TP) mengaitkan soal ke CP/TP
+function tautCpTpImpor(mapelId, r, galat){
+  if(!cpTpTersedia) return {};
+  const cpK = String(r.cp_kode||'').trim().toLowerCase(), tpK = String(r.tp_kode||'').trim().toLowerCase();
+  if(!cpK && !tpK) return {};
+  let cp = null, tp = null;
+  if(cpK) cp = cpUntukMapel(mapelId).find(c=>String(c.kode||'').trim().toLowerCase()===cpK) || null;
+  if(!cpK && tpK){
+    const calon = tpList.filter(t=>t.mapel_id===mapelId && String(t.kode||'').trim().toLowerCase()===tpK);
+    if(calon.length===1){ tp = calon[0]; cp = cpDari(tp.cp_id) || null; }
+  }
+  if(!cp){ galat.n++; return {}; }
+  if(tpK && !tp){ tp = tpUntukCp(cp.id).find(t=>String(t.kode||'').trim().toLowerCase()===tpK) || null; if(!tp) galat.n++; }
+  return { cp_id: cp.id, tp_id: tp ? tp.id : null };
+}
+
 // ---------- GENERATE AI ----------
 function openGenerateAI(){
   document.getElementById('modal-ai').classList.remove('hidden');
@@ -2794,6 +3565,7 @@ function syncAiProgramKelas(){
   const mapelId = document.getElementById('ai-mapel').value;
   const m = currentMapelList.find(x=>x.id===mapelId);
   document.getElementById('ai-program').value = m ? `${m.program} - Kelas ${m.kelas||'?'}` : '';
+  isiCpAi();
 }
 let draftSoalAI = [];
 const MAKS_SOAL_GENERATE = 100;
@@ -2870,7 +3642,7 @@ async function prosesBatchAI(daftar, info){
       try{
         const data = await panggilBatchAI({
           mapel: info.mapel, program: info.program, topik: info.topik, tingkat_kesulitan: info.tingkat,
-          komposisi: b.komposisi,
+          komposisi: b.komposisi, cp: info.cp || undefined, tp: (info.tp && info.tp.length) ? info.tp : undefined,
           hindari: draftSoalAI.map(s=>s.pertanyaan).slice(-40),
           bagian: { ke: b.idx, dari: b.total },
         });
@@ -2904,8 +3676,11 @@ async function generateAI(){
   const mapelId = document.getElementById('ai-mapel').value;
   const mapelObj = currentMapelList.find(m=>m.id===mapelId);
   if(!mapelObj) return alert('Pilih mata pelajaran dulu');
-  const topik = document.getElementById('ai-topik').value.trim();
-  if(!topik) return alert('Isi topik/materi dulu');
+  const cpObj = (cpTpTersedia && document.getElementById('ai-cp').value) ? cpDari(document.getElementById('ai-cp').value) : null;
+  const tpIds = cpObj ? Array.from(document.querySelectorAll('.ai-tp-cek:checked')).map(x=>x.value) : [];
+  const topikIn = document.getElementById('ai-topik').value.trim();
+  if(!topikIn && !cpObj) return alert('Isi topik/materi, atau pilih Capaian Pembelajaran (CP).');
+  const topik = topikIn || cpObj.elemen || cpObj.kode || 'CP';
   const komposisi = ambilKomposisiAI();
   if(!komposisi.length) return alert('Pilih minimal satu jenis soal (centang) dan isi jumlahnya');
   const totalSoal = komposisi.reduce((a,k)=>a+k.jumlah, 0);
@@ -2914,7 +3689,10 @@ async function generateAI(){
   const batches = bagiBatchAI(komposisi).map((k,i,arr)=>({ komposisi:k, idx:i+1, total:arr.length }));
   draftSoalAI = []; batchAIGagal = []; providerAIDipakai = new Set();
   document.getElementById('ai-hasil').innerHTML = '';
-  ctxGenerateAI = { mapelId, mapel: mapelObj.nama, program: document.getElementById('ai-program').value, topik, tingkat: document.getElementById('ai-tingkat').value };
+  ctxGenerateAI = { mapelId, mapel: mapelObj.nama, program: document.getElementById('ai-program').value, topik, tingkat: document.getElementById('ai-tingkat').value,
+    cpId: cpObj ? cpObj.id : null, tpIds,
+    cp: cpObj ? { kode:cpObj.kode, elemen:cpObj.elemen, deskripsi:cpObj.deskripsi, fase:faseMapel(mapelObj) } : null,
+    tp: tpIds.map(tpDari).filter(Boolean).map(t=>({ kode:t.kode, deskripsi:t.deskripsi })) };
   await prosesBatchAI(batches, ctxGenerateAI);
 }
 let ctxGenerateAI = null;
@@ -2927,7 +3705,7 @@ function renderDraftAI(){
   draftSoalAI = draftSoalAI.map((x,i)=>({x,i})).sort((a,b)=>((URUT_JENIS[a.x.jenis]??9)-(URUT_JENIS[b.x.jenis]??9)) || (a.i-b.i)).map(o=>o.x);
   wrap.innerHTML = draftSoalAI.map((s,i)=>`
     <div class="card" style="margin-top:14px;">
-      <span class="muted" style="font-size:12px;">${labelJenis(s.jenis)}</span>
+      <span class="muted" style="font-size:12px;">${labelJenis(s.jenis)}</span>${s.tp_kode?` <span class="badge manual">TP ${escapeHtml(s.tp_kode)}</span>`:''}
       <strong><span class="num-tag">${i+1}</span>${escapeHtml(s.pertanyaan)}</strong>
       ${s.jenis==='pilihan_ganda' ? `
         <div class="muted" style="margin-top:8px;">
@@ -2944,12 +3722,13 @@ async function simpanDraftAI(lanjutPaket){
     mapel_id: s.mapel_id,
     jenis: s.jenis,
     tingkat_kesulitan: s.tingkat_kesulitan || 'sedang',
-    topik: document.getElementById('ai-topik').value.trim(),
+    topik: document.getElementById('ai-topik').value.trim() || (ctxGenerateAI && ctxGenerateAI.topik) || '',
     pertanyaan: s.pertanyaan,
     opsi_a: s.opsi_a || null, opsi_b: s.opsi_b || null, opsi_c: s.opsi_c || null, opsi_d: s.opsi_d || null, opsi_e: s.opsi_e || null,
     kunci_jawaban: s.kunci_jawaban || '',
     poin: 1,
     sumber: 'ai',
+    ...(ctxGenerateAI && ctxGenerateAI.cpId ? { cp_id: ctxGenerateAI.cpId, tp_id: tpIdUntukSoal(s, ctxGenerateAI) } : {}),
     ...(document.getElementById('ai-remedial') && document.getElementById('ai-remedial').checked ? { khusus_remedial: true } : {}),
   }));
   // Mode "Simpan & Buat Paket Ujian": ambil id soal yang baru tersimpan supaya bisa langsung dicentang di formulir paket.
@@ -3034,6 +3813,8 @@ async function loadSoalUntukPaket(){
   if(error){ wrap.innerHTML = error.message; return; }
   const urut = { pilihan_ganda:0, isian_singkat:1, essay:2 };
   let semuaSoal = (data||[]).slice();
+  const cpPk = isiFilterCpPaket(mapelId, semuaSoal);
+  if(cpPk) semuaSoal = semuaSoal.filter(s=>(cpPk==='tanpa' ? !s.cp_id : s.cp_id===cpPk) || preselectSoalIds.includes(s.id));
   // Soal "Khusus Remedial" dicadangkan untuk Paket Remedial: tidak ditawarkan di paket UTS/UAS/UH.
   const jenisPaketIni = document.getElementById('pk-jenis').value;
   const nKhusus = semuaSoal.filter(s=>s.khusus_remedial && !preselectSoalIds.includes(s.id)).length;
@@ -6534,6 +7315,7 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
   const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
   const [hadirRek, ttdWali] = await Promise.all([ ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilWali(kelas) ]);
   const cel = v => v==null ? '-' : fmtN(v);
+  const blokCp = await htmlCapaianRapor(nisn, ta, smt, rows);   // CP & TP per mapel (v17)
   return `${kopSekolahHTML()}
     <h1>LAPORAN HASIL BELAJAR (RAPOR)</h1>
     <div class="sub">${esc2(labelSmt(smt))} &mdash; Tahun Ajaran ${esc2(ta)}</div>
@@ -6547,6 +7329,7 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
       ${rows.map((r,i)=>`<tr${r.tuntas===false?' style="color:#b3261e;"':''}><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.uh)}${r.rem&&r.rem.uh?'*':''}</td><td class="c">${cel(r.uts)}${r.rem&&r.rem.uts?'*':''}</td><td class="c">${cel(r.uas)}${r.rem&&r.rem.uas?'*':''}</td>${adaTugas?`<td class="c">${cel(r.tugas)}</td>`:''}${adaPraktik?`<td class="c">${cel(r.praktik)}</td>`:''}<td class="c"><b>${cel(r.na)}</b></td><td>${r.na==null?'-':esc2(predikatNilai(r.na))}</td><td class="c">${fmtN(r.kkm)}</td><td>${ketTuntas(r.tuntas)}</td></tr>`).join('')}
       </tbody>
     </table>
+    ${blokCp}
     <div class="ringkasan">
       <div><b>Jumlah Mapel:</b> ${rows.length}</div>
       <div><b>Rata-rata Nilai Akhir:</b> ${cel(rata)}${rata!=null?' ('+esc2(predikatNilai(rata))+')':''}</div>

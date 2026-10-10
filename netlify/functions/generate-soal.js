@@ -86,10 +86,10 @@ async function fetchDenganTimeout(url, opts, ms) {
 }
 
 // ---------- Panggilan per jenis provider ----------
-async function panggilGemini(k, promptText, totalSoal, ms) {
+async function panggilGemini(k, promptText, totalSoal, ms, ekstra) {
   const generationConfig = {
     temperature: 0.7,
-    maxOutputTokens: Math.min(32768, Math.max(2048, totalSoal * 380 + 1000)),
+    maxOutputTokens: (ekstra && ekstra.tokens) || Math.min(32768, Math.max(2048, totalSoal * 380 + 1000)),
     responseMimeType: 'application/json',
     responseSchema: {
       type: 'ARRAY',
@@ -102,11 +102,13 @@ async function panggilGemini(k, promptText, totalSoal, ms) {
           opsi_a: { type: 'STRING' }, opsi_b: { type: 'STRING' }, opsi_c: { type: 'STRING' },
           opsi_d: { type: 'STRING' }, opsi_e: { type: 'STRING' },
           kunci_jawaban: { type: 'STRING' },
+          tp_kode: { type: 'STRING' },
         },
         required: ['pertanyaan', 'jenis', 'kunci_jawaban'],
       },
     },
   };
+  if (ekstra && ekstra.schema) generationConfig.responseSchema = ekstra.schema;
   // Pengaturan "thinking" berbeda antar generasi model Gemini
   if (/gemini-3/i.test(k.model)) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
   else if (/gemini-2\.5-flash/i.test(k.model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
@@ -125,7 +127,7 @@ async function panggilGemini(k, promptText, totalSoal, ms) {
   return data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
 }
 
-async function panggilOpenAICompat(k, promptText, totalSoal, ms) {
+async function panggilOpenAICompat(k, promptText, totalSoal, ms, ekstra) {
   const body = {
     model: k.model,
     messages: [
@@ -133,7 +135,9 @@ async function panggilOpenAICompat(k, promptText, totalSoal, ms) {
       { role: 'user', content: promptText },
     ],
     temperature: 0.7,
-    max_tokens: Math.min(k.konteksKecil ? 6000 : 8000, Math.max(1500, totalSoal * 380 + 800)),
+    max_tokens: (ekstra && ekstra.tokens)
+      ? Math.min(k.konteksKecil ? 6000 : 8000, ekstra.tokens)
+      : Math.min(k.konteksKecil ? 6000 : 8000, Math.max(1500, totalSoal * 380 + 800)),
     response_format: { type: 'json_object' },
   };
   if (/gpt-oss/i.test(k.model)) body.reasoning_effort = 'low';
@@ -192,10 +196,138 @@ function bersihkanSoal(arr, tingkatDefault) {
         opsi_d: pg ? s.opsi_d || null : null,
         opsi_e: pg ? s.opsi_e || null : null,
         kunci_jawaban: kunci,
+        tp_kode: s.tp_kode ? String(s.tp_kode).trim().slice(0, 40) : null,
       };
     })
     // Pilihan ganda tanpa minimal 2 opsi tidak berguna
     .filter((s) => s.jenis !== 'pilihan_ganda' || (s.opsi_a && s.opsi_b));
+}
+
+// =====================================================================
+// MODE CP/TP: membuat Capaian Pembelajaran (CP) & Tujuan Pembelajaran (TP)
+//   mode 'cp_tp' -> { mapel, program, kelas, fase, jumlah_cp, tp_per_cp, semester?, catatan? }  => { cp:[{kode,elemen,deskripsi,tp:[{kode,deskripsi,semester}]}] }
+//   mode 'tp'    -> { mapel, program, kelas, fase, cp:{kode,elemen,deskripsi}, tp_per_cp, semester?, catatan?, hindari? } => { tp:[{kode,deskripsi,semester}] }
+// =====================================================================
+const SKEMA_TP = {
+  type: 'OBJECT',
+  properties: { kode: { type: 'STRING' }, deskripsi: { type: 'STRING' }, semester: { type: 'STRING' } },
+  required: ['deskripsi'],
+};
+const SKEMA_CP_TP = {
+  type: 'ARRAY',
+  items: {
+    type: 'OBJECT',
+    properties: {
+      kode: { type: 'STRING' }, elemen: { type: 'STRING' }, deskripsi: { type: 'STRING' },
+      tp: { type: 'ARRAY', items: SKEMA_TP },
+    },
+    required: ['deskripsi', 'tp'],
+  },
+};
+const SKEMA_TP_SAJA = { type: 'ARRAY', items: SKEMA_TP };
+
+function bersihkanTp(arr) {
+  return (arr || [])
+    .filter((t) => t && String(t.deskripsi || '').trim())
+    .map((t) => ({
+      kode: String(t.kode || '').trim().slice(0, 30),
+      deskripsi: String(t.deskripsi).trim(),
+      semester: /genap/i.test(t.semester || '') ? 'Genap' : (/ganjil/i.test(t.semester || '') ? 'Ganjil' : null),
+    }));
+}
+function bersihkanCp(arr) {
+  return (arr || [])
+    .filter((c) => c && String(c.deskripsi || '').trim())
+    .map((c) => ({
+      kode: String(c.kode || '').trim().slice(0, 30),
+      elemen: String(c.elemen || '').trim().slice(0, 120),
+      deskripsi: String(c.deskripsi).trim(),
+      tp: bersihkanTp(c.tp),
+    }))
+    .filter((c) => c.tp.length);
+}
+
+async function handleCpTp(body, kandidat) {
+  const mode = body.mode;
+  const mapel = String(body.mapel || '').trim();
+  if (!mapel) return { statusCode: 400, body: JSON.stringify({ error: 'Mapel wajib diisi' }) };
+  const program = String(body.program || '').trim();
+  const kelas = String(body.kelas || '').trim();
+  const fase = String(body.fase || '').trim();
+  const tpPerCp = Math.min(Math.max(parseInt(body.tp_per_cp, 10) || 4, 1), 8);
+  const jumlahCp = Math.min(Math.max(parseInt(body.jumlah_cp, 10) || 3, 1), 6);
+  const semester = /^(ganjil|genap)$/i.test(body.semester || '') ? (/genap/i.test(body.semester) ? 'Genap' : 'Ganjil') : '';
+  const catatan = String(body.catatan || '').slice(0, 1500);
+
+  const identitas = `Mata pelajaran: ${mapel}\nJenjang: ${program || 'Paket B/C'}${kelas ? `, Kelas ${kelas}` : ''}${fase ? `, Fase ${fase}` : ''} (pendidikan kesetaraan/PKBM, Kurikulum Merdeka)`;
+  const aturanTp = `Aturan TP (Tujuan Pembelajaran):
+- Satu kalimat operasional, diawali kata kerja ("Peserta didik dapat/mampu ..."), terukur, dan cukup spesifik sehingga bisa dibuatkan soal.
+- Urutkan dari yang paling dasar ke yang lebih kompleks.
+- ${semester ? `Isi field "semester" dengan "${semester}" untuk semua TP.` : 'Isi field "semester" dengan "Ganjil" untuk materi paruh awal dan "Genap" untuk materi paruh akhir.'}`;
+
+  let teksTugas, skema, tokens, pembungkus;
+  if (mode === 'cp_tp') {
+    teksTugas = `Susun ${jumlahCp} Capaian Pembelajaran (CP), masing-masing mewakili satu elemen/ruang lingkup mata pelajaran, dan untuk tiap CP susun ${tpPerCp} Tujuan Pembelajaran (TP).
+Aturan CP: rumuskan kompetensi akhir fase seperti yang tercantum pada Capaian Pembelajaran Kurikulum Merdeka untuk mata pelajaran dan fase ini sejauh yang kamu ketahui, dengan kata-katamu sendiri, 1-3 kalimat. Isi "elemen" dengan nama elemen/ruang lingkupnya. Jangan menyebut nomor dokumen/regulasi.
+${aturanTp}
+Beri "kode" CP berformat CP-1, CP-2, ... dan "kode" TP berformat 1.1, 1.2, 2.1, ... (nomor CP.nomor TP).${catatan ? `\nCakupan/materi yang harus diperhatikan:\n${catatan}` : ''}`;
+    skema = SKEMA_CP_TP;
+    tokens = Math.min(8000, Math.max(2048, 900 + jumlahCp * (tpPerCp * 120 + 160)));
+    pembungkus = '{"cp":[{"kode":"CP-1","elemen":"","deskripsi":"","tp":[{"kode":"1.1","deskripsi":"","semester":"Ganjil"}]}]}';
+  } else {
+    const cp = body.cp && typeof body.cp === 'object' ? body.cp : null;
+    if (!cp || !String(cp.deskripsi || '').trim()) return { statusCode: 400, body: JSON.stringify({ error: 'CP wajib diisi untuk membuat TP' }) };
+    const hindari = (Array.isArray(body.hindari) ? body.hindari : []).map((x) => String(x || '').slice(0, 160)).filter(Boolean).slice(0, 30);
+    teksTugas = `Susun ${tpPerCp} Tujuan Pembelajaran (TP) yang menjabarkan Capaian Pembelajaran (CP) berikut:
+CP${cp.kode ? ` (${cp.kode})` : ''}${cp.elemen ? ` — elemen ${cp.elemen}` : ''}: ${String(cp.deskripsi).slice(0, 1500)}
+${aturanTp}
+Beri "kode" TP berformat nomor urut (mis. 1.1, 1.2).${catatan ? `\nCakupan/materi yang harus diperhatikan:\n${catatan}` : ''}${hindari.length ? `\nJANGAN mengulang TP yang sudah ada berikut:\n${hindari.map((h) => `- ${h}`).join('\n')}` : ''}`;
+    skema = SKEMA_TP_SAJA;
+    tokens = Math.min(6000, Math.max(1500, 700 + tpPerCp * 130));
+    pembungkus = '{"tp":[{"kode":"1.1","deskripsi":"","semester":"Ganjil"}]}';
+  }
+
+  const dasar = `Kamu adalah pakar kurikulum pendidikan kesetaraan di Indonesia. Gunakan bahasa Indonesia baku.\n${identitas}\n\n${teksTugas}`;
+  const promptGemini = `${dasar}\nBalas HANYA dengan JSON array sesuai skema yang diberikan, tanpa teks tambahan.`;
+  const promptOpenAI = `${dasar}\nBalas HANYA dengan satu JSON object berbentuk:\n${pembungkus}\nTanpa teks tambahan, tanpa markdown/code fence.`;
+
+  const mulai = Date.now();
+  const sisaWaktu = () => BUDGET_MS - (Date.now() - mulai);
+  const log = [];
+  const providerKeyBermasalah = new Set();
+
+  for (const k of kandidat) {
+    if (providerKeyBermasalah.has(k.provider)) { log.push({ provider: k.provider, model: k.model, hasil: 'dilewati (API key ditolak)' }); continue; }
+    let percobaan = 0;
+    while (percobaan < 2) {
+      percobaan++;
+      const sisa = sisaWaktu();
+      if (sisa < 3000) { log.push({ provider: k.provider, model: k.model, hasil: 'dilewati (waktu habis)' }); break; }
+      try {
+        const ekstra = { schema: skema, tokens };
+        const raw = k.jenis === 'gemini'
+          ? await panggilGemini(k, promptGemini, 0, Math.min(sisa - 500, 22000), ekstra)
+          : await panggilOpenAICompat(k, promptOpenAI, 0, Math.min(sisa - 500, 22000), ekstra);
+        const arr = ekstrakArray(raw);
+        const hasil = mode === 'cp_tp' ? bersihkanCp(arr) : bersihkanTp(arr);
+        if (!hasil.length) throw new ErrorAI(422, 'AI tidak menghasilkan CP/TP yang valid');
+        log.push({ provider: k.provider, model: k.model, hasil: 'berhasil' });
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ [mode === 'cp_tp' ? 'cp' : 'tp']: hasil, provider: k.provider, model: k.model, percobaan: log }),
+        };
+      } catch (err) {
+        const status = err.status || 0;
+        const kat = err instanceof SyntaxError || /JSON|Struktur/.test(err.message) ? 'lainnya' : kategoriError(status, err.message);
+        log.push({ provider: k.provider, model: k.model, hasil: `gagal (${status || 'error'}): ${String(err.message).slice(0, 120)}` });
+        if (status === 401 || status === 403 || /api.?key|unauthori[sz]ed|permission.?denied|invalid.?key|authentication/i.test(err.message || '')) providerKeyBermasalah.add(k.provider);
+        if (kat === 'sementara' && percobaan < 2 && sisaWaktu() > 5000) { await new Promise((r) => setTimeout(r, 800)); continue; }
+        break;
+      }
+    }
+  }
+  const detail = log.filter((l) => !/^dilewati/.test(l.hasil)).map((l) => `• ${l.provider}/${l.model}: ${l.hasil}`).join('\n');
+  return { statusCode: 503, body: JSON.stringify({ error: `Semua penyedia AI gagal/sibuk. Tunggu sebentar lalu coba lagi.${detail ? `\n\nDetail:\n${detail}` : ''}`, percobaan: log }) };
 }
 
 const { adaKonfigurasi, wajibLogin } = require('../lib/ujian-core');
@@ -226,15 +358,26 @@ exports.handler = async function (event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Body tidak valid' }) };
   }
 
+  if (body.mode === 'cp_tp' || body.mode === 'tp') {
+    return await handleCpTp(body, kandidat);
+  }
+
   const {
     mapel = '',
     program = '',
-    topik = '',
+    topik: topikInput = '',
     tingkat_kesulitan = 'sedang',
   } = body;
 
+  // Soal berbasis Capaian Pembelajaran: cp = {kode, elemen, deskripsi, fase}, tp = [{kode, deskripsi}]
+  const cp = body.cp && typeof body.cp === 'object' && String(body.cp.deskripsi || '').trim() ? body.cp : null;
+  const tpDipilih = cp && Array.isArray(body.tp)
+    ? body.tp.filter((t) => t && String(t.deskripsi || '').trim()).slice(0, 15)
+    : [];
+  const topik = String(topikInput || '').trim() || (cp ? (cp.elemen || String(cp.deskripsi).slice(0, 120)) : '');
+
   if (!mapel || !topik) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Mapel dan topik wajib diisi' }) };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Mapel dan topik (atau CP) wajib diisi' }) };
   }
 
   // Terima format baru (komposisi: [{jenis, jumlah}]) maupun format lama
@@ -283,11 +426,23 @@ exports.handler = async function (event) {
       ? `\nJANGAN membuat soal yang sama atau mirip dengan soal-soal yang sudah ada berikut:\n${hindari.map((h) => `- ${h}`).join('\n')}`
       : '');
 
+  // Blok tambahan bila soal dibuat berdasarkan CP/TP yang dipilih guru
+  let blokCp = '';
+  if (cp) {
+    blokCp = `\nCapaian Pembelajaran (CP)${cp.fase ? ` Fase ${cp.fase}` : ''}${cp.elemen ? ` — elemen ${cp.elemen}` : ''}: ${String(cp.deskripsi).slice(0, 1200)}`;
+    if (tpDipilih.length) {
+      blokCp += `\nTujuan Pembelajaran (TP) yang harus diukur:\n${tpDipilih.map((t) => `- [${t.kode || 'TP'}] ${String(t.deskripsi).slice(0, 400)}`).join('\n')}`;
+      blokCp += `\nSetiap soal HARUS mengukur tepat satu TP di atas. Isi field "tp_kode" dengan kode TP persis seperti tertulis di dalam kurung siku (tanpa kurung). Bagi rata jumlah soal ke seluruh TP dan sesuaikan kata kerja operasional TP dengan bentuk soalnya.`;
+    } else {
+      blokCp += `\nSemua soal HARUS mengukur CP di atas. Kosongkan field "tp_kode".`;
+    }
+  }
+
   const promptDasar = `Kamu adalah asisten pembuat soal ujian untuk sekolah kesetaraan (PKBM) di Indonesia, jenjang ${program || 'Paket B/C'}.
 Buat soal ujian berkualitas, sesuai kurikulum, dalam bahasa Indonesia yang baik dan jelas, dengan tingkat kesulitan "${tingkat_kesulitan}".
 
 Mata pelajaran: ${mapel}
-Topik/materi: ${topik}
+Topik/materi: ${topik}${blokCp}
 Total soal yang harus dibuat: ${totalSoal}, dengan rincian jenis sebagai berikut:
 ${rincianKomposisi}
 ${catatanBatch}
@@ -297,7 +452,7 @@ Susun urutan soal dalam satu lembar: kelompokkan per jenis (semua pilihan ganda 
   const promptGemini = `${promptDasar}\nBalas HANYA dengan JSON array sesuai skema yang diberikan, tanpa teks tambahan apa pun.`;
   const promptOpenAI = `${promptDasar}
 Balas HANYA dengan satu JSON object berbentuk:
-{"soal":[{"pertanyaan":"...","jenis":"pilihan_ganda|isian_singkat|essay","tingkat_kesulitan":"${tingkat_kesulitan}","opsi_a":"","opsi_b":"","opsi_c":"","opsi_d":"","opsi_e":"","kunci_jawaban":""}]}
+{"soal":[{"pertanyaan":"...","jenis":"pilihan_ganda|isian_singkat|essay","tingkat_kesulitan":"${tingkat_kesulitan}","opsi_a":"","opsi_b":"","opsi_c":"","opsi_d":"","opsi_e":"","kunci_jawaban":"","tp_kode":""}]}
 Tanpa teks tambahan, tanpa markdown/code fence.`;
 
   // ---------- Jalankan rantai cadangan ----------
