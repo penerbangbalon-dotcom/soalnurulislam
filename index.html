@@ -135,6 +135,9 @@
   .mon-bar{height:6px;background:#DCE6F5;border-radius:3px;overflow:hidden;min-width:70px;margin-top:4px;}
   .mon-bar>span{display:block;height:100%;background:var(--green);}
   .mon-aksi{display:flex;gap:4px;flex-wrap:wrap;}
+  .ms-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);}
+  .ms-item:last-child{border-bottom:0;}
+  .ms-item .btn{padding:4px 10px;white-space:nowrap;}
   .mon-aksi .btn{padding:3px 8px;font-size:12px;}
   .quick-chip{border:1px solid var(--line);background:#F5F8FD;border-radius:12px;padding:4px 10px;font-size:12.5px;cursor:pointer;}
   .quick-chip:hover{background:#E3ECF9;}
@@ -191,6 +194,7 @@
       <div class="ghead" onclick="toggleGroup('laksana')"><span>Pelaksanaan Ujian</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="monitor" onclick="showTab('monitor')">Monitoring Ujian</div>
+        <div class="item admin-only hidden" data-tab="monsiswa" onclick="showTab('monsiswa')">Monitoring per Siswa</div>
         <div class="item" data-tab="manual" onclick="showTab('manual')">Ujian Cetak &amp; Nilai Manual</div>
         <div class="item" data-tab="hasil" onclick="showTab('hasil')">Hasil Ujian Online</div>
         <div class="item" data-tab="belumujian" onclick="showTab('belumujian')">Belum Mengikuti Ujian</div>
@@ -419,6 +423,43 @@
             <th>Siswa</th><th>Status</th><th>Progres</th><th>Sisa Waktu</th><th>Pindah Tab</th><th>Terakhir Aktif</th><th>Aksi</th>
           </tr></thead>
           <tbody id="mon-body"><tr><td colspan="8" class="muted">Pilih paket ujian untuk mulai memantau.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== TAB: MONITORING PER SISWA ===== -->
+    <section id="tab-monsiswa" class="hidden">
+      <h2>Monitoring per Siswa</h2>
+      <p class="muted">Lihat setiap siswa beserta mata pelajaran (paket ujian) yang sudah ia kerjakan. Dari sini admin / super admin bisa
+        <b>mereset satu mata pelajaran</b> atau <b>mereset semua mata pelajaran</b> siswa tertentu, misalnya untuk siswa yang melanggar aturan
+        atau berbuat curang, sehingga ia harus mengerjakan ulang dari awal. Reset menghapus jawaban dan nilai di sesi itu; salinan nilai lama
+        tetap tersimpan di menu <b>Arsip Nilai</b>. Bila siswa cukup dilanjutkan tanpa mengulang, pakai tombol <b>Aktifkan Kembali</b> di menu Monitoring Ujian.</p>
+      <div class="toolbar">
+        <select id="ms-kelas" onchange="renderMonSiswa()">
+          <option value="">Semua Kelas</option>
+          <option value="VII">Kelas VII</option><option value="VIII">Kelas VIII</option><option value="IX">Kelas IX</option>
+          <option value="X">Kelas X</option><option value="XI">Kelas XI</option><option value="XII">Kelas XII</option>
+        </select>
+        <select id="ms-ta" onchange="renderMonSiswa()"><option value="">Semua tahun ajaran</option></select>
+        <select id="ms-jenis" onchange="renderMonSiswa()">
+          <option value="">Semua jenis ujian</option>
+          <option value="UTS">UTS</option><option value="UAS">UAS</option>
+          <option value="Ulangan Harian">Ulangan Harian</option><option value="Remedial">Remedial</option>
+        </select>
+        <input type="text" id="ms-cari" placeholder="Cari nama / NISN..." oninput="renderMonSiswa()" style="max-width:220px;">
+        <select id="ms-urut" onchange="renderMonSiswa()">
+          <option value="nama">Urut: Nama A-Z</option>
+          <option value="langgar">Urut: Pelanggaran terbanyak</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink);"><input type="checkbox" id="ms-langgar" onchange="renderMonSiswa()" style="width:auto;"> Hanya yang pernah melanggar</label>
+        <button class="btn outline" onclick="loadMonSiswa()">Refresh</button>
+        <span class="muted" id="ms-updated"></span>
+      </div>
+      <div id="ms-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;"></div>
+      <div class="card">
+        <table>
+          <thead><tr><th style="width:26%;">Siswa</th><th>Mata pelajaran yang sudah dikerjakan</th><th style="width:150px;">Aksi</th></tr></thead>
+          <tbody id="ms-body"><tr><td colspan="3" class="muted">Memuat data...</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -1660,9 +1701,9 @@ async function hapusUser(userId, email){
 // ---------- NAV ----------
 function showTab(tab){
   if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
-  if((tab==='sekolah' || tab==='siswa') && !ADALAH_ADMIN) return; // khusus admin (server juga menolak)
+  if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
+  ['bank','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1675,6 +1716,7 @@ function showTab(tab){
   if(tab==='pending') loadPerluDinilai();
   if(tab!=='monitor') hentikanMonitor();
   if(tab==='monitor') loadMonitorPaketOptions();
+  if(tab==='monsiswa') loadMonSiswa();
   if(tab==='manual') loadManualPaketOptions();
   if(tab==='hasil') loadHasilPaketOptions();
   if(tab==='belumujian') loadBelumUjian();
@@ -4429,6 +4471,145 @@ function aturAutoMonitor(){
   if(on && aktifDiTabIni) monTimer = setInterval(()=>muatMonitor(false), 8000);
 }
 function hentikanMonitor(){ if(monTimer){ clearInterval(monTimer); monTimer = null; } }
+
+// ---------- MONITORING PER SISWA (reset per mapel / reset semua mapel) ----------
+// Menampilkan tiap siswa beserta paket ujian (mapel) yang sudah ia kerjakan. Reset = hapus sesi_ujian
+// (detail_jawaban ikut terhapus lewat ON DELETE CASCADE); salinan nilai tetap ada di arsip_nilai.
+let ms = { siswa:[], awal:true, muat:false };
+const MS_LABEL_STATUS = { berlangsung:'Sedang mengerjakan', selesai:'Selesai', dinilai:'Dinilai' };
+async function loadMonSiswa(){
+  if(ms.muat) return;
+  ms.muat = true;
+  const info = document.getElementById('ms-updated');
+  info.textContent = 'Memuat data...';
+  try{
+    const [roster, rPaket, rSesi] = await Promise.all([
+      ambilSemuaSiswaAbsensi(),
+      ambilSemuaBaris(()=>supa.from('paket_ujian')
+        .select('id, judul, jenis_ujian, kelas, program, semester, tahun_ajaran, mata_pelajaran(nama)')
+        .eq('diarsipkan', false).order('id')),
+      ambilSemuaBaris(()=>supa.from('sesi_ujian')
+        .select('id, paket_ujian_id, siswa_nisn, siswa_nama, status, mode_ujian, total_skor, pelanggaran, waktu_mulai, waktu_selesai').order('id'))
+    ]);
+    if(rPaket.error) throw rPaket.error;
+    if(rSesi.error) throw rSesi.error;
+    const paket = new Map((rPaket.data||[]).map(p=>[p.id, { ...p, ...normSemesterTA(p.semester, p.tahun_ajaran) }]));
+    const rosterMap = new Map(roster.map(r=>[r.nisn, r]));
+    const peta = new Map();
+    (rSesi.data||[]).forEach(x=>{
+      const p = paket.get(x.paket_ujian_id);
+      if(!p) return; // paket diarsipkan / tidak ada
+      let st = peta.get(x.siswa_nisn);
+      if(!st){
+        const r = rosterMap.get(x.siswa_nisn);
+        st = { nisn:x.siswa_nisn, nama:(r&&r.nama)||x.siswa_nama||x.siswa_nisn, kelas:(r&&r.kelasRomawi)||p.kelas||'', kelasLabel:(r&&r.kelasAsli)||(p.kelas?('Kelas '+p.kelas):''), items:[] };
+        peta.set(x.siswa_nisn, st);
+      }
+      st.items.push({ id:x.id, s:x, p });
+    });
+    ms.siswa = [...peta.values()];
+    // Pilihan tahun ajaran dari paket yang punya sesi; pertama kali dibuka memakai yang terbaru.
+    const taList = [...new Set(ms.siswa.flatMap(st=>st.items.map(i=>i.p.tahun_ajaran)).filter(Boolean))].sort().reverse();
+    const selTa = document.getElementById('ms-ta'), prev = selTa.value;
+    selTa.innerHTML = '<option value="">Semua tahun ajaran</option>' + taList.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+    if(ms.awal){ selTa.value = taList[0] || ''; ms.awal = false; }
+    else if(taList.includes(prev)) selTa.value = prev;
+    info.textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID');
+    renderMonSiswa();
+  }catch(e){
+    info.textContent = '';
+    document.getElementById('ms-body').innerHTML = `<tr><td colspan="3" class="error">Gagal memuat data: ${escapeHtml(e.message||String(e))}</td></tr>`;
+  }finally{ ms.muat = false; }
+}
+// Sesi milik siswa yang lolos filter Tahun Ajaran & Jenis (dipakai tampilan dan tombol Reset Semua)
+function msItemTersaring(st){
+  const ta = document.getElementById('ms-ta').value, jenis = document.getElementById('ms-jenis').value;
+  return st.items.filter(i=>(!ta || i.p.tahun_ajaran===ta) && (!jenis || i.p.jenis_ujian===jenis))
+    .sort((a,b)=>String((a.p.mata_pelajaran&&a.p.mata_pelajaran.nama)||a.p.judul).localeCompare(String((b.p.mata_pelajaran&&b.p.mata_pelajaran.nama)||b.p.judul),'id'));
+}
+function msNamaMapel(p){ return (p.mata_pelajaran && p.mata_pelajaran.nama) || p.judul; }
+function renderMonSiswa(){
+  const body = document.getElementById('ms-body');
+  const kelas = document.getElementById('ms-kelas').value;
+  const cari = document.getElementById('ms-cari').value.trim().toLowerCase();
+  const hanyaLanggar = document.getElementById('ms-langgar').checked;
+  const urut = document.getElementById('ms-urut').value;
+  let daftar = ms.siswa.map(st=>({ st, items: msItemTersaring(st) })).filter(x=>x.items.length);
+  if(kelas) daftar = daftar.filter(x=>x.st.kelas===kelas);
+  if(cari) daftar = daftar.filter(x=>(x.st.nama||'').toLowerCase().includes(cari) || String(x.st.nisn||'').toLowerCase().includes(cari));
+  const langgar = x => x.items.reduce((a,i)=>a+(Number(i.s.pelanggaran)||0),0);
+  if(hanyaLanggar) daftar = daftar.filter(x=>langgar(x)>0);
+  daftar.sort((a,b)=> urut==='langgar' ? (langgar(b)-langgar(a)) || a.st.nama.localeCompare(b.st.nama,'id') : a.st.nama.localeCompare(b.st.nama,'id'));
+
+  const totalMapel = daftar.reduce((a,x)=>a+x.items.length,0);
+  const pernahLanggar = daftar.filter(x=>langgar(x)>0).length;
+  document.getElementById('ms-summary').innerHTML =
+    `<div class="mon-chip"><span>Siswa ditampilkan</span><b>${daftar.length}</b></div>` +
+    `<div class="mon-chip"><span>Mapel dikerjakan</span><b>${totalMapel}</b></div>` +
+    `<div class="mon-chip bad"><span>Siswa ada pelanggaran</span><b>${pernahLanggar}</b></div>`;
+
+  body.innerHTML = daftar.map(({st, items})=>{
+    const lg = langgar({items});
+    const baris = items.map(i=>{
+      const s = i.s, p = i.p;
+      const pel = Number(s.pelanggaran)||0;
+      const info = [
+        MS_LABEL_STATUS[s.status] || s.status,
+        (s.total_skor!=null && s.status!=='berlangsung') ? `Nilai ${s.total_skor}` : null,
+        s.mode_ujian==='manual' ? 'Nilai manual' : null
+      ].filter(Boolean).join(' · ');
+      const pelTxt = pel ? ` <span style="color:${pel>=3?'#b3261e':'#7A5300'};font-weight:600;">⚠ ${pel}x pindah tab</span>` : '';
+      return `<div class="ms-item">
+        <div><b>${escapeHtml(msNamaMapel(p))}</b> <span class="badge mon-selesai">${escapeHtml(p.jenis_ujian||'')}</span>${p.semester?` <span class="muted">${escapeHtml(p.semester)}${p.tahun_ajaran?' '+escapeHtml(p.tahun_ajaran):''}</span>`:''}<br>
+          <span class="muted">${escapeHtml(info)}</span>${pelTxt}</div>
+        <button class="btn danger" title="Hapus jawaban & nilai mapel ini; siswa mengerjakan ulang dari awal" onclick="msResetSatu('${i.id}')">Reset</button>
+      </div>`;
+    }).join('');
+    return `<tr>
+      <td>${escapeHtml(st.nama)}<br><span class="muted">${escapeHtml(st.nisn||'')}${st.kelasLabel?' · '+escapeHtml(st.kelasLabel):''}</span>${lg?`<br><span style="color:#b3261e;font-size:12px;font-weight:600;">Total pelanggaran: ${lg}x</span>`:''}</td>
+      <td>${baris}</td>
+      <td><button class="btn danger" onclick="msResetSemua(${jsq(st.nisn)})">Reset Semua Mapel (${items.length})</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="3" class="muted">Tidak ada siswa yang cocok dengan filter ini.</td></tr>';
+}
+async function msHapusSesi(ids){
+  let terhapus = 0;
+  for(let i=0; i<ids.length; i+=100){
+    // .select('id') supaya kelihatan berapa baris yang benar-benar terhapus (izin database bisa menolak tanpa pesan galat)
+    const { data, error } = await supa.from('sesi_ujian').delete().in('id', ids.slice(i, i+100)).select('id');
+    if(error) throw new Error(error.message + (terhapus ? ` (${terhapus} sesi sudah terhapus sebelum galat ini)` : ''));
+    terhapus += (data||[]).length;
+  }
+  return terhapus;
+}
+async function msResetSatu(id){
+  let item = null, siswa = null;
+  for(const st of ms.siswa){ const f = st.items.find(i=>i.id===id); if(f){ item = f; siswa = st; break; } }
+  if(!item) return alert('Data tidak ditemukan. Klik Refresh lalu coba lagi.');
+  const mapel = msNamaMapel(item.p);
+  const manual = item.s.mode_ujian==='manual' ? '\n\n⚠ Ini nilai yang diinput manual (ujian cetak). Setelah direset, nilainya harus diinput ulang.' : '';
+  if(!confirm(`Reset mapel "${mapel}" (${item.p.jenis_ujian||'-'}) untuk ${siswa.nama}?\n\nJawaban dan nilai mapel ini DIHAPUS dan siswa harus mengerjakan ulang dari awal.\nSalinan nilai lama tetap ada di Arsip Nilai.${manual}`)) return;
+  try{
+    const n = await msHapusSesi([id]);
+    if(!n) alert('Reset tidak menghapus apa pun. Sesi mungkin sudah dihapus, atau izin hapus di database belum aktif (jalankan migrasi-lengkap.sql). Klik Refresh lalu coba lagi.');
+  }catch(e){ alert('Gagal reset: '+e.message); }
+  loadMonSiswa();
+}
+async function msResetSemua(nisn){
+  const st = ms.siswa.find(x=>x.nisn===nisn);
+  if(!st) return alert('Data siswa tidak ditemukan. Klik Refresh lalu coba lagi.');
+  const items = msItemTersaring(st);
+  if(!items.length) return alert('Tidak ada mapel untuk direset pada filter ini.');
+  const daftar = items.slice(0,15).map(i=>'• '+msNamaMapel(i.p)+' ('+(i.p.jenis_ujian||'-')+')').join('\n') + (items.length>15 ? `\n• ...dan ${items.length-15} lainnya` : '');
+  const adaManual = items.some(i=>i.s.mode_ujian==='manual');
+  if(!confirm(`Reset SEMUA mapel (${items.length}) milik ${st.nama}?\n\n${daftar}\n\nSemua jawaban dan nilai di mapel di atas DIHAPUS dan siswa harus mengerjakan ulang dari awal.\nSalinan nilai lama tetap ada di Arsip Nilai.${adaManual?'\n\n⚠ Termasuk nilai yang diinput manual (ujian cetak): harus diinput ulang.':''}\n\n(Hanya mapel sesuai filter Tahun Ajaran & Jenis yang sedang tampil.)`)) return;
+  try{
+    const n = await msHapusSesi(items.map(i=>i.id));
+    if(n < items.length) alert(`Hanya ${n} dari ${items.length} sesi yang terhapus. Klik Refresh untuk melihat sisanya; bila berulang, periksa izin hapus di database (migrasi-lengkap.sql).`);
+    else alert(`${n} mapel ${st.nama} berhasil direset.`);
+  }catch(e){ alert('Gagal reset: '+e.message); }
+  loadMonSiswa();
+}
 
 // ---------- TANDA TANGAN DIGITAL (KEPALA PKBM & WALI KELAS) ----------
 const SEMUA_KELAS = ['VII','VIII','IX','X','XI','XII'];

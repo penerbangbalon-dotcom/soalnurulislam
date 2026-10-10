@@ -1,5 +1,14 @@
 # Perubahan terbaru
 
+## v12.5 — Menu baru "Monitoring per Siswa" (reset per mapel / reset semua mapel)
+Tanpa migrasi SQL. Hanya `index.html` yang berubah. Unggah ke GitHub, Vercel deploy otomatis.
+1. **Menu baru** di grup Pelaksanaan Ujian: **Monitoring per Siswa** (hanya tampil untuk Admin / Super Admin).
+2. Tiap siswa tampil dengan daftar mata pelajaran (paket ujian) yang sudah dikerjakan: jenis (UTS/UAS/UH/Remedial), semester & tahun ajaran, status (sedang mengerjakan / selesai / dinilai), nilai, dan jumlah pelanggaran pindah tab.
+3. **Tombol Reset** pada tiap mapel (hapus jawaban & nilai mapel itu, siswa mengerjakan ulang dari awal) dan **Reset Semua Mapel** per siswa. Reset Semua hanya mencakup mapel yang sedang tampil sesuai filter; daftar mapelnya ditampilkan di jendela konfirmasi.
+4. Filter: Kelas, Tahun Ajaran (default terbaru), Jenis Ujian, pencarian nama/NISN, urutan (nama atau pelanggaran terbanyak), dan "Hanya yang pernah melanggar".
+5. Salinan nilai lama tetap tersimpan di Arsip Nilai. Nilai manual (ujian cetak) diberi peringatan khusus karena harus diinput ulang.
+6. Tombol hanya membawa id sesi / NISN (aman untuk nama berapostrof, seperti perbaikan v12.4).
+
 ## v12.4 — Perbaikan tombol Reset + tombol "Aktifkan Kembali" di Monitoring Ujian
 Tanpa migrasi SQL. 4 file yang berubah: `index.html`, `ujian.html`, `netlify/functions/sudahi-ujian.js`, `netlify/functions/mulai-ujian.js` (adapter di folder `api/` tidak berubah). Unggah ke GitHub, Vercel deploy otomatis.
 1. **Perbaikan tombol Reset yang "tidak berfungsi"**. Penyebab: nama siswa disisipkan ke atribut `onclick`. Nama berapostrof (Ma'ruf, Sa'adah, Ni'matul, dst.) memutus string JavaScript sehingga klik tidak melakukan apa pun, tanpa pesan galat. Kini tombol hanya membawa id sesi, nama dicari dari data di layar. Reset juga memberi pesan jelas bila tidak ada baris yang terhapus.
