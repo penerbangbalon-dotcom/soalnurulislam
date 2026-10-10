@@ -39,7 +39,8 @@ Ganti dengan Project URL dan anon key kamu. Lakukan hal yang sama di
 ## 4. Deploy ke Vercel (versi yang disarankan)
 
 Folder `api/` pada versi ini adalah adapter Vercel untuk seluruh backend lama:
-`generate-soal`, `kelola-user`, `mulai-ujian`, `submit-ujian`, `heartbeat`, dan `sudahi-ujian`.
+`generate-soal`, `kelola-user`, `mulai-ujian`, `submit-ujian`, `heartbeat`, `sudahi-ujian`, dan `tugas-siswa`
+(total 10 fungsi; batas paket Hobby Vercel adalah 12).
 Jadi URL frontend seperti `/api/generate-soal` tidak lagi bergantung pada redirect Netlify.
 
 
@@ -129,7 +130,8 @@ generator-soal/
     ├── mulai-ujian.js             # Validasi kode akses + mulai sesi siswa
     ├── submit-ujian.js            # Simpan & auto-nilai jawaban siswa
     ├── heartbeat.js               # Detak dari halaman siswa (online/progres/cadangan jawaban) + terima perintah guru
-    └── sudahi-ujian.js            # Guru mengakhiri paksa ujian siswa (menilai jawaban tersimpan)
+    ├── sudahi-ujian.js            # Guru mengakhiri paksa ujian siswa (menilai jawaban tersimpan)
+    └── tugas-siswa.js             # Tugas tulis siswa (daftar/buka/simpan draf/kumpulkan) + Syarat Rapor siswa & kelas
 ```
 
 ## Monitoring Ujian (real-time)

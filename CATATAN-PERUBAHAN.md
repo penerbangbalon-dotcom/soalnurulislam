@@ -1,5 +1,40 @@
 # Perubahan terbaru
 
+## v13.1 — Pencarian lebih pintar di Daftar & Cetak (dan menu lain), kelas "X" tidak lagi membawa XI/XII
+Tanpa migrasi SQL. Hanya `index.html` yang berubah.
+**Masalah yang diperbaiki:** pencarian memakai "mengandung huruf", sehingga mengetik `X` ikut menampilkan kelas XI, XII, dan semua kata yang memuat huruf x (kode akses, Eksak, dst.). Kini:
+- Kata yang berupa kelas (VII, VIII, IX, X, XI, XII, atau angka 7-12) dicocokkan **persis** dengan kelas. `X` hanya kelas X; `XI` hanya XI. `10` sama dengan X, dan `kelas x` juga bekerja.
+- Kata satu huruf (mis. `B`, `C`) hanya cocok sebagai kata utuh ("Paket B", "B. Indonesia"), tidak menyusup ke "Biologi".
+- Kata lain tetap cocok sebagian dan tidak peduli huruf besar/kecil maupun aksen. Semua kata yang diketik harus cocok.
+- Operator baru: kecualikan `-draft`, frasa `"ulangan harian"`, filter khusus `kelas:XI jenis:uas status:siap mapel:ipa program:b smt:ganjil ta:2026 kode:ab12`.
+**Menu Daftar & Cetak (Paket Ujian) ditingkatkan:**
+1. Filter dropdown Kelas, Jenis, Tahun Ajaran dan pilihan urutan (terbaru, judul A-Z, mapel A-Z, kelas lalu mapel, status).
+2. Chip status dengan jumlah (Semua / Siap / Draft / Ditutup / Diarsipkan) yang ikut berubah mengikuti pencarian; klik lagi untuk melepas.
+3. Kata yang dicari disorot kuning; tombol hapus (x) dan tombol Esc; tombol Reset menghapus semua filter; tombol "? Tips" menampilkan cara memakai pencarian.
+4. Kolom Kelas kini menampilkan semester dan tahun ajaran (ikut bisa dicari).
+5. Daftar tampil 50 baris dulu lalu "Tampilkan lagi" agar tetap ringan saat paket sudah ratusan; pencarian ditunda 0,15 detik saat mengetik.
+6. Klik kode akses untuk menyalinnya.
+**Mesin pencarian yang sama dipakai di:** Ujian Terlaksana, Perlu Penilaian, dan Arsip Nilai (di Arsip kini pencarian per kata, bukan satu potongan teks utuh, dan bisa mencari kelas/program/jenis). Kolom pencarian Monitoring, Belum Mengikuti Ujian, Syarat Rapor, dan Penilaian Tugas hanya mencari nama/NISN sehingga tidak berubah.
+
+## v13.0 — Tugas Tulis Online, Syarat Rapor, dan Kehadiran sebagai Komponen Nilai
+**Wajib jalankan `migrasi-v16-tugas-syarat-rapor.sql`** di Supabase SQL Editor (sekali; aman diulang), lalu unggah semua file ke GitHub (Vercel deploy otomatis). Data lama tidak berubah. Nilai akhir lama juga tidak berubah sampai Anda mengisi bobot Tugas/Kehadiran di Pengaturan Nilai.
+
+**1. Tugas tulis (uraian) tanpa upload.** Siswa mengetik jawaban langsung di HP lewat tab **Tugas** di halaman ujian (NISN, + PIN bila dipakai). Tidak ada file yang diunggah sehingga kuota gratis Supabase/Vercel aman: hanya teks, draf tersimpan otomatis ~10 detik setelah berhenti mengetik (dan salinan cadangan di HP).
+- Menu guru baru grup **Tugas Siswa**: *Kelola Tugas* (judul, instruksi, mapel, kelas, semester, jurusan, tenggat, min/maks kata, nilai maksimal, batas pelanggaran, wajib/tambahan, terima terlambat, status Draft/Dibuka/Ditutup) dan *Penilaian Tugas* (baca jawaban, nilai + catatan, simpan & berikutnya, nilai manual untuk siswa tanpa HP, bebaskan siswa, buka kembali, reset, unduh Excel).
+- **Deteksi kecurangan tetap berlaku** memakai mesin yang sama dengan ujian: pindah tab/aplikasi, blur, salin, tempel (paste), seret teks, tombol developer, plus deteksi **teks masuk sekaligus >120 karakter** (tempel lewat keyboard HP) yang otomatis dibatalkan. Alarm + peringatan layar penuh. Pada batas pelanggaran (bawaan 3, bisa 0 = hanya dicatat) tugas **dikumpulkan otomatis dengan jawaban yang sudah ditulis**. Guru melihat jumlah, waktu, dan alasan tiap pelanggaran, dan bisa **Buka Kembali** (pelanggaran direset).
+
+**2. Semua komponen masuk Nilai Akhir.** *Tugas*: rata-rata semua tugas (nilai/nilai maks x 100). Tugas wajib yang **tidak dikerjakan dihitung 0** setelah tugas ditutup atau tenggatnya lewat, jadi makin banyak tugas dikerjakan makin tinggi nilai akhir. Tugas tambahan (bukan wajib) hanya menambah bila dikerjakan. Jawaban yang menunggu nilai dan siswa yang dibebaskan tidak dihitung. Nilai manual di Input Nilai Tambahan tetap didahulukan. *Kehadiran*: komponen baru dengan bobot sendiri (bawaan 0). Atur semua bobot di **Pengaturan Nilai**, mis. UH 20 / UTS 25 / UAS 30 / Tugas 15 / Kehadiran 10. Berlaku di Rekap, Leger, Transkrip, Rapor.
+- Kehadiran dipakai dari Input Nilai Tambahan. Menu *Syarat Rapor* punya tombol **Simpan kehadiran ke nilai** (hanya mengisi siswa yang belum punya data; tidak menimpa input guru). Jalankan di akhir semester.
+
+**3. Menu Syarat Rapor (guru) + tab Syarat Rapor (siswa).** Syarat: (a) semua ujian yang berlaku diikuti (UTS/UAS/UH dapat dipilih; "Tidak wajib" dari menu Belum Mengikuti Ujian dihormati), (b) semua tugas wajib dikumpulkan, (c) kehadiran minimal X% (bawaan 75%). Ambang batas diatur di Pengaturan Nilai (bawaan 100% / 100% / 75%).
+- Guru: tabel per kelas dengan status dan rincian kekurangan, filter, cari, "hanya yang belum memenuhi", unduh Excel, cetak daftar.
+- Siswa: banner memenuhi/belum, progress tiap syarat, daftar ujian & tugas yang belum, tombol langsung ke tugas. Siswa jadi tahu kekurangannya sendiri.
+- **Cetak rapor** (Rapor Semester satu/semua, dan Rapor di Laporan Siswa) kini memberi peringatan bila siswa belum memenuhi syarat; cetak massal menawarkan "hanya yang memenuhi / semua / batal". Peringatan bisa dilewati (tidak memblokir).
+
+**File berubah/baru:** `index.html`, `ujian.html`, `netlify/lib/ujian-core.js`, baru: `netlify/functions/tugas-siswa.js`, `api/tugas-siswa.js`, `migrasi-v16-tugas-syarat-rapor.sql`. Hanya 1 fungsi serverless baru (total 10; batas Hobby 12).
+
+**Catatan penting:** tutup tugas di akhir semester (siswa yang tidak mengerjakan baru dihitung 0 setelah ditutup/lewat tenggat). Kehadiran dihitung sampai kemarin. Jika migrasi belum dijalankan, menu lama tetap normal dan syarat tugas dianggap kosong.
+
 ## v12.5 — Menu baru "Monitoring per Siswa" (reset per mapel / reset semua mapel)
 Tanpa migrasi SQL. Hanya `index.html` yang berubah. Unggah ke GitHub, Vercel deploy otomatis.
 1. **Menu baru** di grup Pelaksanaan Ujian: **Monitoring per Siswa** (hanya tampil untuk Admin / Super Admin).

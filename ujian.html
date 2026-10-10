@@ -48,6 +48,13 @@
   .overlay-curang .ikon{font-size:46px;line-height:1;}
   .overlay-curang .btn{background:#B3261E;border-color:#B3261E;justify-content:center;width:100%;margin-top:16px;}
   .badge-pel{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:#B3261E;color:#fff;font-size:12px;font-weight:600;}
+  .badge-st{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12px;font-weight:600;}
+  .st-ok{background:#DFEEDC;color:#1F5A25;} .st-warn{background:#FFF4CC;color:#7A5300;} .st-bad{background:#F3D9D3;color:#8A2E1E;} .st-info{background:#DCE6F5;color:#0A2A66;}
+  .bar{height:8px;background:#DCE6F5;border-radius:4px;overflow:hidden;margin:6px 0 2px;} .bar>span{display:block;height:100%;background:#123F8C;} .bar.ok>span{background:#2F6B34;} .bar.bad>span{background:#B3261E;}
+  .syarat-box{border:2px solid var(--line);border-radius:4px;padding:14px 16px;margin-bottom:14px;} .syarat-box.ok{border-color:#2F6B34;background:#F2F9F1;} .syarat-box.bad{border-color:#B3261E;background:#FDF4F2;}
+  .kurang-list{margin:6px 0 0;padding-left:18px;font-size:14px;} .kurang-list li{margin:2px 0;}
+  #tg-isi{min-height:55vh;font-size:16px;line-height:1.6;}
+  .instruksi{white-space:pre-wrap;-webkit-user-select:none;user-select:none;background:#F5F8FD;border-left:4px solid var(--green);padding:12px 14px;margin:0 0 14px;font-size:15px;}
   #daftar-soal .card strong, #daftar-soal .card img{-webkit-user-select:none;user-select:none;}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
@@ -71,6 +78,8 @@
       <button class="btn tab-btn" id="tab-btn-uts" onclick="gantiMode('uts')">Ikuti UTS</button>
       <button class="btn tab-btn" id="tab-btn-uas" onclick="gantiMode('uas')">Ikuti UAS</button>
       <button class="btn tab-btn" id="tab-btn-remedial" onclick="gantiMode('remedial')">Ikuti Remedial</button>
+      <button class="btn tab-btn" id="tab-btn-tugas" onclick="gantiMode('tugas')">Tugas</button>
+      <button class="btn tab-btn" id="tab-btn-syarat" onclick="gantiMode('syarat')">Syarat Rapor</button>
     </div>
     <div class="card" id="panel-ujian">
       <div style="margin-bottom:14px;">
@@ -120,6 +129,51 @@
       <div class="error" id="rm-error"></div>
       <div id="rm-daftar" style="margin-top:16px;"></div>
     </div>
+
+    <!-- PANEL TUGAS: daftar tugas tulis untuk kelas siswa -->
+    <div class="card hidden" id="panel-tugas">
+      <p style="margin:0 0 12px;color:var(--ink-soft);font-size:14px;">Tugas tulis dari guru. Jawabanmu <b>diketik langsung di sini</b> (tidak perlu upload file). Selama menulis, pindah tab/aplikasi dan menempel (paste) teks akan tercatat dan dilaporkan ke guru. Jawaban tersimpan otomatis sebagai draf.</p>
+      <div style="margin-bottom:14px;"><label>NISN</label><input type="text" id="tg-nisn" placeholder="Masukkan NISN kamu" /></div>
+      <div style="margin-bottom:14px;"><label>PIN (jika diminta guru, mis. tanggal lahir)</label><input type="text" id="tg-pin" placeholder="Kosongkan bila tidak diminta" /></div>
+      <button class="btn" onclick="cekTugas()" id="btn-cek-tugas">Lihat Tugas Saya</button>
+      <div class="error" id="tg-error"></div>
+      <div id="tg-daftar" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- PANEL SYARAT RAPOR: kekurangan siswa untuk mendapat rapor -->
+    <div class="card hidden" id="panel-syarat">
+      <p style="margin:0 0 12px;color:var(--ink-soft);font-size:14px;">Cek apakah kamu sudah memenuhi syarat menerima rapor: semua ujian diikuti, semua tugas dikumpulkan, dan kehadiran mencukupi.</p>
+      <div style="margin-bottom:14px;"><label>NISN</label><input type="text" id="sy-nisn" placeholder="Masukkan NISN kamu" /></div>
+      <div style="margin-bottom:14px;"><label>PIN (jika diminta guru, mis. tanggal lahir)</label><input type="text" id="sy-pin" placeholder="Kosongkan bila tidak diminta" /></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <div style="flex:1 1 140px;"><label>Tahun Ajaran</label><select id="sy-ta" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;"></select></div>
+        <div style="flex:1 1 140px;"><label>Semester</label><select id="sy-smt" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+      </div>
+      <button class="btn" onclick="cekSyarat()" id="btn-cek-syarat">Cek Syarat Rapor Saya</button>
+      <div class="error" id="sy-error"></div>
+      <div id="sy-hasil" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- LAYAR TUGAS -->
+  <div id="layar-tugas" class="hidden">
+    <div class="top-bar">
+      <div>
+        <strong id="tg-judul"></strong><br>
+        <span style="color:var(--ink-soft);font-size:13px;" id="tg-nama"></span><span class="badge-pel hidden" id="tg-badge"></span>
+      </div>
+      <div style="text-align:right;"><div class="timer" id="tg-kata" style="font-size:16px;">0 kata</div><div style="font-size:12px;color:var(--ink-soft);" id="tg-tersimpan"></div></div>
+    </div>
+    <div id="tg-info" class="banner-info hidden"></div>
+    <div class="instruksi" id="tg-instruksi"></div>
+    <div id="tg-hasil-lihat" class="hidden"></div>
+    <textarea id="tg-isi" placeholder="Ketik jawaban tugasmu di sini..." autocomplete="off" autocorrect="on" spellcheck="true"></textarea>
+    <div id="tg-aksi" style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn tab-btn" style="background:#fff;color:var(--ink);" onclick="simpanTugas(false,true)">Simpan Draf</button>
+      <button class="btn tab-btn" onclick="kumpulkanTugas()" id="btn-kumpul-tugas">Kumpulkan Tugas</button>
+    </div>
+    <button class="btn hidden" id="tg-kembali" style="margin-top:12px;" onclick="kembaliKeDaftarTugas()">&larr; Kembali ke daftar tugas</button>
+    <div class="error" id="tg-submit-error"></div>
   </div>
 
   <!-- LAYAR UJIAN -->
@@ -164,8 +218,9 @@
   <!-- LAYAR SELESAI -->
   <div id="layar-selesai" class="hidden">
     <div class="card result-box">
-      <h2>Ujian Selesai</h2>
+      <h2 id="selesai-judul">Ujian Selesai</h2>
       <p id="hasil-text" style="color:var(--ink-soft);"></p>
+      <button class="btn hidden" id="btn-selesai-tugas" onclick="kembaliKeDaftarTugas()">&larr; Kembali ke daftar tugas</button>
     </div>
   </div>
 
@@ -234,7 +289,9 @@ function hentikanAlarm(){
   try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){}
 }
 function ujianSedangBerjalan(){
-  return ANTI_CURANG.aktif && sesiData && !ujianBerakhir && !sedangDiakhiri && !document.getElementById('layar-ujian').classList.contains('hidden');
+  if(!ANTI_CURANG.aktif || sedangDiakhiri) return false;
+  if(tugasAktif) return !tugasAktif.selesai && !document.getElementById('layar-tugas').classList.contains('hidden');   // sedang menulis tugas
+  return !!sesiData && !ujianBerakhir && !document.getElementById('layar-ujian').classList.contains('hidden');
 }
 function catatPelanggaran(alasan){
   if(!ujianSedangBerjalan()) return;
@@ -242,6 +299,7 @@ function catatPelanggaran(alasan){
   if(now - mulaiUjianEpoch < ANTI_CURANG.mulaiDiamDetik*1000) return;   // abaikan beberapa detik pertama
   if(now - terakhirPelanggaran < ANTI_CURANG.jedaMs) return;            // satu kejadian sering memicu beberapa event sekaligus
   terakhirPelanggaran = now;
+  if(tugasAktif) return catatPelanggaranTugas(alasan);
   pelanggaran++;
   try{ localStorage.setItem('ujian_pel_'+sesiData.sesi_id, pelanggaran); }catch(e){}
   const badge = document.getElementById('badge-pel');
@@ -342,10 +400,12 @@ function gantiMode(m){
   document.getElementById('panel-ujian').classList.toggle('hidden', m!=='ujian');
   document.getElementById('panel-jenis').classList.toggle('hidden', !jenis);
   document.getElementById('panel-remedial').classList.toggle('hidden', m!=='remedial');
-  ['ujian','uts','uas','remedial'].forEach(k=>document.getElementById('tab-btn-'+k).classList.toggle('aktif', k===m));
+  document.getElementById('panel-tugas').classList.toggle('hidden', m!=='tugas');
+  document.getElementById('panel-syarat').classList.toggle('hidden', m!=='syarat');
+  ['ujian','uts','uas','remedial','tugas','syarat'].forEach(k=>document.getElementById('tab-btn-'+k).classList.toggle('aktif', k===m));
   // NISN & PIN yang sudah diketik di tab lain ikut terisi, supaya siswa tidak mengetik berulang
-  const nisnSumber = ['input-nisn','jn-nisn','rm-nisn'].map(id=>document.getElementById(id).value.trim()).find(v=>v) || '';
-  const pinSumber = ['input-pin','jn-pin','rm-pin'].map(id=>document.getElementById(id).value.trim()).find(v=>v) || '';
+  const nisnSumber = ['input-nisn','jn-nisn','rm-nisn','tg-nisn','sy-nisn'].map(id=>document.getElementById(id).value.trim()).find(v=>v) || '';
+  const pinSumber = ['input-pin','jn-pin','rm-pin','tg-pin','sy-pin'].map(id=>document.getElementById(id).value.trim()).find(v=>v) || '';
   const isi = (id,v)=>{ const el=document.getElementById(id); if(v && !el.value) el.value=v; };
   if(jenis){
     isi('jn-nisn',nisnSumber); isi('jn-pin',pinSumber);
@@ -355,6 +415,8 @@ function gantiMode(m){
     document.getElementById('jn-error').textContent = ''; document.getElementById('jn-daftar').innerHTML = '';
     jenisDaftar = [];
   } else if(m==='remedial'){ isi('rm-nisn',nisnSumber); isi('rm-pin',pinSumber); }
+  else if(m==='tugas'){ isi('tg-nisn',nisnSumber); isi('tg-pin',pinSumber); }
+  else if(m==='syarat'){ isi('sy-nisn',nisnSumber); isi('sy-pin',pinSumber); siapkanOpsiSyarat(); }
 }
 // ---------- IKUTI UTS / UAS ----------
 let jenisDaftar = [];
@@ -458,6 +520,303 @@ function mulaiRemedial(i){
   document.getElementById('input-pin').value = document.getElementById('rm-pin').value.trim();
   gantiMode('ujian');
   mulaiUjian();
+}
+
+// ================= TUGAS TULIS =================
+// Siswa mengetik jawaban langsung di HP. Draf tersimpan otomatis (HP + server). Anti-curang (pindah tab,
+// paste, salin) memakai mesin yang sama dengan ujian: pelanggaran dicatat, alarm bunyi, dan pada batas
+// pelanggaran tugas dikumpulkan otomatis dengan jawaban yang sudah ditulis.
+let tugasAktif = null, tugasDaftar = [], tgDebounce = null, tgVer = 0, tgVerKirim = 0, tgSedangKirim = false;
+const TG_JEDA_SIMPAN = 10000, TG_LONJAKAN_KARAKTER = 120;
+function kredTugas(){ return { nisn: document.getElementById('tg-nisn').value.trim(), pin: document.getElementById('tg-pin').value.trim() }; }
+async function panggilTugas(payload){
+  const res = await fetch('/api/tugas-siswa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  let data = {}; try{ data = await res.json(); }catch(e){}
+  return { ok: res.ok, status: res.status, data };
+}
+const hitungKataJs = t => { t = String(t||'').trim(); return t ? t.split(/\s+/).length : 0; };
+const fmtAngka = v => v==null ? '-' : String(Math.round(Number(v)*10)/10).replace('.',',');
+const fmtWaktu = iso => iso ? new Date(iso).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}) : '';
+function badgeTugas(d){
+  if(d.status==='dinilai') return `<span class="badge-st st-ok">Dinilai: ${fmtAngka(d.skor)}${d.nilai_maks!==100?' / '+d.nilai_maks:''}</span>`;
+  if(d.status==='dikumpulkan') return '<span class="badge-st st-info">Dikumpulkan, menunggu nilai</span>';
+  if(d.status==='draf') return '<span class="badge-st st-warn">Draf (belum dikumpulkan)</span>';
+  if(d.status==='dibebaskan') return '<span class="badge-st st-info">Dibebaskan</span>';
+  if(d.status==='terlewat') return '<span class="badge-st st-bad">Terlewat</span>';
+  return '<span class="badge-st st-warn">Belum dikerjakan</span>';
+}
+async function cekTugas(){
+  const { nisn, pin } = kredTugas();
+  const err = document.getElementById('tg-error'), box = document.getElementById('tg-daftar'), btn = document.getElementById('btn-cek-tugas');
+  err.textContent = ''; box.innerHTML = '';
+  if(!nisn){ err.textContent = 'NISN wajib diisi'; return; }
+  btn.disabled = true; btn.textContent = 'Memeriksa...';
+  try{
+    const r = await panggilTugas({ aksi:'daftar', nisn, pin });
+    if(!r.ok) throw new Error(r.data.error || 'Gagal memuat daftar tugas');
+    const data = r.data; tugasDaftar = data.tugas || [];
+    const sapa = `<p style="margin:0 0 10px;">Halo, <b>${escapeHtml(data.nama_siswa||'')}</b>${data.kelas ? ` (Kelas ${escapeHtml(data.kelas)})` : ''}.</p>`;
+    if(data.pesan){ box.innerHTML = sapa + `<p style="margin:0;color:var(--ink-soft);">${escapeHtml(data.pesan)}</p>`; return; }
+    if(!tugasDaftar.length){ box.innerHTML = sapa + '<p style="margin:0;color:var(--ink-soft);">Belum ada tugas untuk kelasmu.</p>'; return; }
+    const kurang = tugasDaftar.filter(d=>d.wajib && ['belum','draf','terlewat'].includes(d.status)).length;
+    const ringkas = kurang ? `<div class="banner-pesan" style="margin-bottom:12px;"><div><strong>Tugas wajib yang belum dikumpulkan: ${kurang}</strong>Kumpulkan semuanya agar memenuhi syarat rapor. Semakin banyak tugas yang kamu kerjakan, semakin baik nilai akhirmu.</div></div>` : '<div class="banner-info" style="margin-bottom:12px;">&#10003; Semua tugas wajib sudah kamu kumpulkan. Terima kasih!</div>';
+    box.innerHTML = sapa + ringkas + tugasDaftar.map((d,i)=>{
+      const smt = d.semester==='Ganjil' ? 'Semester 1' : d.semester==='Genap' ? 'Semester 2' : '';
+      const ket = [smt, d.tahun_ajaran].filter(Boolean).join(' ');
+      let aksi = '';
+      if(d.boleh_kerjakan) aksi = `<button class="btn" style="width:100%;justify-content:center;margin-top:8px;" onclick="bukaTugas(${i})">${d.status==='draf'?'Lanjutkan menulis':'Kerjakan'}</button>`;
+      else if(d.status==='dikumpulkan'||d.status==='dinilai') aksi = `<button class="btn tab-btn" style="margin-top:8px;background:#fff;color:var(--ink);" onclick="bukaTugas(${i})">Lihat jawaban${d.status==='dinilai'?' &amp; nilai':''}</button>`;
+      const info = [
+        d.batas_waktu ? `Tenggat: <b>${escapeHtml(fmtWaktu(d.batas_waktu))}</b>${d.terima_terlambat?'':' (tidak menerima terlambat)'}` : 'Tanpa tenggat',
+        d.min_kata ? `minimal ${d.min_kata} kata` : '', d.maks_kata ? `maksimal ${d.maks_kata} kata` : '',
+        d.wajib ? '' : '<b>Tugas tambahan</b> (menambah nilai)', d.terlambat ? '<span style="color:#B3261E;">dikumpulkan terlambat</span>' : '',
+        d.diakhiri_otomatis ? '<span style="color:#B3261E;">dikumpulkan otomatis karena pelanggaran</span>' : ''
+      ].filter(Boolean).join(' &bull; ');
+      const cat = d.catatan_guru ? `<div style="margin-top:6px;font-size:14px;"><b>Catatan guru:</b> ${escapeHtml(d.catatan_guru)}</div>` : '';
+      return `<div class="card" style="margin-bottom:10px;"><strong>${escapeHtml(d.judul)}</strong> <span style="color:var(--ink-soft);">&mdash; ${escapeHtml(d.mapel)}${ket?' &bull; '+escapeHtml(ket):''}</span><div style="margin:4px 0;">${badgeTugas(d)}</div><div style="font-size:13px;color:var(--ink-soft);">${info}</div>${cat}${aksi}</div>`;
+    }).join('');
+  }catch(e){ err.textContent = e.message; }
+  finally{ btn.disabled = false; btn.textContent = 'Lihat Tugas Saya'; }
+}
+async function bukaTugas(i){
+  const d = tugasDaftar[i]; if(!d) return;
+  const { nisn, pin } = kredTugas();
+  const err = document.getElementById('tg-error'); err.textContent = '';
+  siapkanAlarm();   // klik ini mengizinkan suara alarm dari browser
+  document.querySelectorAll('#tg-daftar button').forEach(b=>b.disabled=true);
+  try{
+    const r = await panggilTugas({ aksi:'buka', nisn, pin, tugas_id:d.tugas_id });
+    if(!r.ok) throw new Error(r.data.error || 'Gagal membuka tugas');
+    tampilkanTugas(r.data);
+  }catch(e){ err.textContent = e.message; document.querySelectorAll('#tg-daftar button').forEach(b=>b.disabled=false); }
+}
+const kunciDrafTugas = id => 'tugas_draf_' + id;
+function tampilkanTugas(data){
+  const lihat = data.mode === 'lihat';
+  tugasAktif = { id:data.jawaban_id||null, info:data.tugas, pelanggaran:data.pelanggaran||0, selesai:lihat, nilaiTerakhir:'', alasan:'', gagalOtomatis:0 };
+  document.getElementById('layar-masuk').classList.add('hidden');
+  document.getElementById('layar-selesai').classList.add('hidden');
+  document.getElementById('layar-tugas').classList.remove('hidden');
+  document.getElementById('tg-judul').textContent = data.tugas.judul + ' — ' + data.tugas.mapel;
+  document.getElementById('tg-nama').textContent = data.nama_siswa || '';
+  document.getElementById('tg-instruksi').textContent = data.tugas.instruksi;
+  const ta = document.getElementById('tg-isi'), info = document.getElementById('tg-info');
+  document.getElementById('tg-submit-error').textContent = '';
+  const badge = document.getElementById('tg-badge');
+  badge.classList.add('hidden');
+  const syarat = [];
+  if(data.tugas.min_kata) syarat.push(`minimal ${data.tugas.min_kata} kata`);
+  if(data.tugas.maks_kata) syarat.push(`maksimal ${data.tugas.maks_kata} kata`);
+  if(data.tugas.batas_waktu) syarat.push(`tenggat ${fmtWaktu(data.tugas.batas_waktu)}`);
+  if(lihat){
+    ta.value = data.jawaban || ''; ta.readOnly = true;
+    document.getElementById('tg-aksi').classList.add('hidden');
+    document.getElementById('tg-kembali').classList.remove('hidden');
+    document.getElementById('tg-kata').textContent = (data.jumlah_kata||hitungKataJs(ta.value)) + ' kata';
+    document.getElementById('tg-tersimpan').textContent = data.dikumpulkan_pada ? 'Dikumpulkan ' + fmtWaktu(data.dikumpulkan_pada) : '';
+    const hasil = document.getElementById('tg-hasil-lihat');
+    hasil.classList.remove('hidden');
+    hasil.innerHTML = `<div class="syarat-box ${data.status==='dinilai'?'ok':''}"><b>${data.status==='dinilai' ? 'Nilai: '+fmtAngka(data.skor)+(data.tugas.nilai_maks!==100?' dari '+data.tugas.nilai_maks:'') : 'Sudah dikumpulkan, menunggu penilaian guru.'}</b>${data.terlambat?'<br><span style="color:#B3261E;">Dikumpulkan terlambat.</span>':''}${data.diakhiri_otomatis?'<br><span style="color:#B3261E;">Dikumpulkan otomatis karena batas pelanggaran tercapai.</span>':''}${data.catatan_guru?'<br>Catatan guru: '+escapeHtml(data.catatan_guru):''}</div>`;
+    info.classList.add('hidden');
+    return;
+  }
+  document.getElementById('tg-hasil-lihat').classList.add('hidden');
+  document.getElementById('tg-aksi').classList.remove('hidden');
+  document.getElementById('tg-kembali').classList.add('hidden');
+  ta.readOnly = false;
+  // Pilih draf yang lebih baru: salinan di HP ini atau salinan di server
+  let awal = data.jawaban || '';
+  try{
+    const lokal = JSON.parse(localStorage.getItem(kunciDrafTugas(tugasAktif.id)) || 'null');
+    if(lokal && lokal.v && lokal.v.length >= awal.length && lokal.t > (data.terakhir_disimpan||0)) awal = lokal.v;
+  }catch(e){}
+  ta.value = awal; tugasAktif.nilaiTerakhir = awal;
+  document.getElementById('tg-kata').textContent = hitungKataJs(awal) + ' kata';
+  document.getElementById('tg-tersimpan').textContent = data.terakhir_disimpan ? 'Draf tersimpan ' + new Date(data.terakhir_disimpan).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '';
+  info.classList.remove('hidden');
+  info.innerHTML = `Aturan: pindah tab/aplikasi dan menempel (paste) teks <b>tercatat sebagai pelanggaran</b>` + (data.tugas.batas_pelanggaran>0 ? ` &mdash; pada pelanggaran ke-${data.tugas.batas_pelanggaran} tugas dikumpulkan otomatis.` : '.') + (syarat.length ? '<br>' + escapeHtml(syarat.join(' · ')) : '') + (data.lewat_tenggat ? '<br><b style="color:#B3261E;">Tenggat sudah lewat: tugas akan ditandai terlambat.</b>' : '');
+  if(tugasAktif.pelanggaran>0){ badge.textContent = 'Pelanggaran: '+tugasAktif.pelanggaran+(data.tugas.batas_pelanggaran>0?'/'+data.tugas.batas_pelanggaran:''); badge.classList.remove('hidden'); }
+  mulaiUjianEpoch = Date.now();
+  terakhirPelanggaran = Date.now();
+  tgVer = 0; tgVerKirim = 0;
+  pasangPenjagaTugas(ta);
+  window.scrollTo({ top:0 });
+}
+// Penjaga isian: tempel (paste/drop) diblokir, dan teks yang tiba-tiba bertambah banyak sekaligus dianggap tempel
+// (sebagian keyboard HP menempel lewat jalur yang tidak memicu event paste biasa).
+function pasangPenjagaTugas(ta){
+  if(ta._terpasang) return; ta._terpasang = true;
+  ta.addEventListener('beforeinput', e=>{
+    if(!tugasAktif || tugasAktif.selesai) return;
+    if(['insertFromPaste','insertFromDrop','insertFromYank','insertFromPasteAsQuotation'].includes(e.inputType)){
+      e.preventDefault(); catatPelanggaran('Menempel (paste) teks tidak diperbolehkan saat mengerjakan tugas.');
+    }
+  });
+  ta.addEventListener('drop', e=>{ if(tugasAktif && !tugasAktif.selesai){ e.preventDefault(); catatPelanggaran('Menyeret teks ke kolom jawaban tidak diperbolehkan.'); } });
+  ta.addEventListener('input', ()=>{
+    if(!tugasAktif || tugasAktif.selesai) return;
+    const baru = ta.value, lama = tugasAktif.nilaiTerakhir;
+    if(baru.length - lama.length > TG_LONJAKAN_KARAKTER){
+      ta.value = lama;   // batalkan teks yang masuk sekaligus
+      catatPelanggaran('Teks dalam jumlah besar masuk sekaligus (diduga ditempel).');
+      return;
+    }
+    tugasAktif.nilaiTerakhir = baru;
+    document.getElementById('tg-kata').textContent = hitungKataJs(baru) + ' kata';
+    try{ localStorage.setItem(kunciDrafTugas(tugasAktif.id), JSON.stringify({ v:baru, t:Date.now() })); }catch(e){}
+    tgVer++;
+    clearTimeout(tgDebounce); tgDebounce = setTimeout(()=>simpanTugas(false,false), TG_JEDA_SIMPAN);
+  });
+}
+function selesaiTugasUI(judul, teks){
+  tugasAktif.selesai = true; hentikanAlarm(); clearTimeout(tgDebounce);
+  try{ localStorage.removeItem(kunciDrafTugas(tugasAktif.id)); }catch(e){}
+  document.getElementById('overlay-curang').classList.add('hidden');
+  document.getElementById('layar-tugas').classList.add('hidden');
+  document.getElementById('layar-selesai').classList.remove('hidden');
+  document.getElementById('selesai-judul').textContent = judul;
+  document.getElementById('hasil-text').textContent = teks;
+  document.getElementById('btn-selesai-tugas').classList.remove('hidden');
+}
+// Simpan draf ke server. manual=true: tombol "Simpan Draf" (beri umpan balik).
+async function simpanTugas(manual, tampilkan){
+  if(!tugasAktif || tugasAktif.selesai || tgSedangKirim) return;
+  clearTimeout(tgDebounce);
+  const ta = document.getElementById('tg-isi');
+  if(!manual && tgVer === tgVerKirim && !tugasAktif.alasan) return;
+  const ver = tgVer; tgSedangKirim = true;
+  try{
+    const r = await panggilTugas({ aksi:'simpan', jawaban_id:tugasAktif.id, jawaban:ta.value, pelanggaran:tugasAktif.pelanggaran, alasan:tugasAktif.alasan });
+    if(!r.ok){ if(tampilkan) document.getElementById('tg-submit-error').textContent = r.data.error || 'Gagal menyimpan'; if(r.data.status==='ditutup') selesaiTugasUI('Tugas Ditutup','Guru sudah menutup tugas ini. Hubungi guru bila jawabanmu belum terkirim.'); return; }
+    tgVerKirim = Math.max(tgVerKirim, ver); tugasAktif.alasan = '';
+    handleStatusTugas(r.data);
+    if(!tugasAktif.selesai){
+      document.getElementById('tg-tersimpan').textContent = 'Draf tersimpan ' + new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+      if(tampilkan) document.getElementById('tg-submit-error').textContent = '';
+    }
+  }catch(e){ if(tampilkan) document.getElementById('tg-submit-error').textContent = 'Koneksi bermasalah, draf aman di HP ini dan akan dicoba lagi.'; }
+  finally{ tgSedangKirim = false; }
+}
+function handleStatusTugas(d){
+  if(!d || !tugasAktif || tugasAktif.selesai) return;
+  if(d.status === 'dikumpulkan'){
+    selesaiTugasUI('Tugas Dikumpulkan', d.alasan==='pelanggaran'
+      ? 'Tugasmu dikumpulkan otomatis karena batas pelanggaran tercapai. Jawaban yang sudah kamu tulis tetap diterima dan akan dinilai guru.'
+      : `Tugasmu sudah dikumpulkan (${d.jumlah_kata||0} kata)${d.terlambat?', tetapi ditandai terlambat':''}. Guru akan menilainya.`);
+  } else if(d.status === 'dihapus'){
+    selesaiTugasUI('Tugas Direset', 'Tugasmu direset oleh guru. Silakan buka lagi dari daftar tugas.');
+  } else if(d.status === 'dinilai' || d.status === 'selesai'){
+    selesaiTugasUI('Tugas Sudah Dikumpulkan', 'Tugas ini sudah tercatat dikumpulkan.');
+  }
+}
+async function kumpulkanTugas(otomatis){
+  if(!tugasAktif || tugasAktif.selesai) return;
+  const ta = document.getElementById('tg-isi'), err = document.getElementById('tg-submit-error');
+  err.textContent = '';
+  const kata = hitungKataJs(ta.value);
+  if(!otomatis){
+    if(!kata){ err.textContent = 'Jawaban masih kosong.'; return; }
+    if(tugasAktif.info.min_kata && kata < tugasAktif.info.min_kata){ err.textContent = `Jawaban minimal ${tugasAktif.info.min_kata} kata. Sekarang baru ${kata} kata.`; return; }
+    if(tugasAktif.info.maks_kata && kata > tugasAktif.info.maks_kata){ err.textContent = `Jawaban maksimal ${tugasAktif.info.maks_kata} kata. Sekarang ${kata} kata.`; return; }
+    terakhirPelanggaran = Date.now() + 3000;   // kotak konfirmasi bisa memicu blur; jangan dihitung
+    const ya = confirm('Kumpulkan tugas sekarang? Setelah dikumpulkan jawaban tidak bisa diubah lagi.');
+    terakhirPelanggaran = Date.now() + 1500;
+    if(!ya) return;
+  }
+  const btn = document.getElementById('btn-kumpul-tugas'); btn.disabled = true;
+  clearTimeout(tgDebounce);
+  try{
+    const r = await panggilTugas({ aksi:'kumpulkan', jawaban_id:tugasAktif.id, jawaban:ta.value, pelanggaran:tugasAktif.pelanggaran, alasan:tugasAktif.alasan });
+    if(!r.ok) throw new Error(r.data.error || 'Gagal mengumpulkan tugas');
+    if(r.data.status === 'dikumpulkan') handleStatusTugas(r.data);
+    else handleStatusTugas({ status: r.data.status==='draf' ? 'dikumpulkan' : r.data.status, jumlah_kata:kata });
+  }catch(e){
+    if(otomatis){
+      tugasAktif.gagalOtomatis++;
+      document.getElementById('curang-hitung').textContent = 'Menyimpan tugasmu... (' + (e.message||'koneksi bermasalah') + '). Jangan tutup halaman ini.';
+      if(tugasAktif.gagalOtomatis < 10) setTimeout(()=>kumpulkanTugas(true), 4000);
+    } else err.textContent = e.message;
+  }finally{ btn.disabled = false; }
+}
+function catatPelanggaranTugas(alasan){
+  tugasAktif.pelanggaran++; tugasAktif.alasan = alasan;
+  const batas = tugasAktif.info.batas_pelanggaran || 0;
+  const kata = hitungKataJs(document.getElementById('tg-isi').value);
+  const badge = document.getElementById('tg-badge');
+  badge.textContent = 'Pelanggaran: ' + tugasAktif.pelanggaran + (batas>0 ? '/'+batas : ''); badge.classList.remove('hidden');
+  document.getElementById('curang-teks').textContent = alasan;
+  const tercapai = batas > 0 && tugasAktif.pelanggaran >= batas && kata > 0;
+  document.getElementById('curang-hitung').textContent = batas > 0
+    ? `Pelanggaran ${tugasAktif.pelanggaran} dari ${batas}. ` + (tercapai ? 'Tugasmu dikumpulkan otomatis dengan jawaban yang sudah kamu tulis.' : `Pada pelanggaran ke-${batas}, tugasmu dikumpulkan otomatis.`)
+    : 'Total pelanggaran kamu: ' + tugasAktif.pelanggaran + 'x';
+  document.getElementById('overlay-curang').classList.remove('hidden');
+  document.getElementById('btn-curang-tutup').classList.toggle('hidden', tercapai);
+  mulaiAlarm();
+  if(tercapai){ tugasAktif.gagalOtomatis = 0; kumpulkanTugas(true); }
+  else simpanTugas(true,false);   // laporkan ke guru segera
+}
+function kembaliKeDaftarTugas(){
+  tugasAktif = null; hentikanAlarm(); clearTimeout(tgDebounce);
+  document.getElementById('layar-tugas').classList.add('hidden');
+  document.getElementById('layar-selesai').classList.add('hidden');
+  document.getElementById('btn-selesai-tugas').classList.add('hidden');
+  document.getElementById('selesai-judul').textContent = 'Ujian Selesai';
+  document.getElementById('layar-masuk').classList.remove('hidden');
+  gantiMode('tugas'); cekTugas();
+}
+// Draf yang masih berjalan dikirim ketika siswa meninggalkan halaman (jaga-jaga)
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && tugasAktif && !tugasAktif.selesai && tgVer>tgVerKirim) simpanTugas(false,false); });
+
+// ================= SYARAT RAPOR =================
+function siapkanOpsiSyarat(){
+  const sel = document.getElementById('sy-ta'); if(sel.options.length) return;
+  const n = new Date(), y = n.getMonth()+1 >= 7 ? n.getFullYear() : n.getFullYear()-1;
+  [y, y-1].forEach(t=>{ const o = document.createElement('option'); o.value = o.textContent = `${t}/${t+1}`; sel.appendChild(o); });
+  document.getElementById('sy-smt').value = (n.getMonth()+1 >= 7) ? 'Ganjil' : 'Genap';
+}
+function barSyarat(r, satuan){
+  if(!r.aktif) return '';
+  if(r.status==='tanpa_data') return '<div style="font-size:13px;color:var(--ink-soft);">Belum ada data untuk periode ini.</div>';
+  const p = Math.max(0, Math.min(100, r.persen||0));
+  return `<div class="bar ${r.status==='lulus'?'ok':'bad'}"><span style="width:${p}%"></span></div>`;
+}
+async function cekSyarat(){
+  const nisn = document.getElementById('sy-nisn').value.trim(), pin = document.getElementById('sy-pin').value.trim();
+  const err = document.getElementById('sy-error'), box = document.getElementById('sy-hasil'), btn = document.getElementById('btn-cek-syarat');
+  err.textContent = ''; box.innerHTML = '';
+  if(!nisn){ err.textContent = 'NISN wajib diisi'; return; }
+  btn.disabled = true; btn.textContent = 'Memeriksa...';
+  try{
+    const r = await panggilTugas({ aksi:'syarat', nisn, pin, ta:document.getElementById('sy-ta').value, smt:document.getElementById('sy-smt').value });
+    if(!r.ok) throw new Error(r.data.error || 'Gagal memeriksa syarat rapor');
+    const d = r.data, s = d.syarat;
+    if(d.pesan || !s){ box.innerHTML = `<p style="margin:0;color:var(--ink-soft);">${escapeHtml(d.pesan||'Data belum tersedia.')}</p>`; return; }
+    const smtTeks = d.periode.smt==='Ganjil' ? 'Semester 1' : 'Semester 2';
+    const judul = s.memenuhi
+      ? '<b style="color:#1F5A25;font-size:17px;">&#10003; Kamu sudah memenuhi syarat menerima rapor</b>'
+      : '<b style="color:#B3261E;font-size:17px;">&#9888; Kamu belum memenuhi syarat menerima rapor</b>';
+    let html = `<p style="margin:0 0 10px;">Halo, <b>${escapeHtml(d.nama_siswa||'')}</b> &bull; ${smtTeks} ${escapeHtml(d.periode.ta)}</p><div class="syarat-box ${s.memenuhi?'ok':'bad'}">${judul}`;
+    if(!s.memenuhi) html += `<ul class="kurang-list">${s.kekurangan.map(k=>`<li>${escapeHtml(k)}</li>`).join('')}</ul>`;
+    html += '</div>';
+    const baris = (nama, r, teksUtama, ket) => {
+      if(!r.aktif) return '';
+      const badge = r.status==='lulus' ? '<span class="badge-st st-ok">Terpenuhi</span>' : r.status==='kurang' ? '<span class="badge-st st-bad">Belum terpenuhi</span>' : '<span class="badge-st st-info">Belum ada data</span>';
+      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>${nama}</strong>${badge}</div><div style="margin-top:4px;">${teksUtama}</div>${barSyarat(r)}<div style="font-size:12.5px;color:var(--ink-soft);">${ket}</div></div>`;
+    };
+    const u = s.ujian, t = s.tugas, h = s.hadir;
+    html += baris('Ujian', u, `<b>${u.selesai}</b> dari <b>${u.total}</b> ujian sudah diikuti`, `Syarat: minimal ${u.min_persen}% ujian diikuti.`);
+    if(u.aktif && u.belum && u.belum.length) html += `<div class="card" style="margin-bottom:10px;"><strong>Ujian yang belum kamu ikuti</strong><ul class="kurang-list">${u.belum.map(x=>`<li>${escapeHtml(x.mapel)} (${escapeHtml(x.jenis)})${x.susulan?' &mdash; susulan':''}</li>`).join('')}</ul><div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;">Ikuti lewat tab <b>Ikuti UTS</b> / <b>Ikuti UAS</b> / <b>Ujian</b>, atau tanyakan jadwalnya ke guru.</div></div>`;
+    html += baris('Tugas', t, `<b>${t.selesai}</b> dari <b>${t.total}</b> tugas wajib sudah dikumpulkan${t.tambahan?` (+ ${t.tambahan} tugas tambahan)`:''}`, `Syarat: minimal ${t.min_persen}% tugas wajib dikumpulkan.`);
+    if(t.aktif && t.belum && t.belum.length) html += `<div class="card" style="margin-bottom:10px;"><strong>Tugas yang belum dikumpulkan</strong><ul class="kurang-list">${t.belum.map(x=>`<li>${escapeHtml(x.judul)} &mdash; ${escapeHtml(x.mapel)}${x.batas?` (tenggat ${escapeHtml(fmtWaktu(x.batas))})`:''}${x.status==='draf'?' &mdash; draf belum dikirim':''}</li>`).join('')}</ul><button class="btn" style="margin-top:8px;" onclick="gantiMode('tugas');cekTugas();">Kerjakan tugas sekarang</button></div>`;
+    if(h.aktif){
+      const pers = h.ada ? String(h.persen).replace('.',',')+'%' : '-';
+      const det = h.ada ? `Hadir ${h.hadir} &bull; Sakit ${h.sakit} &bull; Izin ${h.izin} &bull; Alpa ${h.alpa}` : 'Data absensi semester ini belum tersedia.';
+      html += baris('Kehadiran', { aktif:true, status:h.status, persen:h.persen }, `Kehadiranmu <b>${pers}</b> (minimal <b>${h.min_persen}%</b>)`, det + (h.status==='kurang' ? '. Rajin masuk sekolah agar persentasenya naik.' : ''));
+    }
+    html += '<p style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 0;">Selain menjadi syarat rapor, tugas yang kamu kerjakan ikut menaikkan nilai akhir. Bila ada data yang menurutmu keliru, tanyakan ke guru.</p>';
+    box.innerHTML = html;
+  }catch(e){ err.textContent = e.message; }
+  finally{ btn.disabled = false; btn.textContent = 'Cek Syarat Rapor Saya'; }
 }
 
 function kunciLocal(sesiId){ return 'ujian_jawaban_' + sesiId; }

@@ -496,8 +496,214 @@ async function daftarUjianSiswa(nisn, siswa, jenis) {
   return { profil: prof, ujian: hasil };
 }
 
+// ---------------------------------------------------------------------------
+// TUGAS & SYARAT RAPOR (v13.0)
+// Syarat rapor siswa per semester = (1) semua ujian yang berlaku sudah diikuti, (2) semua tugas wajib sudah
+// dikumpulkan, (3) kehadiran mencapai batas minimum. Ambang batas diatur admin di Pengaturan Nilai
+// (kolom pengaturan_nilai.syarat_rapor, lihat migrasi-v16-tugas-syarat-rapor.sql).
+// Fungsi ini dipakai dua tempat supaya hasilnya selalu sama: jendela siswa (tab "Syarat Rapor")
+// dan menu guru "Syarat Rapor".
+// ---------------------------------------------------------------------------
+const DEF_SYARAT = {
+  ujian: { aktif: true, jenis: ['UTS', 'UAS', 'Ulangan Harian'], min_persen: 100 },
+  tugas: { aktif: true, min_persen: 100 },
+  hadir: { aktif: true, min_persen: 75 },
+};
+const potong = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
+const hitungKata = (teks) => { const t = String(teks == null ? '' : teks).trim(); return t ? t.split(/\s+/).length : 0; };
+
+// Mengambil semua baris (PostgREST membatasi 1000 baris per permintaan).
+async function sbSemua(path, urut) {
+  const hasil = [];
+  const ukuran = 1000;
+  for (let off = 0; off < 200000; off += ukuran) {
+    const sep = path.includes('?') ? '&' : '?';
+    const rows = await sb(`${path}${sep}limit=${ukuran}&offset=${off}${urut ? '&order=' + urut : ''}`);
+    if (rows && rows.length) hasil.push(...rows);
+    if (!rows || rows.length < ukuran) break;
+  }
+  return hasil;
+}
+
+// Tahun ajaran & semester berjalan menurut jam WIB (UTC+7). Tahun ajaran Juli - Juni.
+function taSemesterBerjalan() {
+  const d = new Date(Date.now() + 7 * 3600 * 1000);
+  const bln = d.getUTCMonth() + 1, th = d.getUTCFullYear();
+  const mulai = bln >= 7 ? th : th - 1;
+  return { ta: `${mulai}/${mulai + 1}`, smt: bln >= 7 ? 'Ganjil' : 'Genap', tahunMulai: mulai };
+}
+function kemarinWIB() { return new Date(Date.now() + 7 * 3600 * 1000 - 86400000).toISOString().slice(0, 10); }
+// Ganjil = Jul-Des tahun mulai; Genap = Jan-Jun tahun berikutnya (sama dengan rentangDefaultAbsensi di index.html).
+function rentangSemester(ta, smt) {
+  const y = parseInt(String(ta || '').split('/')[0], 10) || taSemesterBerjalan().tahunMulai;
+  return smt === 'Genap' ? { awal: `${y + 1}-01-01`, akhir: `${y + 1}-06-30` } : { awal: `${y}-07-01`, akhir: `${y}-12-31` };
+}
+
+async function bacaSyaratRapor() {
+  const salin = () => JSON.parse(JSON.stringify(DEF_SYARAT));
+  try {
+    const r = await sb('pengaturan_nilai?id=eq.umum&select=syarat_rapor');
+    const s = (r && r[0] && r[0].syarat_rapor) || {};
+    const d = salin();
+    const jenis = Array.isArray(s.ujian && s.ujian.jenis) ? s.ujian.jenis.filter((j) => ['UTS', 'UAS', 'Ulangan Harian'].includes(j)) : d.ujian.jenis;
+    const angka = (v, def) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : def; };
+    return {
+      ujian: { aktif: s.ujian && s.ujian.aktif === false ? false : true, jenis, min_persen: angka(s.ujian && s.ujian.min_persen, d.ujian.min_persen) },
+      tugas: { aktif: s.tugas && s.tugas.aktif === false ? false : true, min_persen: angka(s.tugas && s.tugas.min_persen, d.tugas.min_persen) },
+      hadir: { aktif: s.hadir && s.hadir.aktif === false ? false : true, min_persen: angka(s.hadir && s.hadir.min_persen, d.hadir.min_persen) },
+    };
+  } catch (e) { return salin(); }   // kolom syarat_rapor belum ada (migrasi v16 belum dijalankan): pakai bawaan
+}
+
+// Seluruh siswa aktif (tabel absensi), sudah dipetakan ke kelas romawi + program + jurusan.
+async function ambilSiswaAktif() {
+  const TABEL = process.env.TABEL_SISWA || 'students';
+  const K_NISN = process.env.KOLOM_NISN || 'nisn';
+  const K_NAMA = process.env.KOLOM_NAMA_SISWA || 'nama';
+  const rows = await sbSemua(`${TABEL}?select=${K_NISN},${K_NAMA},kelas,program${TABEL === 'students' ? '&status=eq.AKTIF' : ''}`, K_NISN);
+  return rows.filter((r) => r[K_NISN]).map((r) => {
+    const p = profilKelasSiswa(r);
+    return { nisn: String(r[K_NISN]), nama: r[K_NAMA] || String(r[K_NISN]), kelasAsli: p.kelasAsli, kelas: p.kelas, program: p.program, jurusan: p.jurusan };
+  });
+}
+
+async function hitungSyaratRapor({ ta, smt, siswaList }) {
+  const cfg = await bacaSyaratRapor();
+  const siswa = (siswaList || []).filter((s) => s && s.nisn && s.kelas && s.program);
+  const periode = { ta, smt };
+  const hasilKosong = { config: cfg, periode, siswa: [] };
+  if (!siswa.length) return hasilKosong;
+  const nisnSet = new Set(siswa.map((s) => s.nisn));
+  const kelasProg = new Set(siswa.map((s) => `${s.program}|${s.kelas}`));
+  const filterNisn = siswa.length <= 50 ? `&siswa_nisn=in.(${siswa.map((s) => encodeURIComponent(s.nisn)).join(',')})` : '';
+
+  // ---------- UJIAN ----------
+  let paket = [];
+  const jur = new Map(), peng = new Map(), sesiSelesai = new Set();
+  if (cfg.ujian.aktif && cfg.ujian.jenis.length) {
+    const semuaPaket = await sbSemua('paket_ujian?diarsipkan=eq.false&status=in.(siap,ditutup)&select=id,judul,jenis_ujian,kelas,program,semester,tahun_ajaran,mata_pelajaran(nama)', 'id');
+    paket = semuaPaket.filter((p) => {
+      if (!cfg.ujian.jenis.includes(p.jenis_ujian) || !kelasProg.has(`${p.program}|${p.kelas}`)) return false;
+      const n = pisahSmtTa(p.semester, p.tahun_ajaran);
+      return n.ta === ta && n.smt === smt;
+    });
+    if (paket.length) {
+      for (const grup of potong(paket.map((p) => p.id), 30)) {
+        const ids = grup.join(',');
+        const [jr, pg, ss] = await Promise.all([
+          sb(`paket_jurusan?paket_ujian_id=in.(${ids})&select=paket_ujian_id,jurusan`).catch(() => []),
+          sb(`ujian_pengecualian?paket_ujian_id=in.(${ids})&select=paket_ujian_id,siswa_nisn,status`).catch(() => []),
+          sbSemua(`sesi_ujian?paket_ujian_id=in.(${ids})&status=in.(selesai,dinilai)${filterNisn}&select=paket_ujian_id,siswa_nisn`, 'id'),
+        ]);
+        (jr || []).forEach((x) => jur.set(x.paket_ujian_id, x.jurusan));
+        (pg || []).forEach((x) => peng.set(`${x.paket_ujian_id}|${x.siswa_nisn}`, x.status));
+        ss.forEach((x) => sesiSelesai.add(`${x.paket_ujian_id}|${x.siswa_nisn}`));
+      }
+    }
+  }
+
+  // ---------- TUGAS ----------
+  let tugas = [];
+  const jawab = new Map();
+  if (cfg.tugas.aktif) {
+    try {
+      const semuaTugas = await sbSemua(`tugas?status=in.(dibuka,ditutup)&tahun_ajaran=eq.${encodeURIComponent(ta)}&semester=eq.${encodeURIComponent(smt)}&select=id,judul,mapel_nama,program,kelas,jurusan,status,batas_waktu,wajib`, 'id');
+      tugas = semuaTugas.filter((t) => kelasProg.has(`${t.program}|${t.kelas}`));
+      for (const grup of potong(tugas.map((t) => t.id), 30)) {
+        const rows = await sbSemua(`tugas_jawaban?tugas_id=in.(${grup.join(',')})${filterNisn}&select=tugas_id,siswa_nisn,status,terlambat`, 'id');
+        rows.forEach((x) => jawab.set(`${x.tugas_id}|${x.siswa_nisn}`, x));
+      }
+    } catch (e) { tugas = []; }   // tabel tugas belum dibuat (migrasi v16): syarat tugas dianggap tidak ada
+  }
+
+  // ---------- KEHADIRAN ----------
+  const hadirMap = new Map();
+  if (cfg.hadir.aktif) {
+    const catatan = new Map();
+    try {
+      for (const grup of potong(siswa.map((s) => s.nisn), 40)) {
+        const rows = await sb(`catatan_siswa_semester?tahun_ajaran=eq.${encodeURIComponent(ta)}&semester=eq.${encodeURIComponent(smt)}&siswa_nisn=in.(${grup.map(encodeURIComponent).join(',')})&select=siswa_nisn,hadir,sakit,izin,alpa`);
+        (rows || []).forEach((r) => { if (r.hadir != null) catatan.set(r.siswa_nisn, r); });
+      }
+    } catch (e) { /* abaikan */ }
+    const perluAbsensi = siswa.filter((s) => !catatan.has(s.nisn));
+    const rekapGrup = new Map();
+    if (perluAbsensi.length) {
+      const rg = rentangSemester(ta, smt);
+      let awal = rg.awal, akhir = rg.akhir;
+      const kemarin = kemarinWIB();
+      if (akhir > kemarin) akhir = kemarin;   // hari ini & masa depan belum punya catatan absensi
+      let mulaiAbs = null;
+      try { mulaiAbs = await sb('rpc/tanggal_mulai_absensi', { method: 'POST', body: '{}' }); } catch (e) { /* abaikan */ }
+      if (mulaiAbs && mulaiAbs > awal) awal = mulaiAbs;
+      if (awal <= akhir) {
+        for (const kp of new Set(perluAbsensi.map((s) => `${s.program}|${s.kelas}`))) {
+          const [program, kelas] = kp.split('|');
+          try {
+            const data = await sb('rpc/tarik_absensi_nilai', { method: 'POST', body: JSON.stringify({ p_start: awal, p_end: akhir, p_program: program, p_kelas: kelas }) });
+            (data || []).forEach((r) => rekapGrup.set(r.siswa_nisn, r));
+          } catch (e) { /* fungsi absensi belum tersedia: kehadiran dianggap tanpa data */ }
+        }
+      }
+    }
+    siswa.forEach((s) => {
+      const c = catatan.get(s.nisn);
+      if (c) {
+        const h = Number(c.hadir), sk = Number(c.sakit) || 0, iz = Number(c.izin) || 0, al = Number(c.alpa) || 0, t = h + sk + iz + al;
+        hadirMap.set(s.nisn, { hadir: h, sakit: sk, izin: iz, alpa: al, total: t, persen: t ? Math.round(h / t * 1000) / 10 : null, sumber: 'catatan' });
+        return;
+      }
+      const r = rekapGrup.get(s.nisn);
+      if (r) hadirMap.set(s.nisn, { hadir: r.hadir, sakit: r.sakit, izin: r.izin, alpa: r.alpa, total: r.total_hari, persen: r.persentase != null ? Number(r.persentase) : null, sumber: 'absensi' });
+    });
+  }
+
+  // ---------- GABUNGKAN PER SISWA ----------
+  const cocokJur = (jurusanPaket, s) => !(jurusanPaket && s.jurusan && jurusanPaket !== s.jurusan);
+  const hasil = siswa.map((s) => {
+    const kekurangan = [];
+    // Ujian
+    const itemU = paket.filter((p) => p.kelas === s.kelas && p.program === s.program && cocokJur(jur.get(p.id), s) && peng.get(`${p.id}|${s.nisn}`) !== 'tidak_wajib')
+      .map((p) => ({ mapel: (p.mata_pelajaran && p.mata_pelajaran.nama) || p.judul, jenis: p.jenis_ujian, selesai: sesiSelesai.has(`${p.id}|${s.nisn}`), susulan: peng.get(`${p.id}|${s.nisn}`) === 'susulan' }))
+      .sort((a, b) => a.mapel.localeCompare(b.mapel, 'id') || a.jenis.localeCompare(b.jenis));
+    const ujian = ringkasSyarat(cfg.ujian, itemU);
+    if (ujian.status === 'kurang') kekurangan.push(`Ujian belum diikuti ${ujian.total - ujian.selesai} dari ${ujian.total}: ${itemU.filter((x) => !x.selesai).map((x) => `${x.mapel} (${x.jenis})`).join(', ')}`);
+    // Tugas (hanya tugas wajib masuk syarat; tugas tambahan hanya menambah nilai)
+    const tugasS = tugas.filter((t) => t.kelas === s.kelas && t.program === s.program && cocokJur(t.jurusan, s));
+    const itemT = tugasS.filter((t) => t.wajib !== false).map((t) => {
+      const j = jawab.get(`${t.id}|${s.nisn}`);
+      if (j && j.status === 'dibebaskan') return null;
+      const selesai = !!(j && (j.status === 'dikumpulkan' || j.status === 'dinilai'));
+      return { id: t.id, judul: t.judul, mapel: t.mapel_nama, batas: t.batas_waktu, selesai, status: j ? j.status : 'belum', terlambat: !!(j && j.terlambat), ditutup: t.status === 'ditutup' };
+    }).filter(Boolean).sort((a, b) => a.mapel.localeCompare(b.mapel, 'id') || a.judul.localeCompare(b.judul, 'id'));
+    const tugasR = ringkasSyarat(cfg.tugas, itemT);
+    tugasR.tambahan = tugasS.filter((t) => t.wajib === false).length;
+    if (tugasR.status === 'kurang') kekurangan.push(`Tugas belum dikumpulkan ${tugasR.total - tugasR.selesai} dari ${tugasR.total}: ${itemT.filter((x) => !x.selesai).map((x) => `${x.judul} (${x.mapel})`).join(', ')}`);
+    // Kehadiran
+    const h = hadirMap.get(s.nisn) || null;
+    const hadir = { aktif: cfg.hadir.aktif, min_persen: cfg.hadir.min_persen, ada: !!(h && h.persen != null), ...(h || {}), status: 'nonaktif' };
+    if (cfg.hadir.aktif) {
+      if (!hadir.ada) hadir.status = 'tanpa_data';
+      else if (h.persen + 1e-9 >= cfg.hadir.min_persen) hadir.status = 'lulus';
+      else { hadir.status = 'kurang'; kekurangan.push(`Kehadiran ${String(h.persen).replace('.', ',')}% (minimal ${cfg.hadir.min_persen}%)`); }
+    }
+    return { nisn: s.nisn, nama: s.nama, kelas: s.kelas, kelasAsli: s.kelasAsli, program: s.program, jurusan: s.jurusan,
+      ujian: { ...ujian, belum: itemU.filter((x) => !x.selesai) }, tugas: { ...tugasR, belum: itemT.filter((x) => !x.selesai) }, hadir,
+      memenuhi: [ujian.status, tugasR.status, hadir.status].every((x) => x !== 'kurang'), kekurangan };
+  });
+  return { config: cfg, periode, siswa: hasil };
+}
+function ringkasSyarat(cfg, items) {
+  const total = items.length, selesai = items.filter((x) => x.selesai).length;
+  const persen = total ? Math.round(selesai / total * 1000) / 10 : null;
+  let status = 'nonaktif';
+  if (cfg.aktif) status = !total ? 'tanpa_data' : (persen + 1e-9 >= cfg.min_persen ? 'lulus' : 'kurang');
+  return { aktif: cfg.aktif, min_persen: cfg.min_persen, total, selesai, persen, status, items };
+}
+
 module.exports = {
   daftarUjianSiswa,daftarRemedialSiswa, cekPesertaRemedial, verifikasiSiswa,
+  hitungSyaratRapor, bacaSyaratRapor, ambilSiswaAktif, sbSemua, potong, hitungKata, taSemesterBerjalan, profilKelasSiswa, pisahSmtTa,
   UUID, BATAS_PELANGGARAN, adaKonfigurasi, sb, pastikanLogin, hitungNilai, nilaiDanSimpanSesi,
   authAdmin, tentukanPeran, wajibLogin, wajibAdmin, wajibSuperAdmin, peranDari, adminLangsung, superLangsung, ipDari, hitungGagal, catatGagal,
 };

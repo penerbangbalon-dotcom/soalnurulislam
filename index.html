@@ -139,6 +139,12 @@
   .ms-item:last-child{border-bottom:0;}
   .ms-item .btn{padding:4px 10px;white-space:nowrap;}
   .mon-aksi .btn{padding:3px 8px;font-size:12px;}
+  mark{background:#FFE066;color:inherit;padding:0 1px;border-radius:2px;}
+  .fchip{display:inline-block;border:1px solid var(--line);background:#F5F8FD;border-radius:14px;padding:4px 12px;font-size:13px;cursor:pointer;margin:0 6px 8px 0;user-select:none;}
+  .fchip:hover{background:#E3ECF9;} .fchip.aktif{background:var(--green);border-color:var(--green);color:#fff;}
+  code.salin{cursor:pointer;} code.salin:hover{background:#FFF4CC;}
+  .kotak-cari{position:relative;flex:1;min-width:240px;max-width:480px;} .kotak-cari input{width:100%;padding-right:30px;}
+  .kotak-cari .hapus-cari{position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--ink-soft);display:none;font-size:15px;}
   .quick-chip{border:1px solid var(--line);background:#F5F8FD;border-radius:12px;padding:4px 10px;font-size:12.5px;cursor:pointer;}
   .quick-chip:hover{background:#E3ECF9;}
 </style>
@@ -200,10 +206,18 @@
         <div class="item" data-tab="belumujian" onclick="showTab('belumujian')">Belum Mengikuti Ujian</div>
       </div>
     </div>
+    <div class="group" data-group="tugasg">
+      <div class="ghead" onclick="toggleGroup('tugasg')"><span>Tugas Siswa</span><span class="chev">&#9656;</span></div>
+      <div class="subs">
+        <div class="item" data-tab="tugas" onclick="showTab('tugas')">Kelola Tugas</div>
+        <div class="item" data-tab="nilaitugas" onclick="showTab('nilaitugas')">Penilaian Tugas</div>
+      </div>
+    </div>
     <div class="item top" data-tab="pending" onclick="showTab('pending')"><span>Perlu Dinilai</span><span class="nbadge hidden" id="badge-pending">0</span></div>
     <div class="group" data-group="nilai">
       <div class="ghead" onclick="toggleGroup('nilai')"><span>Laporan Nilai</span><span class="chev">&#9656;</span></div>
       <div class="subs">
+        <div class="item" data-tab="syaratrapor" onclick="showTab('syaratrapor')">Syarat Rapor</div>
         <div class="item" data-tab="laporan" onclick="showTab('laporan')">Laporan Siswa</div>
         <div class="item" data-tab="rekapnilai" onclick="showTab('rekapnilai')">Rekap Nilai Siswa</div>
         <div class="item" data-tab="leger" onclick="showTab('leger')">Leger Nilai (Excel)</div>
@@ -329,17 +343,30 @@
     <!-- ===== TAB: DAFTAR & CETAK ===== -->
     <section id="tab-daftar" class="hidden">
       <h2>Daftar Paket Ujian</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;">
-        <input type="text" id="daftar-cari" placeholder="Cari judul / mapel / jenis / kelas / status / kode akses..." style="max-width:380px;flex:1;min-width:220px;" oninput="renderDaftarPaket()" />
-        <button class="btn outline" style="padding:6px 12px;" onclick="document.getElementById('daftar-cari').value='';renderDaftarPaket();">Reset</button>
+      <div class="toolbar" style="margin-bottom:8px;">
+        <div class="kotak-cari">
+          <input type="text" id="daftar-cari" placeholder="Cari judul, mapel, jenis, kelas, kode akses..." oninput="onDaftarCari()" onkeydown="if(event.key==='Escape'){this.value='';renderDaftarPaket(true);}" autocomplete="off" />
+          <span class="hapus-cari" id="daftar-x" title="Kosongkan pencarian (Esc)" onclick="document.getElementById('daftar-cari').value='';renderDaftarPaket(true);">&#10005;</span>
+        </div>
+        <select id="daftar-f-kelas" onchange="renderDaftarPaket(true)"><option value="">Semua kelas</option><option value="VII">Kelas VII</option><option value="VIII">Kelas VIII</option><option value="IX">Kelas IX</option><option value="X">Kelas X</option><option value="XI">Kelas XI</option><option value="XII">Kelas XII</option></select>
+        <select id="daftar-f-jenis" onchange="renderDaftarPaket(true)"><option value="">Semua jenis</option><option>UTS</option><option>UAS</option><option>Ulangan Harian</option><option>Remedial</option></select>
+        <select id="daftar-f-ta" onchange="renderDaftarPaket(true)"><option value="">Semua tahun ajaran</option></select>
+        <select id="daftar-urut" onchange="renderDaftarPaket(true)" title="Urutkan"><option value="baru">Urut: Terbaru dibuat</option><option value="judul">Urut: Judul A-Z</option><option value="mapel">Urut: Mata pelajaran A-Z</option><option value="kelas">Urut: Kelas, lalu mapel</option><option value="status">Urut: Status (siap dulu)</option></select>
+        <button class="btn outline" style="padding:6px 12px;" onclick="resetDaftarPaket()">Reset</button>
+        <button class="btn outline" style="padding:6px 12px;" onclick="toggleTipsCari('daftar-tips')" title="Cara memakai pencarian">? Tips</button>
+      </div>
+      <div id="daftar-tips" class="card hidden" style="font-size:13px;line-height:1.7;padding:10px 14px;"></div>
+      <div id="daftar-chips"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:6px;">
+        <label class="checkline" style="margin:0;border:0;padding:0;"><input type="checkbox" id="daftar-tampil-arsip" onchange="loadDaftarPaket()"><span>Tampilkan paket yang sudah diarsipkan</span></label>
         <span class="muted" id="daftar-info"></span>
       </div>
-      <label class="checkline" style="margin-bottom:10px;"><input type="checkbox" id="daftar-tampil-arsip" onchange="loadDaftarPaket()"><span>Tampilkan paket yang sudah diarsipkan</span></label>
-      <div class="card">
+      <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Judul</th><th>Jenis</th><th>Kelas</th><th>Status</th><th>Kode Akses</th><th></th></tr></thead>
           <tbody id="daftar-paket-body"></tbody>
         </table>
+        <div id="daftar-more" class="hidden" style="text-align:center;margin-top:10px;"><button class="btn outline" onclick="daftarLagi()">Tampilkan lagi</button></div>
       </div>
     </section>
 
@@ -567,7 +594,7 @@
       <h2>Ujian Terlaksana</h2>
       <p class="muted">Daftar mata pelajaran yang sudah diujikan (sudah ada siswa yang mengerjakan), lengkap dengan jenis ujian, kelas, tanggal pelaksanaan, dan ringkasan pengerjaan. Untuk melihat nilai per siswa, klik &ldquo;Lihat Hasil&rdquo;.</p>
       <div class="toolbar">
-        <input type="text" id="tl-cari" placeholder="Cari judul / mapel / kelas / semester..." style="max-width:300px;flex:1;min-width:200px;" oninput="renderTerlaksana()" />
+        <input type="text" id="tl-cari" placeholder="Cari judul / mapel / kelas (X = hanya kelas X) / semester..." title="Contoh: x uts   kelas:XI   -remedial   &quot;ulangan harian&quot;" style="max-width:360px;flex:1;min-width:200px;" oninput="renderTerlaksana()" />
         <select id="tl-jenis" onchange="renderTerlaksana()"><option value="">Semua Jenis</option><option value="UTS">UTS</option><option value="UAS">UAS</option><option value="Ulangan Harian">Ulangan Harian (UH)</option><option value="Remedial">Remedial</option></select>
         <select id="tl-program" onchange="renderTerlaksana()"><option value="">Semua Program</option><option>Paket B</option><option>Paket C</option></select>
         <select id="tl-kelas" onchange="renderTerlaksana()"><option value="">Semua Kelas</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select>
@@ -588,7 +615,7 @@
       <h2>Perlu Dinilai (Essay)</h2>
       <p class="muted">Ujian yang sudah dikerjakan siswa tetapi jawaban essay-nya belum dinilai. Klik &ldquo;Nilai Essay&rdquo; untuk langsung memberi skor; setelah semua essay siswa terisi, status otomatis menjadi &ldquo;dinilai&rdquo; dan siswa hilang dari daftar ini.</p>
       <div class="toolbar">
-        <input type="text" id="pd-cari" placeholder="Cari siswa / NISN / mapel / judul..." style="max-width:300px;flex:1;min-width:200px;" oninput="renderPending()" />
+        <input type="text" id="pd-cari" placeholder="Cari siswa / NISN / mapel / judul / kelas..." title="Contoh: x uts   kelas:XI   nama:budi" style="max-width:340px;flex:1;min-width:200px;" oninput="renderPending()" />
         <select id="pd-jenis" onchange="renderPending()"><option value="">Semua Jenis</option><option value="UTS">UTS</option><option value="UAS">UAS</option><option value="Ulangan Harian">Ulangan Harian (UH)</option></select>
         <select id="pd-kelas" onchange="renderPending()"><option value="">Semua Kelas</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select>
         <button class="btn outline" onclick="loadPerluDinilai()">Muat Ulang</button>
@@ -907,6 +934,25 @@
           <div class="field"><label>Bila komponen belum ada</label>
             <select id="pn-mode"><option value="sebagian">Hitung dari komponen yang sudah ada</option><option value="lengkap">Nilai Akhir hanya jika semua komponen berbobot ada</option></select></div>
         </div>
+        <div class="grid3">
+          <div class="field"><label>Kehadiran (isi 0 bila tidak dipakai)</label><input type="number" id="pn-b-hadir" min="0" max="100" />
+            <p class="muted" style="margin:4px 0 0;font-size:12px;">Persentase kehadiran siswa pada semester itu ikut menjadi komponen Nilai Akhir tiap mapel. Memakai data di Input Nilai Tambahan (isi lewat menu Syarat Rapor &rarr; Simpan kehadiran ke nilai).</p></div>
+          <div></div><div></div>
+        </div>
+        <h3 style="margin-top:14px;">Syarat Mendapat Rapor</h3>
+        <p class="muted" style="margin:0 0 8px;">Dipakai di menu <b>Syarat Rapor</b>, tab Syarat Rapor di halaman siswa, dan peringatan saat mencetak rapor.</p>
+        <div class="grid3">
+          <div class="field"><label style="display:flex;align-items:center;gap:6px;color:var(--ink);"><input type="checkbox" id="pn-sy-uj-aktif" style="width:auto;"> Wajib mengikuti ujian</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--ink);margin:6px 0;">
+              <label style="display:flex;align-items:center;gap:4px;margin:0;color:var(--ink);"><input type="checkbox" id="pn-sy-uj-uts" style="width:auto;"> UTS</label>
+              <label style="display:flex;align-items:center;gap:4px;margin:0;color:var(--ink);"><input type="checkbox" id="pn-sy-uj-uas" style="width:auto;"> UAS</label>
+              <label style="display:flex;align-items:center;gap:4px;margin:0;color:var(--ink);"><input type="checkbox" id="pn-sy-uj-uh" style="width:auto;"> Ulangan Harian</label></div>
+            <label>Minimal ujian diikuti (%)</label><input type="number" id="pn-sy-uj-min" min="0" max="100" /></div>
+          <div class="field"><label style="display:flex;align-items:center;gap:6px;color:var(--ink);"><input type="checkbox" id="pn-sy-tg-aktif" style="width:auto;"> Wajib mengumpulkan tugas</label>
+            <label style="margin-top:30px;">Minimal tugas wajib dikumpulkan (%)</label><input type="number" id="pn-sy-tg-min" min="0" max="100" /></div>
+          <div class="field"><label style="display:flex;align-items:center;gap:6px;color:var(--ink);"><input type="checkbox" id="pn-sy-hd-aktif" style="width:auto;"> Wajib kehadiran minimum</label>
+            <label style="margin-top:30px;">Minimal kehadiran (%)</label><input type="number" id="pn-sy-hd-min" min="0" max="100" /></div>
+        </div>
         <h3 style="margin-top:14px;">Remedial</h3>
         <div class="grid3"><div class="field"><label>Aturan nilai setelah remedial</label>
           <select id="pn-rem-mode">
@@ -929,6 +975,116 @@
           <button class="btn gold" onclick="simpanPengaturanNilai()">💾 Simpan Pengaturan</button>
           <button class="btn outline" onclick="loadPengaturanNilai()">↻ Batalkan / Muat Ulang</button>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: KELOLA TUGAS ===== -->
+    <section id="tab-tugas" class="hidden">
+      <h2>Kelola Tugas</h2>
+      <p class="muted">Buat tugas tulis (uraian) untuk siswa. Siswa mengetik jawabannya langsung di HP lewat tab <b>Tugas</b> di halaman ujian siswa, tanpa upload file.
+        Pindah tab/aplikasi dan menempel (paste) tercatat sebagai pelanggaran. Nilai tugas otomatis menjadi komponen <b>Tugas</b> pada Nilai Akhir
+        (rata-rata semua tugas: tugas wajib yang tidak dikerjakan dihitung 0, sehingga makin banyak tugas dikerjakan makin baik nilai akhirnya), dan tugas wajib
+        yang belum dikumpulkan menjadi kekurangan pada <b>Syarat Rapor</b>. Atur bobot komponen Tugas di <b>Pengaturan Nilai</b>.</p>
+      <div id="tg-banner"></div>
+      <div class="card">
+        <h3 id="tg-form-judul">Buat Tugas Baru</h3>
+        <div class="grid3">
+          <div class="field"><label>Jenjang (Program)</label><select id="tg-program" onchange="isiOpsiKelasTugas();isiOpsiMapelTugas()"><option>Paket B</option><option>Paket C</option></select></div>
+          <div class="field"><label>Kelas</label><select id="tg-kelas" onchange="isiOpsiMapelTugas()"></select></div>
+          <div class="field"><label>Mata Pelajaran</label><select id="tg-mapel"></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Tahun Ajaran</label><select id="tg-ta"></select></div>
+          <div class="field"><label>Semester</label><select id="tg-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+          <div class="field"><label>Khusus jurusan (Paket C)</label><select id="tg-jurusan"><option value="">Semua siswa kelas ini</option><option value="IPA">Khusus IPA</option><option value="IPS">Khusus IPS</option></select></div>
+        </div>
+        <div class="field"><label>Judul Tugas</label><input type="text" id="tg-judul" maxlength="150" placeholder="mis. Esai: Dampak Sampah Plastik bagi Lingkungan" /></div>
+        <div class="field"><label>Instruksi / Pertanyaan untuk Siswa</label><textarea id="tg-instruksi" rows="6" placeholder="Tulis perintah tugas selengkap mungkin: apa yang harus ditulis, sudut pandang, contoh, dan kriteria penilaian."></textarea></div>
+        <div class="grid3">
+          <div class="field"><label>Tenggat (opsional)</label><input type="datetime-local" id="tg-batas" /></div>
+          <div class="field"><label>Minimal kata (0 = bebas)</label><input type="number" id="tg-min" min="0" value="0" /></div>
+          <div class="field"><label>Maksimal kata (0 = bebas)</label><input type="number" id="tg-maks" min="0" value="0" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Nilai maksimal</label><input type="number" id="tg-nilaimaks" min="1" value="100" /></div>
+          <div class="field"><label>Batas pelanggaran (0 = hanya dicatat)</label><input type="number" id="tg-pel" min="0" value="3" />
+            <p class="muted" style="margin:4px 0 0;font-size:12px;">Pada batas ini tugas dikumpulkan otomatis dengan jawaban yang sudah ditulis.</p></div>
+          <div class="field"><label>Status</label><select id="tg-status"><option value="draft">Draft (belum terlihat siswa)</option><option value="dibuka">Dibuka (siswa bisa mengerjakan)</option><option value="ditutup">Ditutup</option></select></div>
+        </div>
+        <div class="toolbar" style="gap:18px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:14px;color:var(--ink);"><input type="checkbox" id="tg-wajib" checked style="width:auto;"> Tugas wajib (masuk syarat rapor)</label>
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:14px;color:var(--ink);"><input type="checkbox" id="tg-telat" checked style="width:auto;"> Terima pengumpulan terlambat (ditandai terlambat)</label>
+        </div>
+        <div class="toolbar" style="justify-content:flex-end;margin:0;">
+          <button class="btn outline hidden" id="tg-batal-btn" onclick="batalEditTugas()">Batal Edit</button>
+          <button class="btn gold" id="tg-simpan-btn" onclick="simpanTugasGuru()">💾 Simpan Tugas</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <select id="tg-f-kelas" onchange="renderDaftarTugas()"><option value="">Semua kelas</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select>
+        <select id="tg-f-ta" onchange="renderDaftarTugas()"></select>
+        <select id="tg-f-smt" onchange="renderDaftarTugas()"><option value="">Semua semester</option><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select>
+        <button class="btn outline" onclick="loadTugasGuru()">Refresh</button>
+      </div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Tugas</th><th>Kelas</th><th>Tenggat</th><th>Status</th><th>Pengumpulan</th><th style="width:230px;">Aksi</th></tr></thead>
+          <tbody id="tg-body"><tr><td colspan="6" class="muted">Memuat data...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== TAB: PENILAIAN TUGAS ===== -->
+    <section id="tab-nilaitugas" class="hidden">
+      <h2>Penilaian Tugas</h2>
+      <p class="muted">Pilih tugas, lalu baca jawaban tiap siswa dan beri nilai. Kolom <b>Pelanggaran</b> menunjukkan berapa kali siswa pindah tab/aplikasi atau mencoba menempel teks saat menulis
+        (arahkan kursor ke angkanya untuk melihat rinciannya). Siswa tanpa HP bisa diberi <b>nilai manual</b>; siswa yang berhalangan bisa <b>dibebaskan</b> dari tugas tertentu.</p>
+      <div class="toolbar">
+        <select id="nt-tugas" onchange="muatPenilaianTugas()" style="min-width:320px;max-width:560px;"></select>
+        <input type="text" id="nt-cari" placeholder="Cari nama / NISN..." oninput="renderPenilaianTugas()" style="max-width:200px;">
+        <select id="nt-filter" onchange="renderPenilaianTugas()">
+          <option value="">Semua status</option><option value="perlu">Perlu dinilai</option><option value="belum">Belum mengumpulkan</option>
+          <option value="dinilai">Sudah dinilai</option><option value="langgar">Pernah melanggar</option>
+        </select>
+        <button class="btn outline" onclick="muatPenilaianTugas()">Refresh</button>
+        <button class="btn outline" onclick="unduhPenilaianTugas()">Unduh Excel</button>
+      </div>
+      <div id="nt-ringkas" class="ringkas"></div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>No</th><th>Nama Siswa</th><th>Status</th><th>Kata</th><th>Pelanggaran</th><th>Nilai</th><th style="width:200px;">Aksi</th></tr></thead>
+          <tbody id="nt-body"><tr><td colspan="7" class="muted">Pilih tugas terlebih dahulu.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== TAB: SYARAT RAPOR ===== -->
+    <section id="tab-syaratrapor" class="hidden">
+      <h2>Syarat Rapor</h2>
+      <p class="muted">Pantau apakah siswa sudah memenuhi syarat menerima rapor: <b>semua ujian diikuti</b>, <b>semua tugas wajib dikumpulkan</b>, dan <b>kehadiran</b> mencapai batas minimum.
+        Ambang batasnya diatur di <b>Pengaturan Nilai</b>. Siswa melihat kekurangannya sendiri lewat tab <b>Syarat Rapor</b> di halaman ujian siswa.
+        Ujian yang ditandai <i>Tidak wajib</i> di menu Belum Mengikuti Ujian, dan tugas yang siswanya <i>dibebaskan</i>, tidak dihitung.</p>
+      <div id="sr-banner"></div>
+      <div class="toolbar">
+        <select id="sr-program" onchange="isiOpsiKelasSyarat()"><option value="">Semua jenjang</option><option>Paket B</option><option>Paket C</option></select>
+        <select id="sr-kelas"><option value="">Semua kelas</option></select>
+        <select id="sr-ta"></select>
+        <select id="sr-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select>
+        <button class="btn gold" onclick="muatSyaratRapor()">Tampilkan</button>
+      </div>
+      <div class="toolbar">
+        <input type="text" id="sr-cari" placeholder="Cari nama / NISN..." oninput="renderSyaratRapor()" style="max-width:220px;">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink);"><input type="checkbox" id="sr-hanya" onchange="renderSyaratRapor()" style="width:auto;"> Hanya yang belum memenuhi syarat</label>
+        <button class="btn outline" onclick="unduhSyaratRapor()">Unduh Excel</button>
+        <button class="btn outline" onclick="cetakSyaratRapor()">Cetak Daftar</button>
+        <button class="btn outline" onclick="simpanKehadiranKeNilai()" title="Menyimpan Hadir/Sakit/Izin/Alpa dari absensi ke Input Nilai Tambahan agar dipakai sebagai komponen Kehadiran pada Nilai Akhir">Simpan kehadiran ke nilai</button>
+      </div>
+      <div id="sr-ringkas" class="ringkas"></div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>No</th><th>Nama Siswa</th><th>Kelas</th><th>Ujian</th><th>Tugas</th><th>Kehadiran</th><th>Status</th><th>Kekurangan</th></tr></thead>
+          <tbody id="sr-body"><tr><td colspan="8" class="muted">Klik Tampilkan untuk memuat data.</td></tr></tbody>
+        </table>
       </div>
     </section>
 
@@ -993,7 +1149,7 @@
       <h2>Arsip Nilai</h2>
       <p class="muted">Salinan permanen setiap nilai ujian siswa. Nilai di sini <b>tidak ikut terhapus</b> walaupun paket ujian dihapus atau sesi siswa di-reset, dan tidak bisa diubah dari aplikasi.</p>
       <div class="toolbar">
-        <input type="text" id="arsip-cari" placeholder="Cari nama / NISN / paket / mapel..." style="max-width:290px;" oninput="renderArsipNilai()" />
+        <input type="text" id="arsip-cari" placeholder="Cari nama / NISN / paket / mapel / kelas..." title="Contoh: x uts   kelas:XI   -remedial   &quot;ulangan harian&quot;" style="max-width:340px;" oninput="renderArsipNilai()" />
         <select id="arsip-filter" onchange="renderArsipNilai()">
           <option value="">Semua nilai</option>
           <option value="hilang">Hanya yang datanya sudah dihapus dari sistem</option>
@@ -1703,7 +1859,7 @@ function showTab(tab){
   if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
+  ['bank','tugas','nilaitugas','syaratrapor','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -1711,6 +1867,9 @@ function showTab(tab){
     g.classList.toggle('has-active', aktif);
     if(aktif) g.classList.add('open');
   });
+  if(tab==='tugas') loadTugasGuru();
+  if(tab==='nilaitugas') loadPenilaianTugas();
+  if(tab==='syaratrapor') loadSyaratRapor();
   if(tab==='terlaksana') loadTerlaksana();
   if(tab==='paketremedial') loadPaketRemedial();
   if(tab==='pending') loadPerluDinilai();
@@ -1772,7 +1931,7 @@ async function loadTerlaksana(){
 }
 function labelJenis(j){ return j==='Ulangan Harian' ? 'UH' : (j||'-'); }
 function renderTerlaksana(){
-  const kata = (document.getElementById('tl-cari').value||'').toLowerCase().split(/\s+/).filter(Boolean);
+  const parsed = parsePencarian(document.getElementById('tl-cari').value, ['kelas','jenis','mapel','program','smt','ta','judul']);
   const fJenis = document.getElementById('tl-jenis').value, fProg = document.getElementById('tl-program').value,
         fKelas = document.getElementById('tl-kelas').value, fSem = document.getElementById('tl-semester').value;
   const rows = terlaksanaData.filter(p=>{
@@ -1780,8 +1939,8 @@ function renderTerlaksana(){
     if(fProg && p.program!==fProg) return false;
     if(fKelas && p.kelas!==fKelas) return false;
     if(fSem && p.semester!==fSem) return false;
-    const teks = [p.judul,p.mapel,p.jenis_ujian,p.kelas,p.program,p.semester,p.tahun_ajaran].join(' ').toLowerCase();
-    return kata.every(k=>teks.includes(k));
+    return cocokPencarian(parsed, p, { umum:x=>[x.judul,x.mapel,x.jenis_ujian,x.kelas,x.program,x.semester,x.tahun_ajaran], kelas:x=>x.kelas,
+      medan:{ kelas:x=>x.kelas, jenis:x=>x.jenis_ujian, mapel:x=>x.mapel, program:x=>x.program, smt:x=>x.semester, ta:x=>x.tahun_ajaran, judul:x=>x.judul } });
   });
   const hitung = j=>rows.filter(p=>p.jenis_ujian===j).length;
   document.getElementById('tl-ringkas').innerHTML =
@@ -1840,14 +1999,14 @@ async function loadPerluDinilai(){
   renderPending();
 }
 function renderPending(){
-  const kata = (document.getElementById('pd-cari').value||'').toLowerCase().split(/\s+/).filter(Boolean);
+  const parsed = parsePencarian(document.getElementById('pd-cari').value, ['kelas','jenis','mapel','judul','nama','nisn']);
   const fJenis = document.getElementById('pd-jenis').value, fKelas = document.getElementById('pd-kelas').value;
   const rows = pendingData.filter(x=>{
     const p = x.paket_ujian||{};
     if(fJenis && p.jenis_ujian!==fJenis) return false;
     if(fKelas && p.kelas!==fKelas) return false;
-    const teks = [x.siswa_nama,x.siswa_nisn,p.judul,p.mata_pelajaran?.nama,p.jenis_ujian].join(' ').toLowerCase();
-    return kata.every(k=>teks.includes(k));
+    return cocokPencarian(parsed, x, { umum:r=>[r.siswa_nama,r.siswa_nisn,p.judul,p.mata_pelajaran?.nama,p.jenis_ujian,p.kelas], kelas:()=>p.kelas,
+      medan:{ kelas:()=>p.kelas, jenis:()=>p.jenis_ujian, mapel:()=>p.mata_pelajaran?.nama, judul:()=>p.judul, nama:r=>r.siswa_nama, nisn:r=>r.siswa_nisn } });
   });
   const body = document.getElementById('pd-body');
   document.getElementById('pd-info').innerHTML = rows.length
@@ -3439,6 +3598,30 @@ async function bukaBuatPaketRemedial(program, kelas, mapel, komp, ta, smt){
 }
 
 // ---------- DAFTAR & CETAK ----------
+// ---------- DAFTAR & CETAK: pencarian, filter, urutan ----------
+var daftarPaketData = [], daftarStatus = '', daftarBatas = 50, daftarTimer = null;
+const DAFTAR_HALAMAN = 50;
+const DEF_CARI_PAKET = {
+  umum: p=>{ const n = normSmtTa(p); return [p.judul, p.mata_pelajaran?.nama, jenisPaketTeks(p), p.jenis_ujian, p.kelas, p.program, n.smt, n.ta, statusPaketTeks(p), p.status==='siap'?'online aktif':'', p.kode_akses]; },
+  kelas: p=>p.kelas,
+  medan: { kelas:p=>p.kelas, jenis:p=>jenisPaketTeks(p), status:p=>statusPaketTeks(p), mapel:p=>p.mata_pelajaran?.nama, program:p=>p.program,
+           smt:p=>normSmtTa(p).smt, ta:p=>normSmtTa(p).ta, kode:p=>p.kode_akses, judul:p=>p.judul }
+};
+const MEDAN_CARI_PAKET = Object.keys(DEF_CARI_PAKET.medan);
+function statusPaketTeks(p){ return p.diarsipkan ? 'diarsipkan' : (p.status||''); }
+function onDaftarCari(){ clearTimeout(daftarTimer); daftarTimer = setTimeout(()=>renderDaftarPaket(true), 150); }
+function resetDaftarPaket(){
+  ['daftar-cari','daftar-f-kelas','daftar-f-jenis','daftar-f-ta'].forEach(id=>{ document.getElementById(id).value = ''; });
+  document.getElementById('daftar-urut').value = 'baru'; daftarStatus = '';
+  renderDaftarPaket(true); document.getElementById('daftar-cari').focus();
+}
+function setDaftarStatus(s){ daftarStatus = (daftarStatus===s ? '' : s); renderDaftarPaket(true); }
+function isiOpsiTaDaftar(){
+  const sel = document.getElementById('daftar-f-ta'), sebelum = sel.value;
+  const ta = [...new Set(daftarPaketData.map(p=>normSmtTa(p).ta).filter(Boolean))].sort().reverse();
+  sel.innerHTML = '<option value="">Semua tahun ajaran</option>' + ta.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  sel.value = ta.includes(sebelum) ? sebelum : '';
+}
 async function loadDaftarPaket(){
   const tampilArsip = !!(document.getElementById('daftar-tampil-arsip')||{}).checked;
   const { data, error } = await ambilSemuaBaris(()=>{
@@ -3449,26 +3632,68 @@ async function loadDaftarPaket(){
   const body = document.getElementById('daftar-paket-body');
   if(error){ body.innerHTML = error.message; return; }
   daftarPaketData = data || [];
-  renderDaftarPaket();
+  isiOpsiTaDaftar();
+  renderDaftarPaket(false);
 }
-// Pencarian client-side: semua kata yang diketik harus cocok di salah satu kolom (tanpa peduli huruf besar/kecil).
-var daftarPaketData = [];
-function renderDaftarPaket(){
-  const body = document.getElementById('daftar-paket-body');
-  const kata = (document.getElementById('daftar-cari').value||'').toLowerCase().split(/\s+/).filter(Boolean);
-  const data = daftarPaketData.filter(p=>{
-    const teks = [p.judul, p.mata_pelajaran?.nama, p.jenis_ujian, p.kelas, p.program, p.diarsipkan?'diarsipkan':p.status, p.kode_akses].join(' ').toLowerCase();
-    return kata.every(k=>teks.includes(k));
+// Pencarian: lihat parsePencarian() (kelas dicocokkan persis, "X" tidak ikut XI/XII). Filter dropdown + chip status + urutan.
+function saringDaftarPaket(abaikanStatus){
+  const parsed = parsePencarian(document.getElementById('daftar-cari').value, MEDAN_CARI_PAKET);
+  const fKelas = document.getElementById('daftar-f-kelas').value, fJenis = document.getElementById('daftar-f-jenis').value, fTa = document.getElementById('daftar-f-ta').value;
+  const hasil = daftarPaketData.filter(p=>{
+    if(fKelas && p.kelas!==fKelas) return false;
+    if(fJenis && p.jenis_ujian!==fJenis) return false;
+    if(fTa && normSmtTa(p).ta!==fTa) return false;
+    if(!abaikanStatus && daftarStatus && statusPaketTeks(p)!==daftarStatus) return false;
+    return cocokPencarian(parsed, p, DEF_CARI_PAKET);
   });
-  document.getElementById('daftar-info').textContent = kata.length ? `${data.length} dari ${daftarPaketData.length} paket cocok` : `${daftarPaketData.length} paket`;
-  if(!data.length){ body.innerHTML = `<tr><td colspan="6" class="muted">${kata.length?'Tidak ada paket yang cocok dengan pencarian.':'Belum ada paket ujian.'}</td></tr>`; return; }
-  body.innerHTML = data.map(p=>`
+  return { hasil, parsed };
+}
+function urutkanDaftarPaket(arr){
+  const mode = document.getElementById('daftar-urut').value;
+  if(mode==='baru') return arr;
+  const k = p=>{ const i = KELAS_ROMAWI_CARI.indexOf(p.kelas); return i<0 ? 99 : i; };
+  const cmp = (a,b)=>String(a||'').localeCompare(String(b||''),'id',{ numeric:true, sensitivity:'base' });
+  const urutStatus = { siap:0, draft:1, ditutup:2, diarsipkan:3 };
+  const kopi = arr.slice();
+  if(mode==='judul') kopi.sort((a,b)=>cmp(a.judul,b.judul));
+  else if(mode==='mapel') kopi.sort((a,b)=>cmp(a.mata_pelajaran?.nama,b.mata_pelajaran?.nama) || cmp(a.judul,b.judul));
+  else if(mode==='kelas') kopi.sort((a,b)=>k(a)-k(b) || cmp(a.mata_pelajaran?.nama,b.mata_pelajaran?.nama) || cmp(a.judul,b.judul));
+  else if(mode==='status') kopi.sort((a,b)=>(urutStatus[statusPaketTeks(a)]??9)-(urutStatus[statusPaketTeks(b)]??9) || cmp(a.judul,b.judul));
+  return kopi;
+}
+function renderDaftarPaket(reset){
+  if(reset===true) daftarBatas = DAFTAR_HALAMAN;
+  const body = document.getElementById('daftar-paket-body');
+  const { hasil: tanpaStatus } = saringDaftarPaket(true);
+  const { hasil, parsed } = saringDaftarPaket(false);
+  const data = urutkanDaftarPaket(hasil);
+  // chip status (jumlahnya mengikuti pencarian & filter lain)
+  const hitung = s=>tanpaStatus.filter(p=>statusPaketTeks(p)===s).length;
+  const chip = (s, label)=>`<span class="fchip${daftarStatus===s?' aktif':''}" onclick="setDaftarStatus('${s}')">${label} <b>${s ? hitung(s) : tanpaStatus.length}</b></span>`;
+  const adaArsip = daftarPaketData.some(p=>p.diarsipkan);
+  document.getElementById('daftar-chips').innerHTML = `<span class="fchip${daftarStatus===''?' aktif':''}" onclick="setDaftarStatus('')">Semua <b>${tanpaStatus.length}</b></span>`
+    + chip('siap','Siap (online)') + chip('draft','Draft') + chip('ditutup','Ditutup') + (adaArsip ? chip('diarsipkan','Diarsipkan') : '');
+  const adaFilter = !parsed.kosong || daftarStatus || ['daftar-f-kelas','daftar-f-jenis','daftar-f-ta'].some(id=>document.getElementById(id).value);
+  document.getElementById('daftar-info').textContent = adaFilter ? `${data.length} dari ${daftarPaketData.length} paket cocok` : `${daftarPaketData.length} paket`;
+  document.getElementById('daftar-x').style.display = document.getElementById('daftar-cari').value ? 'block' : 'none';
+  const more = document.getElementById('daftar-more');
+  if(!data.length){
+    more.classList.add('hidden');
+    body.innerHTML = `<tr><td colspan="6" class="muted">${adaFilter?'Tidak ada paket yang cocok. <a href="#" onclick="resetDaftarPaket();return false;">Hapus semua filter</a>':'Belum ada paket ujian.'}</td></tr>`; return;
+  }
+  const tampil = data.slice(0, daftarBatas);
+  more.classList.toggle('hidden', data.length<=daftarBatas);
+  if(data.length>daftarBatas) more.querySelector('button').textContent = `Tampilkan ${Math.min(DAFTAR_HALAMAN, data.length-daftarBatas)} lagi (sisa ${data.length-daftarBatas})`;
+  const s = t=>sorotCari(t, parsed);
+  body.innerHTML = tampil.map(p=>{
+    const n = normSmtTa(p), periode = [n.smt, n.ta].filter(Boolean).join(' ');
+    return `
     <tr>
-      <td>${escapeHtml(p.judul)}<br><span class="muted">${escapeHtml(p.mata_pelajaran?.nama||'')}</span></td>
-      <td>${escapeHtml(jenisPaketTeks(p))}</td>
-      <td>${p.kelas||'-'} / ${p.program||'-'}</td>
-      <td><span class="badge ${p.status==='siap'?'siap':'draft'}">${p.diarsipkan?'diarsipkan':p.status}</span></td>
-      <td><code>${p.kode_akses}</code></td>
+      <td>${s(p.judul)}<br><span class="muted">${s(p.mata_pelajaran?.nama||'')}</span></td>
+      <td>${s(jenisPaketTeks(p))}</td>
+      <td>${s(p.kelas||'-')} / ${s(p.program||'-')}${periode?`<br><span class="muted">${s(periode)}</span>`:''}</td>
+      <td><span class="badge ${p.status==='siap'?'siap':'draft'}">${s(statusPaketTeks(p))}</span></td>
+      <td><code class="salin" title="Klik untuk menyalin kode" data-k="${escapeHtml(p.kode_akses||'')}" onclick="salinKodeAkses(this)">${s(p.kode_akses||'')}</code></td>
       <td>${p.diarsipkan ? `
         <button class="btn outline" style="padding:5px 10px;" onclick="cetakPaket('${p.id}')">Cetak</button>
         <button class="btn outline" style="padding:5px 10px;" onclick="cetakWord('${p.id}')">Cetak Word</button>
@@ -3484,8 +3709,16 @@ function renderDaftarPaket(){
           : `<button class="btn gold" style="padding:5px 10px;" onclick="aktifkanKembaliPaket('${p.id}')">Aktifkan Kembali</button>`}
         <button class="btn danger" style="padding:5px 10px;" onclick="hapusPaket('${p.id}')">Hapus</button>`}
       </td>
-    </tr>`).join('');
+    </tr>`; }).join('');
 }
+function daftarLagi(){ daftarBatas += DAFTAR_HALAMAN; renderDaftarPaket(false); }
+async function salinKodeAkses(el){
+  const kode = el.dataset.k || ''; if(!kode) return;
+  try{ await navigator.clipboard.writeText(kode); }
+  catch(e){ const t = document.createElement('textarea'); t.value = kode; document.body.appendChild(t); t.select(); try{ document.execCommand('copy'); }catch(_){} t.remove(); }
+  const asli = el.innerHTML; el.textContent = 'Tersalin ✓'; setTimeout(()=>{ el.innerHTML = asli; }, 1000);
+}
+function toggleTipsCari(id){ const e = document.getElementById(id); if(!e.innerHTML.trim()) e.innerHTML = PETUNJUK_CARI; e.classList.toggle('hidden'); }
 // Hapus PERMANEN paket yang sudah diarsipkan. Kalau paket punya hasil ujian siswa, seluruh sesi & jawaban
 // siswa untuk paket itu ikut terhapus dan TIDAK bisa dikembalikan. Soal di Bank Soal tidak ikut terhapus.
 async function hapusPermanenPaket(id){
@@ -4781,12 +5014,12 @@ async function loadArsipNilai(){
   renderArsipNilai();
 }
 function arsipTersaring(){
-  const cari = document.getElementById('arsip-cari').value.trim().toLowerCase();
+  const parsed = parsePencarian(document.getElementById('arsip-cari').value, ['kelas','jenis','mapel','program','smt','ta','judul','nama','nisn']);
   const hanyaHilang = document.getElementById('arsip-filter').value==='hilang';
   return arsipData.filter(r=>{
     if(hanyaHilang && !r.sesi_dihapus_pada) return false;
-    if(!cari) return true;
-    return [r.siswa_nama, r.siswa_nisn, r.paket_judul, r.mapel_nama].some(v=>String(v||'').toLowerCase().includes(cari));
+    return cocokPencarian(parsed, r, { umum:x=>[x.siswa_nama, x.siswa_nisn, x.paket_judul, x.mapel_nama, x.kelas, x.program, x.jenis_ujian, x.semester, x.tahun_ajaran], kelas:x=>x.kelas,
+      medan:{ kelas:x=>x.kelas, jenis:x=>x.jenis_ujian, mapel:x=>x.mapel_nama, program:x=>x.program, smt:x=>x.semester, ta:x=>x.tahun_ajaran, judul:x=>x.paket_judul, nama:x=>x.siswa_nama, nisn:x=>x.siswa_nisn } });
   });
 }
 function renderArsipNilai(){
@@ -5641,6 +5874,7 @@ async function cetakRapor(){
   const p0 = rows[0].paket_ujian;
   const ta = document.getElementById('lap-filter-ta').value;
   const smt = document.getElementById('lap-filter-smt').value;
+  if(ta && smt && !await izinCetakRaporSiswa(nisn, p0.program, p0.kelas, ta, smt)) return;   // peringatan bila belum memenuhi syarat rapor
   const nilaiValid = rows.filter(s=>s.status==='dinilai' && s.total_skor!=null).map(s=>Number(s.total_skor));
   const rata = nilaiValid.length ? (nilaiValid.reduce((a,b)=>a+b,0)/nilaiValid.length) : null;
   const adaBelumFinal = rows.some(s=>s.status==='selesai');
@@ -5837,11 +6071,16 @@ async function cetakPiagam(){
 // Nilai ujian dibaca dari tabel arsip_nilai (salinan permanen). Bobot, KKM, nilai Tugas/Praktik,
 // sikap & kehadiran disimpan di database (lihat migrasi-v7.sql).
 // ============================================================
-const DEF_PENG = { bobot:{ uh:30, uts:30, uas:40, tugas:0, praktik:0 }, mode:'sebagian', kkm:70, kkm_mapel:{}, remedial:{ mode:'kkm' } };
+const DEF_PENG = { bobot:{ uh:30, uts:30, uas:40, tugas:0, praktik:0, hadir:0 }, mode:'sebagian', kkm:70, kkm_mapel:{}, remedial:{ mode:'kkm' },
+  syarat:{ ujian:{ aktif:true, jenis:['UTS','UAS','Ulangan Harian'], min_persen:100 }, tugas:{ aktif:true, min_persen:100 }, hadir:{ aktif:true, min_persen:75 } } };
+function gabungSyarat(raw){
+  const r = raw || {}, d = DEF_PENG.syarat;
+  return { ujian:{ ...d.ujian, ...(r.ujian||{}) }, tugas:{ ...d.tugas, ...(r.tugas||{}) }, hadir:{ ...d.hadir, ...(r.hadir||{}) } };
+}
 let pengNilai = JSON.parse(JSON.stringify(DEF_PENG));
 let dbV7Tersedia = true, sudahPeringatV7 = false;
-const NAMA_KOMP = { uh:'Ulangan Harian', uts:'UTS', uas:'UAS', tugas:'Tugas', praktik:'Praktik' };
-const SINGKAT_KOMP = { uh:'UH', uts:'UTS', uas:'UAS', tugas:'TGS', praktik:'PRK' };
+const NAMA_KOMP = { uh:'Ulangan Harian', uts:'UTS', uas:'UAS', tugas:'Tugas', praktik:'Praktik', hadir:'Kehadiran' };
+const SINGKAT_KOMP = { uh:'UH', uts:'UTS', uas:'UAS', tugas:'TGS', praktik:'PRK', hadir:'HDR' };
 const NAMA_SIKAP = { A:'Sangat Baik', B:'Baik', C:'Cukup', D:'Kurang' };
 // Catatan Wali Kelas OTOMATIS berdasarkan Sikap. Dipakai hanya bila kolom "Catatan wali kelas"
 // di Input Nilai Tambahan dikosongkan; kalau guru mengetik catatan sendiri, catatan itu yang dipakai.
@@ -5892,7 +6131,7 @@ function ambilKKM(program, kelas, mapel){
 }
 function teksBobotNilai(){
   const b = pengNilai.bobot;
-  const bagian = ['uh','uts','uas','tugas','praktik'].filter(k=>b[k]>0).map(k=>`${NAMA_KOMP[k]} ${b[k]}%`);
+  const bagian = ['uh','uts','uas','tugas','praktik','hadir'].filter(k=>b[k]>0).map(k=>`${NAMA_KOMP[k]} ${b[k]}%`);
   return 'Bobot Nilai Akhir: ' + (bagian.join(' · ') || '-') + (pengNilai.mode==='lengkap' ? ' (dihitung hanya jika semua komponen berbobot ada)' : ' (komponen yang belum ada diabaikan, bobot disesuaikan)') + ` · KKM standar ${fmtN(pengNilai.kkm)}`;
 }
 
@@ -5902,18 +6141,58 @@ let manualMap = new Map();      // nisn##ta||smt||kelas||program||mapel -> { tug
 let manualBaris = [];           // baris mentah nilai_manual_komponen
 let remOnlineMap = new Map();   // nisn##ta||smt||kelas||program||mapel -> { rem_uh, rem_uts, rem_uas } dari Paket Remedial online (nilai terbaik)
 // Nilai remedial yang berlaku: input manual guru didahulukan; bila kosong dipakai nilai remedial online terbaik.
+let tugasOnlineMap = new Map();     // nisn##ta||smt||kelas||program||mapel -> { tugas, n }  rata-rata nilai Tugas online (0-100)
+let tugasOnlinePerNisn = new Map(); // nisn -> [ta||smt||kelas||program||mapel, ...]
+let hadirNilaiMap = new Map();      // nisn##ta##smt -> persentase kehadiran (dari catatan_siswa_semester)
+let daftarTugasNilai = [];
+// Nilai tambahan yang berlaku: input manual guru didahulukan; bila kosong dipakai nilai online
+// (remedial online terbaik, rata-rata tugas online, persentase kehadiran).
 function manEfektif(kunci){
-  const m = manualMap.get(kunci), o = remOnlineMap.get(kunci);
-  if(!o) return m;
+  const m = manualMap.get(kunci), o = remOnlineMap.get(kunci), t = tugasOnlineMap.get(kunci);
+  const [nisn, sisa] = kunci.split('##'), p = (sisa||'').split('||');
+  const h = hadirNilaiMap.get(`${nisn}##${p[0]}##${p[1]}`);
+  if(!o && !t && h==null) return m;
   const r = { ...(m||{}) };
-  ['rem_uh','rem_uts','rem_uas'].forEach(k=>{ if(r[k]==null && o[k]!=null) r[k] = o[k]; });
+  if(o) ['rem_uh','rem_uts','rem_uas'].forEach(k=>{ if(r[k]==null && o[k]!=null) r[k] = o[k]; });
+  if(t && r.tugas==null) r.tugas = t.tugas;
+  if(h!=null && r.hadir==null) r.hadir = h;
   return r;
+}
+// Nilai Tugas = rata-rata semua tugas (skor / nilai maksimal x 100). Tugas wajib yang TIDAK dikerjakan dihitung 0
+// setelah tugas ditutup atau tenggatnya lewat, sehingga makin banyak tugas dikerjakan makin tinggi nilai akhirnya.
+// Tugas tambahan (bukan wajib) hanya dihitung bila dikerjakan & dinilai. Jawaban yang menunggu penilaian dan tugas yang
+// dibebaskan tidak dihitung. Tugas yang masih dibuka dan belum lewat tenggat tidak dihitung dulu.
+function bangunNilaiTugasOnline(tugasRows, jawabRows, aktif){
+  tugasOnlineMap = new Map(); tugasOnlinePerNisn = new Map();
+  daftarTugasNilai = tugasRows.filter(t=>t.status!=='draft');
+  const perTugas = kelompokkan(jawabRows, j=>j.tugas_id), sekarang = Date.now(), acc = new Map();
+  daftarTugasNilai.forEach(t=>{
+    const js = new Map((perTugas.get(t.id)||[]).map(j=>[j.siswa_nisn, j]));
+    const nisns = new Set(aktif.filter(s=>s.kelasRomawi===t.kelas && s.programLabel===t.program && !(t.jurusan && jurusanSiswaBU(s) && jurusanSiswaBU(s)!==t.jurusan)).map(s=>s.nisn));
+    js.forEach((_,n)=>nisns.add(n));
+    const lewat = t.status==='ditutup' || (t.batas_waktu && new Date(t.batas_waktu).getTime() < sekarang);
+    const maks = Number(t.nilai_maks) || 100;
+    nisns.forEach(nisn=>{
+      const j = js.get(nisn); let v = null;
+      if(j && j.status==='dibebaskan') return;
+      if(j && j.status==='dinilai' && j.skor!=null) v = Math.max(0, Math.min(100, Number(j.skor)/maks*100));
+      else if(j && j.status==='dikumpulkan') return;
+      else if(t.wajib!==false && lewat) v = 0;
+      if(v==null) return;
+      const k = `${nisn}##${[t.tahun_ajaran, t.semester, t.kelas, t.program, t.mapel_nama].join('||')}`;
+      if(!acc.has(k)) acc.set(k, []); acc.get(k).push(v);
+    });
+  });
+  acc.forEach((arr,k)=>{
+    tugasOnlineMap.set(k, { tugas: arr.reduce((a,c)=>a+c,0)/arr.length, n:arr.length });
+    const [nisn, sisa] = k.split('##'); if(!tugasOnlinePerNisn.has(nisn)) tugasOnlinePerNisn.set(nisn, []); tugasOnlinePerNisn.get(nisn).push(sisa);
+  });
 }
 let catatanMap = new Map();     // nisn##ta##smt -> baris catatan_siswa_semester
 let catatanBaris = [];
 
 async function siapkanDataNilai(){
-  const [arsip, manual, cat, peng] = await Promise.all([
+  const [arsip, manual, cat, peng, tgs, tjw] = await Promise.all([
     (async ()=>{
       const kolom = 'siswa_nisn, siswa_nama, paket_id, paket_judul, jenis_ujian, mapel_nama, program, kelas, semester, tahun_ajaran, status, total_skor, waktu_selesai';
       let r = await ambilSemuaBaris(()=>supa.from('arsip_nilai').select(kolom+', remedial_komponen').order('id'));
@@ -5923,7 +6202,9 @@ async function siapkanDataNilai(){
     })(),
     ambilSemuaBaris(()=>supa.from('nilai_manual_komponen').select('*').order('id')),
     ambilSemuaBaris(()=>supa.from('catatan_siswa_semester').select('*').order('id')),
-    supa.from('pengaturan_nilai').select('*').eq('id','umum').maybeSingle()
+    supa.from('pengaturan_nilai').select('*').eq('id','umum').maybeSingle(),
+    ambilSemuaBaris(()=>supa.from('tugas').select('id, kelas, program, jurusan, semester, tahun_ajaran, mapel_nama, status, batas_waktu, wajib, nilai_maks').order('id')),
+    ambilSemuaBaris(()=>supa.from('tugas_jawaban').select('tugas_id, siswa_nisn, status, skor').order('id'))
   ]);
   if(arsip.error){
     dataNilaiSiap = false;
@@ -5942,7 +6223,8 @@ async function siapkanDataNilai(){
       mode: peng.data.mode || 'sebagian',
       kkm: peng.data.kkm!=null ? Number(peng.data.kkm) : 70,
       kkm_mapel: peng.data.kkm_mapel || {},
-      remedial: { mode:'kkm', ...(peng.data.remedial||{}) }
+      remedial: { mode:'kkm', ...(peng.data.remedial||{}) },
+      syarat: gabungSyarat(peng.data.syarat_rapor)
     };
   }
   manualBaris = manual.error ? [] : (manual.data||[]);
@@ -5954,6 +6236,13 @@ async function siapkanDataNilai(){
     manualMap.get(k)[r.komponen] = Number(r.nilai);
   });
   catatanMap = new Map(catatanBaris.map(r=>[`${r.siswa_nisn}##${r.tahun_ajaran}##${r.semester}`, r]));
+  // Persentase kehadiran per siswa per semester (komponen Kehadiran pada Nilai Akhir)
+  hadirNilaiMap = new Map();
+  catatanBaris.forEach(r=>{
+    if(r.hadir==null) return;
+    const t = Number(r.hadir)+(Number(r.sakit)||0)+(Number(r.izin)||0)+(Number(r.alpa)||0);
+    if(t>0) hadirNilaiMap.set(`${r.siswa_nisn}##${r.tahun_ajaran}##${r.semester}`, Math.round(Number(r.hadir)/t*1000)/10);
+  });
 
   const semua = arsip.data || [];
   remOnlineMap = new Map();
@@ -5972,6 +6261,7 @@ async function siapkanDataNilai(){
   let aktif = [];
   try{ aktif = await ambilSemuaSiswaAbsensi(); }
   catch(e){ alert('Gagal memuat data siswa dari database absensi: '+e.message); }
+  bangunNilaiTugasOnline(tgs.error ? [] : (tgs.data||[]), tjw.error ? [] : (tjw.data||[]), aktif);   // bila tabel tugas belum ada: dilewati
   const peta = new Map(aktif.map(s=>[s.nisn, s]));
   nilaiArsip.slice().sort((a,b)=>new Date(b.waktu_selesai||0)-new Date(a.waktu_selesai||0)).forEach(r=>{
     if(!peta.has(r.siswa_nisn)) peta.set(r.siswa_nisn, { nisn:r.siswa_nisn, nama:r.siswa_nama||r.siswa_nisn, kelasAsli:null, kelasRomawi:r.kelas||null, programLabel:r.program||null, nonaktif:true });
@@ -6032,7 +6322,8 @@ async function pastikanPengNilaiTermuat(){
         mode: data.mode || 'sebagian',
         kkm: data.kkm!=null ? Number(data.kkm) : 70,
         kkm_mapel: data.kkm_mapel || {},
-        remedial: { mode:'kkm', ...(data.remedial||{}) }
+        remedial: { mode:'kkm', ...(data.remedial||{}) },
+        syarat: gabungSyarat(data.syarat_rapor)
       };
     }
     pengNilaiTermuat = true;
@@ -6057,16 +6348,17 @@ function hitungMapel(list, man, kkm){
     return a.length ? a[0].skor : null;
   };
   const uh = uhs.length ? uhs.reduce((a,c)=>a+c,0)/uhs.length : null;
-  const v = { uh, uts:terbaru('uts'), uas:terbaru('uas'), tugas: man && man.tugas!=null ? man.tugas : null, praktik: man && man.praktik!=null ? man.praktik : null };
+  const v = { uh, uts:terbaru('uts'), uas:terbaru('uas'), tugas: man && man.tugas!=null ? man.tugas : null, praktik: man && man.praktik!=null ? man.praktik : null, hadir: man && man.hadir!=null ? man.hadir : null };
   const rem = {};   // komponen yang memakai nilai remedial: { uts:{ asli, rem } }
   ['uh','uts','uas'].forEach(k=>{
     const eff = man ? terapkanRemedial(v[k], man['rem_'+k]!=null ? man['rem_'+k] : null, kkm) : null;
     if(eff!=null){ rem[k] = { asli: v[k], rem: man['rem_'+k] }; v[k] = eff; }
   });
-  const aktifBobot = ['uh','uts','uas','tugas','praktik'].filter(k=>(b[k]||0)>0);
+  const aktifBobot = ['uh','uts','uas','tugas','praktik','hadir'].filter(k=>(b[k]||0)>0);
   const ada = aktifBobot.filter(k=>v[k]!=null);
   let na = null;
-  if(ada.length && (pengNilai.mode!=='lengkap' || ada.length===aktifBobot.length)){
+  // Kehadiran saja (tanpa ujian/tugas/praktik) tidak cukup untuk membentuk Nilai Akhir.
+  if(ada.length && ada.some(k=>k!=='hadir') && (pengNilai.mode!=='lengkap' || ada.length===aktifBobot.length)){
     const w = ada.reduce((a,k)=>a+b[k],0);
     na = ada.reduce((a,k)=>a+v[k]*b[k],0)/w;
   }
@@ -6082,6 +6374,10 @@ function susunNilaiSiswa(nisn, ta, smt){
   manualBaris.filter(r=>r.siswa_nisn===nisn && (!ta || r.tahun_ajaran===ta) && (!smt || r.semester===smt)).forEach(r=>{
     const k = [r.tahun_ajaran, r.semester, r.kelas, r.program, r.mapel_nama].join('||');
     if(!grup.has(k)) grup.set(k, []);
+  });
+  (tugasOnlinePerNisn.get(nisn)||[]).forEach(k=>{
+    const [t, sm] = k.split('||');
+    if((!ta || t===ta) && (!smt || sm===smt) && !grup.has(k)) grup.set(k, []);
   });
   const hasil = [...grup.entries()].map(([k, list])=>{
     const [t, sm, kl, pr, mp] = k.split('||');
@@ -6290,6 +6586,8 @@ async function cetakRaporSemester(){
   const ta = document.getElementById('rn-ta').value, smt = document.getElementById('rn-smt').value;
   if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
   if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
+  const rowsCek = susunNilaiSiswa(nisn, ta, smt);
+  if(rowsCek.length && !await izinCetakRaporSiswa(nisn, rowsCek[0].program, rowsCek[0].kelas, ta, smt)) return;   // peringatan bila belum memenuhi syarat rapor
   const ttdKepala = await ambilTtd('kepala_pkbm','');
   const isi = await htmlRaporSiswa(nisn, ta, smt, ttdKepala, pembuatTtdWali());
   if(!isi) return alert('Belum ada nilai final untuk siswa ini pada semester tersebut.');
@@ -6304,8 +6602,14 @@ async function cetakRaporSemesterSemua(){
   const kelas = document.getElementById('rn-kelas').value;
   if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
   if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
-  const daftar = daftarPickerSiswa('rn').filter(s=>susunNilaiSiswa(s.nisn, ta, smt).length);
+  let daftar = daftarPickerSiswa('rn').filter(s=>susunNilaiSiswa(s.nisn, ta, smt).length);
   if(!daftar.length) return alert('Belum ada nilai final untuk siswa Kelas '+kelas+' pada semester tersebut.');
+  // Siswa yang belum memenuhi syarat rapor (ujian/tugas/kehadiran): pilih cetak hanya yang memenuhi, semua, atau batal.
+  const p0 = susunNilaiSiswa(daftar[0].nisn, ta, smt)[0];
+  const disaring = await saringSiswaCetakSyarat(daftar, p0.program, p0.kelas, ta, smt);
+  if(!disaring) return;
+  if(!disaring.length) return alert('Tidak ada siswa yang memenuhi syarat rapor pada kelas ini.');
+  daftar = disaring;
   // Jendela dibuka dulu (sebelum proses async) supaya tidak diblokir pop-up blocker.
   const win = window.open('', '_blank');
   if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
@@ -6378,10 +6682,11 @@ function bangunLeger(){
   const rows = nilaiArsip.filter(r=>r.program===program && r.kelas===kelas && r.ta===ta && r.smt===smt);
   const manualKelas = manualBaris.filter(r=>r.program===program && r.kelas===kelas && r.tahun_ajaran===ta && r.semester===smt);
   const namaTerdaftar = currentMapelList.filter(m=>m.program===program && m.kelas===kelas && !m.tidak_diujikan).map(m=>m.nama);
-  const mapel = [...new Set([...namaTerdaftar, ...rows.map(r=>r.mapel_nama).filter(Boolean), ...manualKelas.map(r=>r.mapel_nama)])].sort((a,c)=>a.localeCompare(c,'id'));
+  const tugasKelas = daftarTugasNilai.filter(t=>t.program===program && t.kelas===kelas && t.tahun_ajaran===ta && t.semester===smt);
+  const mapel = [...new Set([...namaTerdaftar, ...rows.map(r=>r.mapel_nama).filter(Boolean), ...manualKelas.map(r=>r.mapel_nama), ...tugasKelas.map(t=>t.mapel_nama)])].sort((a,c)=>a.localeCompare(c,'id'));
   const b = pengNilai.bobot;
   const kolom = ['uh','uts','uas'];
-  if(b.tugas>0 || manualKelas.some(r=>r.komponen==='tugas')) kolom.push('tugas');
+  if(b.tugas>0 || tugasKelas.length || manualKelas.some(r=>r.komponen==='tugas')) kolom.push('tugas');
   if(b.praktik>0 || manualKelas.some(r=>r.komponen==='praktik')) kolom.push('praktik');
   kolom.push('na');
   const roster = new Map();
@@ -6969,9 +7274,10 @@ async function muatInputNilai(){
   } else if(c.mode==='tugas'){
     tabel.innerHTML = `<div class="card"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th style="width:110px;">Tugas (0-100)</th><th style="width:110px;">Praktik (0-100)</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
-        const m = manualMap.get(`${s.nisn}##${[c.ta, c.smt, c.kelas, c.program, c.mapel].join('||')}`) || {};
+        const kk = `${s.nisn}##${[c.ta, c.smt, c.kelas, c.program, c.mapel].join('||')}`;
+        const m = manualMap.get(kk) || {}, tOn = tugasOnlineMap.get(kk);
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
-          <td><input type="text" inputmode="decimal" id="in-t-${i}" value="${m.tugas!=null?m.tugas:''}" /></td>
+          <td><input type="text" inputmode="decimal" id="in-t-${i}" value="${m.tugas!=null?m.tugas:''}" />${tOn ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(tOn.tugas)}</b> (rata-rata ${tOn.n} tugas)${m.tugas!=null ? ' (dikalahkan nilai manual)' : ' (dipakai)'}</div>` : ''}</td>
           <td><input type="text" inputmode="decimal" id="in-p-${i}" value="${m.praktik!=null?m.praktik:''}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   } else {
@@ -7095,7 +7401,11 @@ async function simpanInputNilai(){
 async function loadPengaturanNilai(){
   if(!await siapkanDataNilai()) return;
   const b = pengNilai.bobot;
-  ['uh','uts','uas','tugas','praktik'].forEach(k=>{ document.getElementById('pn-b-'+k).value = b[k]; });
+  ['uh','uts','uas','tugas','praktik','hadir'].forEach(k=>{ document.getElementById('pn-b-'+k).value = b[k]!=null ? b[k] : 0; });
+  const sy = pengNilai.syarat || gabungSyarat(null), cek = (id,v)=>{ document.getElementById(id).checked = !!v; };
+  cek('pn-sy-uj-aktif', sy.ujian.aktif); cek('pn-sy-uj-uts', sy.ujian.jenis.includes('UTS')); cek('pn-sy-uj-uas', sy.ujian.jenis.includes('UAS')); cek('pn-sy-uj-uh', sy.ujian.jenis.includes('Ulangan Harian'));
+  document.getElementById('pn-sy-uj-min').value = sy.ujian.min_persen; cek('pn-sy-tg-aktif', sy.tugas.aktif); document.getElementById('pn-sy-tg-min').value = sy.tugas.min_persen;
+  cek('pn-sy-hd-aktif', sy.hadir.aktif); document.getElementById('pn-sy-hd-min').value = sy.hadir.min_persen;
   document.getElementById('pn-mode').value = pengNilai.mode;
   document.getElementById('pn-rem-mode').value = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
   document.getElementById('pn-kkm').value = pengNilai.kkm;
@@ -7110,7 +7420,7 @@ async function loadPengaturanNilai(){
 async function simpanPengaturanNilai(){
   if(!dbV7Tersedia) return alert('Jalankan migrasi-v7.sql di Supabase SQL Editor dulu.');
   const bobot = {};
-  for(const k of ['uh','uts','uas','tugas','praktik']){
+  for(const k of ['uh','uts','uas','tugas','praktik','hadir']){
     const n = angkaAtauNull(document.getElementById('pn-b-'+k).value);
     if(n==null || Number.isNaN(n) || n<0 || n>100) return alert(`Bobot ${NAMA_KOMP[k]} harus angka 0-100 (isi 0 bila tidak dipakai).`);
     bobot[k] = n;
@@ -7126,13 +7436,525 @@ async function simpanPengaturanNilai(){
     if(Number.isNaN(n) || (n!=null && (n<0 || n>100))) return alert('KKM per mapel harus angka 0-100 (kosongkan untuk memakai KKM standar).');
     if(n!=null) kkmMapel[el.dataset.kunci] = n;
   }
-  const { error } = await supa.from('pengaturan_nilai').upsert({ id:'umum', bobot, mode:document.getElementById('pn-mode').value, kkm, kkm_mapel:kkmMapel, remedial:{ mode:document.getElementById('pn-rem-mode').value }, updated_at:new Date().toISOString() });
-  if(error) return alert('Gagal menyimpan: '+error.message+(/remedial/i.test(error.message)?' — jalankan migrasi-v14-remedial.sql di Supabase SQL Editor dulu.':''));
-  alert('Pengaturan nilai tersimpan. Berlaku untuk Rekap Nilai, Leger, dan Transkrip.');
+  const angkaSy = (id, nama)=>{ const n = angkaAtauNull(document.getElementById(id).value); if(n==null || Number.isNaN(n) || n<0 || n>100) throw new Error(`${nama} harus angka 0-100.`); return n; };
+  let syarat;
+  try{
+    const jenis = [['pn-sy-uj-uts','UTS'],['pn-sy-uj-uas','UAS'],['pn-sy-uj-uh','Ulangan Harian']].filter(([id])=>document.getElementById(id).checked).map(([,j])=>j);
+    syarat = { ujian:{ aktif:document.getElementById('pn-sy-uj-aktif').checked, jenis, min_persen:angkaSy('pn-sy-uj-min','Minimal ujian diikuti') },
+      tugas:{ aktif:document.getElementById('pn-sy-tg-aktif').checked, min_persen:angkaSy('pn-sy-tg-min','Minimal tugas dikumpulkan') },
+      hadir:{ aktif:document.getElementById('pn-sy-hd-aktif').checked, min_persen:angkaSy('pn-sy-hd-min','Minimal kehadiran') } };
+    if(syarat.ujian.aktif && !jenis.length) throw new Error('Pilih minimal satu jenis ujian (UTS / UAS / Ulangan Harian) untuk syarat ujian, atau matikan syarat ujian.');
+  }catch(e){ return alert(e.message); }
+  const { error } = await supa.from('pengaturan_nilai').upsert({ id:'umum', bobot, mode:document.getElementById('pn-mode').value, kkm, kkm_mapel:kkmMapel, remedial:{ mode:document.getElementById('pn-rem-mode').value }, syarat_rapor:syarat, updated_at:new Date().toISOString() });
+  if(error) return alert('Gagal menyimpan: '+error.message+(/syarat_rapor/i.test(error.message)?' — jalankan migrasi-v16-tugas-syarat-rapor.sql di Supabase SQL Editor dulu.':/remedial/i.test(error.message)?' — jalankan migrasi-v14-remedial.sql di Supabase SQL Editor dulu.':''));
+  alert('Pengaturan nilai tersimpan. Berlaku untuk Rekap Nilai, Leger, Transkrip, Rapor, dan Syarat Rapor.'); syaratCache.clear();
   await loadPengaturanNilai();
 }
 
 
+// ============================================================
+// TUGAS TULIS, PENILAIAN TUGAS & SYARAT RAPOR (v13.0)
+// Tabel: tugas, tugas_jawaban (migrasi-v16-tugas-syarat-rapor.sql). Siswa mengerjakan lewat ujian.html (/api/tugas-siswa).
+// ============================================================
+let tugasList = [], tugasJawabanRingkas = [], tugasRoster = [], tugasEditId = null, tugasDbSiap = true;
+function tglLokalInput(iso){ if(!iso) return ''; const d = new Date(iso), p = n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+function fmtWaktuGuru(iso){ return iso ? new Date(iso).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}) : '-'; }
+function isiOpsiKelasTugas(pilih){
+  const pr = document.getElementById('tg-program').value, sel = document.getElementById('tg-kelas');
+  sel.innerHTML = (KELAS_PER_PROGRAM[pr]||[]).map(k=>`<option value="${k}">Kelas ${k}</option>`).join('');
+  if(pilih) sel.value = pilih;
+}
+function isiOpsiMapelTugas(pilihId){
+  const pr = document.getElementById('tg-program').value, kl = document.getElementById('tg-kelas').value, sel = document.getElementById('tg-mapel');
+  const daftar = currentMapelList.filter(m=>m.program===pr && m.kelas===kl);
+  sel.innerHTML = daftar.length ? daftar.map(m=>`<option value="${m.id}">${esc2(m.nama)}</option>`).join('') : '<option value="">(belum ada mata pelajaran untuk kelas ini)</option>';
+  if(pilihId) sel.value = pilihId;
+}
+function isiOpsiTahunTugas(sel, pilih, semua){
+  const mulai = tahunAjaranSekarang(), set = new Set();
+  for(let i=-2;i<=2;i++) set.add(`${mulai+i}/${mulai+i+1}`);
+  tugasList.forEach(t=>set.add(t.tahun_ajaran));
+  if(pilih) set.add(pilih);
+  const opsi = [...set].sort().reverse();
+  sel.innerHTML = (semua ? '<option value="">Semua tahun ajaran</option>' : '') + opsi.map(t=>`<option>${esc2(t)}</option>`).join('');
+  sel.value = pilih || (semua ? '' : taBerjalan());
+}
+async function loadTugasGuru(){
+  const body = document.getElementById('tg-body');
+  body.innerHTML = '<tr><td colspan="6" class="muted">Memuat data...</td></tr>';
+  if(!currentMapelList.length) await loadMapelList();
+  const [rt, rj, siswa] = await Promise.all([
+    ambilSemuaBaris(()=>supa.from('tugas').select('*').order('created_at', { ascending:false })),
+    ambilSemuaBaris(()=>supa.from('tugas_jawaban').select('id, tugas_id, siswa_nisn, status').order('id')),
+    ambilSemuaSiswaAbsensi().catch(()=>[])
+  ]);
+  const banner = document.getElementById('tg-banner');
+  if(rt.error){
+    tugasDbSiap = false; tugasList = []; tugasJawabanRingkas = [];
+    banner.innerHTML = '<div class="card" style="border-color:#b3261e;"><b style="color:#b3261e;">Tabel tugas belum ada di database.</b> Jalankan <code>migrasi-v16-tugas-syarat-rapor.sql</code> di Supabase SQL Editor, lalu muat ulang halaman ini.</div>';
+    body.innerHTML = '<tr><td colspan="6" class="muted">-</td></tr>'; return;
+  }
+  tugasDbSiap = true; banner.innerHTML = '';
+  tugasList = rt.data || []; tugasJawabanRingkas = rj.error ? [] : (rj.data||[]); tugasRoster = siswa;
+  if(!document.getElementById('tg-ta').options.length) isiFormTugasAwal();
+  const selF = document.getElementById('tg-f-ta'), prev = selF.value;
+  isiOpsiTahunTugas(selF, prev || taBerjalan(), true);
+  renderDaftarTugas();
+}
+function isiFormTugasAwal(){
+  isiOpsiKelasTugas(); isiOpsiMapelTugas();
+  isiOpsiTahunTugas(document.getElementById('tg-ta'), taBerjalan(), false);
+  document.getElementById('tg-smt').value = semesterBerjalan();
+}
+function siswaTugas(t){
+  return tugasRoster.filter(s=>s.kelasRomawi===t.kelas && s.programLabel===t.program && !(t.jurusan && jurusanSiswaBU(s) && jurusanSiswaBU(s)!==t.jurusan));
+}
+function hitungKataGuru(t){ t = String(t||'').trim(); return t ? t.split(/\s+/).length : 0; }
+function renderDaftarTugas(){
+  const kl = document.getElementById('tg-f-kelas').value, ta = document.getElementById('tg-f-ta').value, smt = document.getElementById('tg-f-smt').value;
+  const daftar = tugasList.filter(t=>(!kl||t.kelas===kl) && (!ta||t.tahun_ajaran===ta) && (!smt||t.semester===smt));
+  const body = document.getElementById('tg-body');
+  if(!daftar.length){ body.innerHTML = '<tr><td colspan="6" class="muted">Belum ada tugas pada filter ini.</td></tr>'; return; }
+  const badge = { draft:'<span class="badge draft">Draft</span>', dibuka:'<span class="badge siap">Dibuka</span>', ditutup:'<span class="badge manual">Ditutup</span>' };
+  body.innerHTML = daftar.map(t=>{
+    const js = tugasJawabanRingkas.filter(j=>j.tugas_id===t.id);
+    const total = siswaTugas(t).length;
+    const kumpul = js.filter(j=>j.status==='dikumpulkan'||j.status==='dinilai').length;
+    const dinilai = js.filter(j=>j.status==='dinilai').length, perlu = js.filter(j=>j.status==='dikumpulkan').length;
+    const aksiStatus = t.status==='dibuka' ? `<button class="btn outline" style="padding:3px 8px;" onclick="ubahStatusTugas('${t.id}','ditutup')">Tutup</button>`
+      : `<button class="btn outline" style="padding:3px 8px;" onclick="ubahStatusTugas('${t.id}','dibuka')">${t.status==='draft'?'Buka':'Buka lagi'}</button>`;
+    return `<tr><td><b>${esc2(t.judul)}</b><br><span class="muted">${esc2(t.mapel_nama)} &bull; ${esc2(labelSmt(t.semester))} ${esc2(t.tahun_ajaran)}${t.wajib===false?' &bull; <i>tambahan</i>':''}${t.jurusan?' &bull; '+esc2(t.jurusan):''}</span></td>
+      <td>${esc2(t.program)}<br>Kelas ${esc2(t.kelas)}</td><td>${esc2(fmtWaktuGuru(t.batas_waktu))}</td><td>${badge[t.status]||''}</td>
+      <td><b>${kumpul}</b> / ${total} siswa${perlu?`<br><span style="color:#9A6B00;font-weight:600;">${perlu} perlu dinilai</span>`:''}${dinilai?`<br><span class="muted">${dinilai} dinilai</span>`:''}</td>
+      <td><div class="mon-aksi">${aksiStatus}
+        <button class="btn" style="padding:3px 8px;" onclick="bukaNilaiTugas('${t.id}')">Nilai</button>
+        <button class="btn outline" style="padding:3px 8px;" onclick="editTugasGuru('${t.id}')">Edit</button>
+        <button class="btn danger" style="padding:3px 8px;" onclick="hapusTugasGuru('${t.id}')">Hapus</button></div></td></tr>`;
+  }).join('');
+}
+function bacaFormTugas(){
+  const val = id => document.getElementById(id).value;
+  const mapelId = val('tg-mapel'), mapel = currentMapelList.find(m=>m.id===mapelId);
+  const judul = val('tg-judul').trim(), instruksi = val('tg-instruksi').trim();
+  if(!mapel) throw new Error('Pilih mata pelajaran (buat dulu di menu Mata Pelajaran bila belum ada).');
+  if(!judul) throw new Error('Judul tugas wajib diisi.');
+  if(instruksi.length < 10) throw new Error('Instruksi tugas wajib diisi (minimal 10 karakter).');
+  const angka = (id, nama, min)=>{ const n = Number(val(id)); if(!Number.isFinite(n) || n<min || !Number.isInteger(n) && id!=='tg-nilaimaks') throw new Error(`${nama} harus angka${min>0?' lebih dari 0':' 0 atau lebih'}.`); return n; };
+  const minK = angka('tg-min','Minimal kata',0), maksK = angka('tg-maks','Maksimal kata',0), pel = angka('tg-pel','Batas pelanggaran',0), nmaks = angka('tg-nilaimaks','Nilai maksimal',1);
+  if(maksK>0 && minK>maksK) throw new Error('Minimal kata tidak boleh lebih besar dari maksimal kata.');
+  const batas = val('tg-batas');
+  return { judul, instruksi, mapel_id:mapel.id, mapel_nama:mapel.nama, program:val('tg-program'), kelas:val('tg-kelas'), jurusan:val('tg-jurusan')||null,
+    semester:val('tg-smt'), tahun_ajaran:val('tg-ta'), status:val('tg-status'), batas_waktu: batas ? new Date(batas).toISOString() : null,
+    terima_terlambat:document.getElementById('tg-telat').checked, wajib:document.getElementById('tg-wajib').checked,
+    nilai_maks:nmaks, min_kata:minK, maks_kata:maksK, batas_pelanggaran:pel, updated_at:new Date().toISOString() };
+}
+async function simpanTugasGuru(){
+  if(!tugasDbSiap) return alert('Jalankan migrasi-v16-tugas-syarat-rapor.sql di Supabase SQL Editor dulu.');
+  let baris; try{ baris = bacaFormTugas(); }catch(e){ return alert(e.message); }
+  if(baris.status==='dibuka' && !confirm('Tugas langsung DIBUKA dan terlihat oleh siswa Kelas '+baris.kelas+'. Lanjutkan?')) return;
+  const btn = document.getElementById('tg-simpan-btn'); btn.disabled = true;
+  try{
+    if(tugasEditId){
+      const { error } = await supa.from('tugas').update(baris).eq('id', tugasEditId); if(error) throw error;
+    } else {
+      const { data:{ user } } = await supa.auth.getUser();
+      const { error } = await supa.from('tugas').insert({ ...baris, dibuat_oleh:user?.email||null }); if(error) throw error;
+    }
+    alert(tugasEditId ? 'Tugas diperbarui.' : 'Tugas tersimpan.' + (baris.status==='draft' ? ' Status masih Draft: klik Buka pada daftar agar siswa bisa mengerjakan.' : ''));
+    batalEditTugas(true); await loadTugasGuru();
+  }catch(e){ alert('Gagal menyimpan: '+(e.message||e)); }
+  finally{ btn.disabled = false; }
+}
+function editTugasGuru(id){
+  const t = tugasList.find(x=>x.id===id); if(!t) return;
+  tugasEditId = id;
+  document.getElementById('tg-program').value = t.program; isiOpsiKelasTugas(t.kelas); isiOpsiMapelTugas(t.mapel_id);
+  isiOpsiTahunTugas(document.getElementById('tg-ta'), t.tahun_ajaran, false);
+  const set = (i,v)=>{ document.getElementById(i).value = v; };
+  set('tg-smt',t.semester); set('tg-jurusan',t.jurusan||''); set('tg-judul',t.judul); set('tg-instruksi',t.instruksi);
+  set('tg-batas',tglLokalInput(t.batas_waktu)); set('tg-min',t.min_kata||0); set('tg-maks',t.maks_kata||0); set('tg-nilaimaks',t.nilai_maks); set('tg-pel',t.batas_pelanggaran); set('tg-status',t.status);
+  document.getElementById('tg-wajib').checked = t.wajib!==false; document.getElementById('tg-telat').checked = t.terima_terlambat!==false;
+  document.getElementById('tg-form-judul').textContent = 'Edit Tugas'; document.getElementById('tg-batal-btn').classList.remove('hidden');
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+function batalEditTugas(diam){
+  tugasEditId = null;
+  ['tg-judul','tg-instruksi','tg-batas'].forEach(i=>{ document.getElementById(i).value = ''; });
+  document.getElementById('tg-min').value = 0; document.getElementById('tg-maks').value = 0; document.getElementById('tg-nilaimaks').value = 100; document.getElementById('tg-pel').value = 3;
+  document.getElementById('tg-status').value = 'draft'; document.getElementById('tg-jurusan').value = '';
+  document.getElementById('tg-wajib').checked = true; document.getElementById('tg-telat').checked = true;
+  document.getElementById('tg-form-judul').textContent = 'Buat Tugas Baru'; document.getElementById('tg-batal-btn').classList.add('hidden');
+}
+async function ubahStatusTugas(id, status){
+  const t = tugasList.find(x=>x.id===id); if(!t) return;
+  if(status==='dibuka' && !confirm(`Buka tugas "${t.judul}" untuk siswa Kelas ${t.kelas}?`)) return;
+  if(status==='ditutup' && !confirm(`Tutup tugas "${t.judul}"?\n\nSiswa tidak bisa lagi mengerjakan. Siswa yang belum mengumpulkan dihitung 0 pada rata-rata nilai tugas dan menjadi kekurangan syarat rapor.`)) return;
+  const { error } = await supa.from('tugas').update({ status, updated_at:new Date().toISOString() }).eq('id', id);
+  if(error) return alert('Gagal: '+error.message);
+  loadTugasGuru();
+}
+async function hapusTugasGuru(id){
+  const t = tugasList.find(x=>x.id===id); if(!t) return;
+  const n = tugasJawabanRingkas.filter(j=>j.tugas_id===id).length;
+  if(!confirm(`Hapus tugas "${t.judul}"?` + (n ? `\n\nPERHATIAN: ${n} jawaban/nilai siswa pada tugas ini ikut TERHAPUS permanen dan nilai tugas siswa berubah. Bila hanya ingin menghentikan pengerjaan, gunakan tombol Tutup.` : ''))) return;
+  if(n && !confirm('Yakin? Tindakan ini tidak bisa dibatalkan.')) return;
+  const { error } = await supa.from('tugas').delete().eq('id', id);
+  if(error) return alert('Gagal menghapus: '+error.message);
+  loadTugasGuru();
+}
+function bukaNilaiTugas(id){ showTab('nilaitugas'); setTimeout(()=>{ document.getElementById('nt-tugas').value = id; muatPenilaianTugas(); }, 0); }
+
+// ---------- PENILAIAN TUGAS ----------
+let ntData = { tugas:null, rows:new Map(), roster:[], tampil:[] }, ntModal = null;
+async function loadPenilaianTugas(){
+  if(!currentMapelList.length) await loadMapelList();
+  const r = await ambilSemuaBaris(()=>supa.from('tugas').select('*').order('created_at', { ascending:false }));
+  const sel = document.getElementById('nt-tugas'), prev = sel.value;
+  if(r.error){ sel.innerHTML = '<option value="">Tabel tugas belum ada (jalankan migrasi v16)</option>'; return; }
+  tugasList = r.data || [];
+  sel.innerHTML = '<option value="">— pilih tugas —</option>' + tugasList.map(t=>`<option value="${t.id}">${esc2(t.judul)} — ${esc2(t.mapel_nama)} (Kelas ${esc2(t.kelas)}, ${esc2(t.semester==='Ganjil'?'Smt 1':'Smt 2')} ${esc2(t.tahun_ajaran)})${t.status==='draft'?' [draft]':''}</option>`).join('');
+  if(tugasList.some(t=>t.id===prev)) { sel.value = prev; muatPenilaianTugas(); }
+}
+async function muatPenilaianTugas(){
+  const id = document.getElementById('nt-tugas').value, body = document.getElementById('nt-body');
+  if(!id){ body.innerHTML = '<tr><td colspan="7" class="muted">Pilih tugas terlebih dahulu.</td></tr>'; document.getElementById('nt-ringkas').innerHTML = ''; return; }
+  body.innerHTML = '<tr><td colspan="7" class="muted">Memuat...</td></tr>';
+  const t = tugasList.find(x=>x.id===id);
+  const [rj, siswa] = await Promise.all([ ambilSemuaBaris(()=>supa.from('tugas_jawaban').select('*').eq('tugas_id', id).order('id')), ambilSemuaSiswaAbsensi().catch(()=>[]) ]);
+  if(rj.error){ body.innerHTML = `<tr><td colspan="7">${esc2(rj.error.message)}</td></tr>`; return; }
+  tugasRoster = siswa;
+  const rows = new Map((rj.data||[]).map(x=>[x.siswa_nisn, x]));
+  const roster = new Map(siswaTugas(t).map(s=>[s.nisn, s.nama]));
+  rows.forEach((x,nisn)=>{ if(!roster.has(nisn)) roster.set(nisn, x.siswa_nama || nisn); });
+  ntData = { tugas:t, rows, roster:[...roster.entries()].map(([nisn,nama])=>({ nisn, nama })).sort((a,b)=>a.nama.localeCompare(b.nama,'id')), tampil:[] };
+  renderPenilaianTugas();
+}
+function statusTugasBaris(x){ return x ? x.status : 'belum'; }
+function renderPenilaianTugas(){
+  const { tugas:t, rows, roster } = ntData; if(!t) return;
+  const q = document.getElementById('nt-cari').value.trim().toLowerCase(), f = document.getElementById('nt-filter').value;
+  const cnt = { total:roster.length, kumpul:0, perlu:0, dinilai:0, belum:0, langgar:0, bebas:0 };
+  roster.forEach(s=>{ const x = rows.get(s.nisn), st = statusTugasBaris(x);
+    if(st==='dikumpulkan'){ cnt.kumpul++; cnt.perlu++; } else if(st==='dinilai'){ cnt.kumpul++; cnt.dinilai++; } else if(st==='dibebaskan') cnt.bebas++; else cnt.belum++;
+    if(x && x.pelanggaran>0) cnt.langgar++; });
+  document.getElementById('nt-ringkas').innerHTML = `<div class="kotak"><b>${cnt.kumpul}/${cnt.total}</b>Sudah mengumpulkan</div><div class="kotak"><b style="color:#9A6B00;">${cnt.perlu}</b>Perlu dinilai</div><div class="kotak"><b>${cnt.dinilai}</b>Sudah dinilai</div><div class="kotak"><b style="color:#b3261e;">${cnt.belum}</b>Belum mengumpulkan</div><div class="kotak"><b style="color:#b3261e;">${cnt.langgar}</b>Pernah melanggar</div>${cnt.bebas?`<div class="kotak"><b>${cnt.bebas}</b>Dibebaskan</div>`:''}`;
+  const tampil = roster.filter(s=>{
+    if(q && !(s.nama.toLowerCase().includes(q) || s.nisn.toLowerCase().includes(q))) return false;
+    const x = rows.get(s.nisn), st = statusTugasBaris(x);
+    if(f==='perlu') return st==='dikumpulkan'; if(f==='belum') return st==='belum' || st==='draf'; if(f==='dinilai') return st==='dinilai'; if(f==='langgar') return !!(x && x.pelanggaran>0);
+    return true; });
+  ntData.tampil = tampil;
+  const label = { belum:'<span class="badge draft">Belum</span>', draf:'<span class="badge draft">Draf (menulis)</span>', dikumpulkan:'<span class="badge manual">Perlu dinilai</span>', dinilai:'<span class="badge siap">Dinilai</span>', dibebaskan:'<span class="badge mon-selesai">Dibebaskan</span>' };
+  document.getElementById('nt-body').innerHTML = tampil.length ? tampil.map((s,i)=>{
+    const x = rows.get(s.nisn), st = statusTugasBaris(x);
+    const alasan = x && Array.isArray(x.alasan_pelanggaran) ? x.alasan_pelanggaran.map(a=>`${fmtWaktuGuru(a.w)}: ${a.a}`).join('\n') : '';
+    const pel = x && x.pelanggaran>0 ? `<span title="${esc2(alasan)}" style="color:#b3261e;font-weight:700;cursor:help;">${x.pelanggaran}x</span>${x.diakhiri_otomatis?' <span class="badge mon-dikunci">otomatis</span>':''}` : '<span class="muted">0</span>';
+    const nilai = st==='dinilai' ? `<b>${fmtN(x.skor)}</b>${Number(t.nilai_maks)!==100?` / ${t.nilai_maks}`:''}` : '<span class="muted">-</span>';
+    let aksi;
+    if(st==='dikumpulkan' || st==='dinilai') aksi = `<button class="btn${st==='dinilai'?' outline':''}" style="padding:3px 8px;" onclick="bukaModalNilaiTugas('${esc2(s.nisn)}')">${st==='dinilai'?'Lihat / Ubah':'Nilai'}</button>`;
+    else if(st==='draf') aksi = `<button class="btn outline" style="padding:3px 8px;" onclick="bukaModalNilaiTugas('${esc2(s.nisn)}')">Lihat draf</button>`;
+    else if(st==='dibebaskan') aksi = `<button class="btn outline" style="padding:3px 8px;" onclick="bukaModalNilaiTugas('${esc2(s.nisn)}')">Ubah</button>`;
+    else aksi = `<button class="btn outline" style="padding:3px 8px;" onclick="bukaModalNilaiTugas('${esc2(s.nisn)}')">Nilai manual / Bebaskan</button>`;
+    return `<tr><td>${i+1}</td><td>${esc2(s.nama)}<br><span class="muted">${esc2(s.nisn)}</span></td><td>${label[st]||''}${x&&x.terlambat?' <span class="badge mon-terputus">terlambat</span>':''}${x&&x.mode==='manual'?' <span class="badge ai">manual</span>':''}</td><td>${x?x.jumlah_kata:0}</td><td>${pel}</td><td>${nilai}</td><td>${aksi}</td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="muted">Tidak ada siswa pada filter ini.</td></tr>';
+}
+function bukaModalNilaiTugas(nisn){
+  const { tugas:t, rows, roster } = ntData; const s = roster.find(r=>r.nisn===nisn); if(!s) return;
+  const x = rows.get(nisn) || null; ntModal = { nisn, nama:s.nama };
+  const lama = document.getElementById('modal-nt'); if(lama) lama.remove();
+  const st = statusTugasBaris(x), punyaJawaban = x && x.mode!=='manual' && x.jawaban;
+  const alasan = x && Array.isArray(x.alasan_pelanggaran) && x.alasan_pelanggaran.length ? `<ul style="margin:4px 0 0;padding-left:18px;font-size:13px;">${x.alasan_pelanggaran.map(a=>`<li>${esc2(fmtWaktuGuru(a.w))} &mdash; ${esc2(a.a)}</li>`).join('')}</ul>` : '';
+  const m = document.createElement('div'); m.id = 'modal-nt'; m.className = 'modal-bg';
+  m.innerHTML = `<div class="modal" style="max-width:760px;">
+    <h3 style="margin-top:0;">${esc2(s.nama)} <span class="muted">(${esc2(nisn)})</span></h3>
+    <p class="muted" style="margin:0 0 8px;">${esc2(t.judul)} &mdash; ${esc2(t.mapel_nama)}</p>
+    <div class="essay-item" style="margin-bottom:10px;"><div class="lbl">Instruksi tugas</div><div class="box">${esc2(t.instruksi)}</div></div>
+    ${x ? `<p class="muted" style="margin:0 0 6px;">Status: <b>${esc2(st)}</b> &bull; ${x.jumlah_kata} kata${x.dikumpulkan_pada?` &bull; dikumpulkan ${esc2(fmtWaktuGuru(x.dikumpulkan_pada))}`:''}${x.terlambat?' &bull; <b style="color:#b3261e;">terlambat</b>':''}${x.diakhiri_otomatis?' &bull; <b style="color:#b3261e;">dikumpulkan otomatis (batas pelanggaran)</b>':''}</p>` : ''}
+    ${x && x.pelanggaran>0 ? `<div style="background:#FDF4F2;border:1px solid #E7B3AA;border-radius:3px;padding:8px 12px;margin-bottom:10px;"><b style="color:#b3261e;">Pelanggaran: ${x.pelanggaran}x</b>${alasan}</div>` : ''}
+    ${punyaJawaban ? `<div class="essay-item" style="margin-bottom:10px;"><div class="lbl">Jawaban siswa</div><div class="box jwb" style="max-height:340px;overflow:auto;">${esc2(x.jawaban)}</div></div>` : (x && x.mode==='manual' ? '<p class="muted">Nilai ini diinput manual oleh guru.</p>' : (st==='belum'||!x ? '<p class="muted">Siswa belum mengerjakan tugas ini. Anda dapat memberi nilai manual (mis. siswa tanpa HP) atau membebaskannya dari tugas ini.</p>' : '<p class="muted">Belum ada jawaban tertulis.</p>'))}
+    <div class="grid2"><div class="field"><label>Nilai (0 - ${esc2(t.nilai_maks)})</label><input type="text" inputmode="decimal" id="nt-skor" value="${x && x.skor!=null ? x.skor : ''}" /></div>
+      <div class="field"><label>Catatan untuk siswa (opsional)</label><input type="text" id="nt-catatan" maxlength="500" value="${esc2(x?x.catatan_guru||'':'')}" /></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+      <button class="btn gold" onclick="simpanNilaiTugas(false)">💾 Simpan Nilai</button>
+      <button class="btn" onclick="simpanNilaiTugas(true)">Simpan &amp; Berikutnya</button>
+      ${x && (st==='dikumpulkan'||st==='dinilai') ? `<button class="btn outline" onclick="bukaKembaliTugas()" title="Siswa bisa melanjutkan menulis; pelanggaran direset ke 0">Buka Kembali untuk Siswa</button>` : ''}
+      ${!x || st==='draf' ? '<button class="btn outline" onclick="bebaskanTugas()">Bebaskan dari Tugas Ini</button>' : ''}
+      ${x ? '<button class="btn danger" onclick="resetTugasSiswa()" title="Hapus jawaban/nilai; siswa mulai dari awal">Reset</button>' : ''}
+      <button class="btn outline" onclick="document.getElementById('modal-nt').remove()">Tutup</button>
+    </div></div>`;
+  document.body.appendChild(m);
+}
+async function simpanNilaiTugas(lanjut){
+  const { tugas:t, rows } = ntData, { nisn, nama } = ntModal;
+  const skor = angkaAtauNull(document.getElementById('nt-skor').value), catatan = document.getElementById('nt-catatan').value.trim() || null;
+  if(skor==null || Number.isNaN(skor) || skor<0 || skor>Number(t.nilai_maks)) return alert(`Nilai harus angka 0 - ${t.nilai_maks}.`);
+  const sekarang = new Date().toISOString();
+  try{
+    const { data:{ user } } = await supa.auth.getUser(); const x = rows.get(nisn);
+    if(x){
+      const { data, error } = await supa.from('tugas_jawaban').update({ status:'dinilai', skor, catatan_guru:catatan, dinilai_pada:sekarang, dinilai_oleh:user?.email||null,
+        ...(x.status==='draf' || x.status==='dibebaskan' ? { dikumpulkan_pada:x.dikumpulkan_pada||sekarang } : {}) }).eq('id', x.id).select().single();
+      if(error) throw error; rows.set(nisn, data);
+    } else {
+      const { data, error } = await supa.from('tugas_jawaban').insert({ tugas_id:t.id, siswa_nisn:nisn, siswa_nama:nama, jawaban:'(nilai diinput guru)', status:'dinilai', skor, catatan_guru:catatan, mode:'manual',
+        dikumpulkan_pada:sekarang, dinilai_pada:sekarang, dinilai_oleh:user?.email||null }).select().single();
+      if(error) throw error; rows.set(nisn, data);
+    }
+  }catch(e){ return alert('Gagal menyimpan: '+(e.message||e)); }
+  document.getElementById('modal-nt').remove(); renderPenilaianTugas();
+  if(lanjut){
+    const urut = ntData.roster, i = urut.findIndex(s=>s.nisn===nisn);
+    const berikut = [...urut.slice(i+1), ...urut.slice(0,i)].find(s=>statusTugasBaris(rows.get(s.nisn))==='dikumpulkan');
+    if(berikut) bukaModalNilaiTugas(berikut.nisn); else alert('Tidak ada lagi jawaban yang perlu dinilai.');
+  }
+}
+async function ubahBarisTugas(patch, pesan){
+  const { rows } = ntData, { nisn, nama } = ntModal, t = ntData.tugas, x = rows.get(nisn);
+  try{
+    if(x){ const { data, error } = await supa.from('tugas_jawaban').update(patch).eq('id', x.id).select().single(); if(error) throw error; rows.set(nisn, data); }
+    else { const { data, error } = await supa.from('tugas_jawaban').insert({ tugas_id:t.id, siswa_nisn:nisn, siswa_nama:nama, jawaban:'', ...patch }).select().single(); if(error) throw error; rows.set(nisn, data); }
+  }catch(e){ return alert('Gagal: '+(e.message||e)); }
+  document.getElementById('modal-nt').remove(); renderPenilaianTugas(); if(pesan) alert(pesan);
+}
+function bukaKembaliTugas(){
+  if(!confirm(`Buka kembali tugas untuk ${ntModal.nama}?\n\nSiswa bisa melanjutkan menulis dari jawaban terakhir dan mengumpulkan ulang. Hitungan pelanggaran direset ke 0, nilai lama dihapus.`)) return;
+  ubahBarisTugas({ status:'draf', skor:null, catatan_guru:null, pelanggaran:0, diakhiri_otomatis:false, terlambat:false, dikumpulkan_pada:null, dinilai_pada:null, dinilai_oleh:null }, 'Tugas dibuka kembali. Siswa dapat melanjutkan dari daftar tugasnya.');
+}
+function bebaskanTugas(){
+  if(!confirm(`Bebaskan ${ntModal.nama} dari tugas ini? Tugas ini tidak dihitung untuk syarat rapor maupun rata-rata nilai tugas siswa tersebut.`)) return;
+  ubahBarisTugas({ status:'dibebaskan', skor:null });
+}
+async function resetTugasSiswa(){
+  const x = ntData.rows.get(ntModal.nisn); if(!x) return;
+  if(!confirm(`Reset tugas ${ntModal.nama}? Jawaban dan nilai dihapus permanen; siswa mulai dari awal.`)) return;
+  const { error } = await supa.from('tugas_jawaban').delete().eq('id', x.id);
+  if(error) return alert('Gagal: '+error.message);
+  ntData.rows.delete(ntModal.nisn); document.getElementById('modal-nt').remove(); renderPenilaianTugas();
+}
+function unduhPenilaianTugas(){
+  const { tugas:t, rows, roster } = ntData; if(!t) return alert('Pilih tugas terlebih dahulu.');
+  const aoa = [['No','Nama','NISN','Status','Jumlah Kata','Terlambat','Pelanggaran','Nilai (0-'+t.nilai_maks+')','Nilai (0-100)','Catatan Guru']];
+  roster.forEach((s,i)=>{ const x = rows.get(s.nisn);
+    aoa.push([i+1, s.nama, s.nisn, x?x.status:'belum', x?x.jumlah_kata:0, x&&x.terlambat?'Ya':'', x?x.pelanggaran:0, x&&x.skor!=null?Number(x.skor):'', x&&x.skor!=null?Math.round(Number(x.skor)/Number(t.nilai_maks)*1000)/10:'', x?x.catatan_guru||'':'']); });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Nilai Tugas');
+  XLSX.writeFile(wb, `Nilai_Tugas_${namaFileAman(t.judul)}_Kelas_${t.kelas}.xlsx`);
+}
+
+// ---------- SYARAT RAPOR ----------
+let syaratData = null, syaratCache = new Map();
+async function panggilSyaratKelas(program, kelas, ta, smt){
+  const { data:{ session } } = await supa.auth.getSession();
+  const res = await fetch('/api/tugas-siswa', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}` }, body:JSON.stringify({ aksi:'syarat_kelas', program, kelas, ta, smt }) });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || `Gagal (${res.status})`);
+  return data;
+}
+function isiOpsiKelasSyarat(){
+  const pr = document.getElementById('sr-program').value, sel = document.getElementById('sr-kelas');
+  const daftar = pr ? KELAS_PER_PROGRAM[pr] : [...KELAS_PER_PROGRAM['Paket B'], ...KELAS_PER_PROGRAM['Paket C']];
+  sel.innerHTML = '<option value="">Semua kelas</option>' + daftar.map(k=>`<option value="${k}">Kelas ${k}</option>`).join('');
+}
+function loadSyaratRapor(){
+  const selTa = document.getElementById('sr-ta');
+  if(!selTa.options.length){
+    isiOpsiTahunTugas(selTa, taBerjalan(), false); document.getElementById('sr-smt').value = semesterBerjalan(); isiOpsiKelasSyarat();
+  }
+}
+async function muatSyaratRapor(){
+  const f = { program:document.getElementById('sr-program').value, kelas:document.getElementById('sr-kelas').value, ta:document.getElementById('sr-ta').value, smt:document.getElementById('sr-smt').value };
+  const body = document.getElementById('sr-body'); body.innerHTML = '<tr><td colspan="8" class="muted">Menghitung syarat rapor... (bisa beberapa detik)</td></tr>';
+  try{
+    const d = await panggilSyaratKelas(f.program, f.kelas, f.ta, f.smt);
+    syaratData = { ...d, filter:f };
+    syaratCache.set([f.program,f.kelas,f.ta,f.smt].join('|'), { t:Date.now(), data:d });
+    const c = d.config;
+    document.getElementById('sr-banner').innerHTML = `<p class="muted" style="margin:0 0 10px;">Aturan saat ini: ${c.ujian.aktif?`ujian (${c.ujian.jenis.join(', ')||'-'}) minimal <b>${c.ujian.min_persen}%</b> diikuti`:'ujian tidak dipakai'} &bull; ${c.tugas.aktif?`tugas wajib minimal <b>${c.tugas.min_persen}%</b> dikumpulkan`:'tugas tidak dipakai'} &bull; ${c.hadir.aktif?`kehadiran minimal <b>${c.hadir.min_persen}%</b>`:'kehadiran tidak dipakai'}. Ubah di Pengaturan Nilai.</p>`;
+    renderSyaratRapor();
+  }catch(e){ body.innerHTML = `<tr><td colspan="8"><span style="color:#b3261e;">Gagal memuat: ${esc2(e.message)}</span></td></tr>`; }
+}
+function selSyarat(r, teksNilai){
+  if(!r.aktif) return '<span class="muted">tidak dipakai</span>';
+  if(r.status==='tanpa_data') return '<span class="muted">belum ada data</span>';
+  return `<span style="color:${r.status==='lulus'?'#1F5A25':'#b3261e'};font-weight:600;">${teksNilai}</span>`;
+}
+function renderSyaratRapor(){
+  if(!syaratData) return;
+  const q = document.getElementById('sr-cari').value.trim().toLowerCase(), hanya = document.getElementById('sr-hanya').checked;
+  const semua = syaratData.siswa;
+  const urut = semua.slice().sort((a,b)=>a.program.localeCompare(b.program) || BU_URUT_KELAS.indexOf(a.kelas)-BU_URUT_KELAS.indexOf(b.kelas) || a.nama.localeCompare(b.nama,'id'));
+  const tampil = urut.filter(s=>(!q || s.nama.toLowerCase().includes(q) || s.nisn.toLowerCase().includes(q)) && (!hanya || !s.memenuhi));
+  syaratData.tampil = tampil;
+  const ok = semua.filter(s=>s.memenuhi).length;
+  const k = (fn)=>semua.filter(fn).length;
+  document.getElementById('sr-ringkas').innerHTML = `<div class="kotak"><b>${semua.length}</b>Siswa</div><div class="kotak"><b style="color:#1F5A25;">${ok}</b>Memenuhi syarat</div><div class="kotak"><b style="color:#b3261e;">${semua.length-ok}</b>Belum memenuhi</div><div class="kotak"><b>${k(s=>s.ujian.status==='kurang')}</b>Kurang ujian</div><div class="kotak"><b>${k(s=>s.tugas.status==='kurang')}</b>Kurang tugas</div><div class="kotak"><b>${k(s=>s.hadir.status==='kurang')}</b>Kehadiran kurang</div>`;
+  document.getElementById('sr-body').innerHTML = tampil.length ? tampil.map((s,i)=>`<tr${s.memenuhi?'':' class="bu-perlu"'}>
+    <td>${i+1}</td><td style="white-space:nowrap;">${esc2(s.nama)}<br><span class="muted">${esc2(s.nisn)}</span></td><td>${esc2(s.kelasAsli||s.kelas)}</td>
+    <td>${selSyarat(s.ujian, `${s.ujian.selesai}/${s.ujian.total}`)}</td><td>${selSyarat(s.tugas, `${s.tugas.selesai}/${s.tugas.total}`)}</td>
+    <td>${s.hadir.aktif ? (s.hadir.ada ? `<span style="color:${s.hadir.status==='lulus'?'#1F5A25':'#b3261e'};font-weight:600;">${fmtN(s.hadir.persen)}%</span>` : '<span class="muted">belum ada data</span>') : '<span class="muted">tidak dipakai</span>'}</td>
+    <td>${s.memenuhi ? '<span class="badge siap">Memenuhi</span>' : '<span class="badge draft" style="color:#b3261e;">Belum</span>'}</td>
+    <td style="font-size:12.5px;">${s.kekurangan.length ? s.kekurangan.map(esc2).join('<br>') : '<span class="muted">-</span>'}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="muted">Tidak ada siswa pada filter ini.</td></tr>';
+}
+function unduhSyaratRapor(){
+  if(!syaratData) return alert('Klik Tampilkan dulu.');
+  const aoa = [['No','Nama','NISN','Kelas','Ujian Diikuti','Ujian Total','Tugas Dikumpulkan','Tugas Total','Kehadiran (%)','Status','Kekurangan']];
+  syaratData.tampil.forEach((s,i)=>aoa.push([i+1, s.nama, s.nisn, s.kelasAsli||s.kelas, s.ujian.selesai, s.ujian.total, s.tugas.selesai, s.tugas.total, s.hadir.ada?s.hadir.persen:'', s.memenuhi?'Memenuhi':'Belum memenuhi', s.kekurangan.join(' | ')]));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Syarat Rapor');
+  XLSX.writeFile(wb, `Syarat_Rapor_${namaFileAman(syaratData.filter.ta)}_${syaratData.filter.smt}.xlsx`);
+}
+function cetakSyaratRapor(){
+  if(!syaratData) return alert('Klik Tampilkan dulu.');
+  const win = window.open('', '_blank'); if(!win) return alert('Pop-up diblokir browser.');
+  const f = syaratData.filter;
+  win.document.write(`<html><head><title>Syarat Rapor</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:18px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #333;padding:4px 6px;vertical-align:top;}th{background:#eee;}.kop{display:flex;align-items:center;gap:12px;border-bottom:3px double #000;padding-bottom:6px;margin-bottom:10px;}.kop img{width:70px;}.kop .t{flex:1;text-align:center;}.kop .t div{line-height:1.3;}</style></head><body>${kopSekolahHTML(70)}
+    <h3 style="text-align:center;margin:6px 0;">DAFTAR KELENGKAPAN SYARAT RAPOR</h3><div style="text-align:center;margin-bottom:8px;">${esc2(labelSmt(f.smt))} &mdash; Tahun Ajaran ${esc2(f.ta)}${f.program?' &mdash; '+esc2(f.program):''}${f.kelas?' Kelas '+esc2(f.kelas):''}</div>
+    <table><thead><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Ujian</th><th>Tugas</th><th>Hadir</th><th>Status</th><th>Kekurangan</th></tr></thead><tbody>${syaratData.tampil.map((s,i)=>`<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.kelasAsli||s.kelas)}</td><td>${s.ujian.aktif&&s.ujian.total?s.ujian.selesai+'/'+s.ujian.total:'-'}</td><td>${s.tugas.aktif&&s.tugas.total?s.tugas.selesai+'/'+s.tugas.total:'-'}</td><td>${s.hadir.ada?fmtN(s.hadir.persen)+'%':'-'}</td><td>${s.memenuhi?'Memenuhi':'<b>Belum</b>'}</td><td>${s.kekurangan.map(esc2).join('<br>')}</td></tr>`).join('')}</tbody></table>
+    <script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  win.document.close();
+}
+// Menyimpan Hadir/Sakit/Izin/Alpa dari absensi ke catatan_siswa_semester supaya komponen Kehadiran ikut dihitung di Nilai Akhir.
+// Hanya siswa yang BELUM punya data kehadiran tersimpan; data yang sudah diinput/disimpan guru tidak ditimpa.
+async function simpanKehadiranKeNilai(){
+  if(!syaratData) return alert('Klik Tampilkan dulu.');
+  const { ta, smt } = syaratData.filter;
+  const kandidat = syaratData.siswa.filter(s=>s.hadir.ada && s.hadir.sumber==='absensi');
+  if(!kandidat.length) return alert('Tidak ada data kehadiran baru dari absensi yang perlu disimpan (semua sudah tersimpan atau belum ada data absensi).');
+  if(!confirm(`Simpan kehadiran ${kandidat.length} siswa dari aplikasi absensi ke Input Nilai Tambahan (${labelSmt(smt)} ${ta})?\n\nData yang sudah pernah disimpan tidak ditimpa. Sikap dan catatan wali kelas tidak diubah. Gunakan pada akhir semester agar rekap absensi sudah lengkap.`)) return;
+  const baris = kandidat.map(s=>({ siswa_nisn:s.nisn, siswa_nama:s.nama, program:s.program, kelas:s.kelas, tahun_ajaran:ta, semester:smt, hadir:s.hadir.hadir, sakit:s.hadir.sakit, izin:s.hadir.izin, alpa:s.hadir.alpa, updated_at:new Date().toISOString() }));
+  try{
+    for(let i=0;i<baris.length;i+=100){
+      const { error } = await supa.from('catatan_siswa_semester').upsert(baris.slice(i,i+100), { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester' });
+      if(error) throw error;
+    }
+    alert(`${baris.length} data kehadiran tersimpan. Isi bobot Kehadiran di Pengaturan Nilai bila ingin kehadiran memengaruhi Nilai Akhir.`);
+    dataNilaiSiap = false; muatSyaratRapor();
+  }catch(e){ alert('Gagal menyimpan: '+(e.message||e)); }
+}
+
+// ---------- SYARAT RAPOR SAAT CETAK RAPOR ----------
+// Mengambil status syarat satu kelas (cache 2 menit). Bila gagal (mis. migrasi belum dijalankan) mengembalikan null: rapor tetap bisa dicetak.
+async function ambilSyaratKelas(program, kelas, ta, smt){
+  const kunci = [program, kelas, ta, smt].join('|'), c = syaratCache.get(kunci);
+  if(c && Date.now()-c.t < 120000) return c.data;
+  try{ const d = await panggilSyaratKelas(program, kelas, ta, smt); syaratCache.set(kunci, { t:Date.now(), data:d }); return d; }
+  catch(e){ console.warn('Cek syarat rapor dilewati:', e.message); return null; }
+}
+// Satu siswa: confirm biasa. Mengembalikan true bila boleh lanjut cetak.
+async function izinCetakRaporSiswa(nisn, program, kelas, ta, smt){
+  if(!program || !kelas || !ta || !smt) return true;
+  const d = await ambilSyaratKelas(program, kelas, ta, smt); if(!d) return true;
+  const s = d.siswa.find(x=>x.nisn===nisn); if(!s || s.memenuhi) return true;
+  return confirm(`${s.nama} BELUM memenuhi syarat rapor:\n\n- ${s.kekurangan.join('\n- ')}\n\nTetap cetak rapor?`);
+}
+// Banyak siswa: pilihan cetak hanya yang memenuhi / semua / batal.
+function pilihCetakSyarat(belum, jumlahOk){
+  return new Promise(res=>{
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    const tutup = v=>{ m.remove(); res(v); };
+    m.innerHTML = `<div class="modal" style="max-width:520px;"><h3 style="margin-top:0;">${belum.length} siswa belum memenuhi syarat rapor</h3>
+      <div style="max-height:220px;overflow:auto;font-size:13px;border:1px solid var(--line);padding:8px 12px;margin-bottom:12px;">${belum.map(s=>`<div style="margin-bottom:6px;"><b>${esc2(s.nama)}</b><br><span class="muted">${s.kekurangan.map(esc2).join('<br>')}</span></div>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn gold" id="pc-ok">Cetak hanya yang memenuhi (${jumlahOk})</button><button class="btn outline" id="pc-semua">Cetak semua</button><button class="btn outline" id="pc-batal">Batal</button></div></div>`;
+    document.body.appendChild(m);
+    m.querySelector('#pc-ok').onclick = ()=>tutup('memenuhi'); m.querySelector('#pc-semua').onclick = ()=>tutup('semua'); m.querySelector('#pc-batal').onclick = ()=>tutup(null);
+  });
+}
+// Menyaring daftar siswa untuk cetak massal. Mengembalikan daftar baru, atau null bila dibatalkan.
+async function saringSiswaCetakSyarat(daftar, program, kelas, ta, smt){
+  const d = await ambilSyaratKelas(program, kelas, ta, smt); if(!d) return daftar;
+  const peta = new Map(d.siswa.map(s=>[s.nisn, s]));
+  const belum = daftar.map(s=>peta.get(s.nisn)).filter(s=>s && !s.memenuhi);
+  if(!belum.length) return daftar;
+  const pilih = await pilihCetakSyarat(belum, daftar.length-belum.length);
+  if(!pilih) return null;
+  if(pilih==='semua') return daftar;
+  const bel = new Set(belum.map(s=>s.nisn)); return daftar.filter(s=>!bel.has(s.nisn));
+}
+
+// ============================================================
+// PENCARIAN CERDAS (v13.1)
+// Masalah lama: pencarian memakai "mengandung huruf" sehingga mengetik X ikut membawa XI dan XII (dan kata
+// apa pun yang memuat huruf x). Aturan baru:
+//  - Kata yang berupa kelas (VII, VIII, IX, X, XI, XII atau angka 7-12) dicocokkan PERSIS dengan kelas:
+//    "X" hanya kelas X, "XI" hanya kelas XI. Angka 10 sama dengan X, 11 dengan XI, dst.
+//  - Kata satu huruf (mis. B, C) hanya cocok sebagai KATA UTUH ("Paket B"), tidak menyusup ke "Biologi".
+//  - Kata lain tetap cocok sebagian (ipa -> "IPA Terpadu"), tanpa peduli huruf besar/kecil dan aksen.
+//  - Semua kata harus cocok (DAN). Kata berawalan minus dikecualikan: -draft. Frasa dalam tanda kutip: "ulangan harian".
+//  - Filter khusus:  kelas:X  jenis:uas  status:siap  mapel:ipa  program:b  smt:ganjil  ta:2026  kode:ab12  judul:...
+// ============================================================
+const KELAS_ROMAWI_CARI = ['VII','VIII','IX','X','XI','XII'];
+const KELAS_ANGKA_CARI = { 7:'VII', 8:'VIII', 9:'IX', 10:'X', 11:'XI', 12:'XII' };
+const ALIAS_MEDAN_CARI = { kls:'kelas', mp:'mapel', paket:'program', jenjang:'program', semester:'smt', tahun:'ta', ta:'ta' };
+function normCari(s){ return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function kelasDariKata(t){
+  const u = String(t).toUpperCase();
+  if(KELAS_ROMAWI_CARI.includes(u)) return u;
+  if(/^\d{1,2}$/.test(t) && KELAS_ANGKA_CARI[+t]) return KELAS_ANGKA_CARI[+t];
+  return null;
+}
+function kataUtuhCari(teksNorm){ return new Set(teksNorm.split(/[^a-z0-9]+/).filter(Boolean)); }
+// Mengurai kotak pencarian menjadi daftar kata. medanTersedia = nama filter khusus yang boleh dipakai di halaman itu.
+function parsePencarian(q, medanTersedia){
+  const tokens = [], re = /(-?)(?:([a-zA-Z]+):)?(?:"([^"]*)"|(\S+))/g; let m;
+  while((m = re.exec(String(q||'')))){
+    const neg = m[1]==='-' && (m[3]!=null || (m[4]||'').length>0);
+    let medan = m[2] ? m[2].toLowerCase() : null; if(medan && ALIAS_MEDAN_CARI[medan]) medan = ALIAS_MEDAN_CARI[medan];
+    let isi = m[3]!=null ? m[3] : m[4];
+    if(medan && !(medanTersedia||[]).includes(medan)){ isi = m[2]+':'+(isi||''); medan = null; }   // bukan filter khusus: anggap kata biasa
+    isi = normCari(isi); if(!isi) continue;
+    const frasa = m[3]!=null && /\s/.test(isi);
+    const kelas = !frasa ? kelasDariKata(isi) : null;
+    const kind = frasa ? 'frasa' : (kelas ? 'kelas' : (isi.length<=1 ? 'huruf' : 'kata'));
+    tokens.push({ t:isi, neg, medan, kind, kelas });
+  }
+  // "kelas x" / "kelas 10": kata "kelas" di depan kata kelas tidak perlu dicocokkan sendiri
+  const hasil = tokens.filter((tk,i)=>!(tk.t==='kelas' && !tk.medan && !tk.neg && tokens[i+1] && tokens[i+1].kind==='kelas'));
+  return { tokens:hasil, kosong: hasil.length===0, pos: hasil.filter(tk=>!tk.neg) };
+}
+// def = { umum:item=>[teks...], kelas:item=>'X', medan:{ nama:item=>teks } }
+function cocokPencarian(parsed, item, def){
+  if(!parsed || parsed.kosong) return true;
+  const umum = normCari((def.umum(item)||[]).join(' | ')), kataUmum = kataUtuhCari(umum);
+  const kelasItem = def.kelas ? String(def.kelas(item)||'').toUpperCase() : '';
+  for(const tk of parsed.tokens){
+    let ok;
+    const fn = tk.medan && def.medan && def.medan[tk.medan];
+    if(fn){
+      const v = normCari(fn(item));
+      if(tk.medan==='kelas' && tk.kelas) ok = String(fn(item)||'').toUpperCase()===tk.kelas;
+      else if(tk.kind==='huruf') ok = kataUtuhCari(v).has(tk.t);
+      else ok = v.includes(tk.t);
+    } else if(tk.kind==='kelas') ok = kelasItem===tk.kelas || kataUmum.has(tk.t);
+    else if(tk.kind==='huruf') ok = kataUmum.has(tk.t);
+    else ok = umum.includes(tk.t);
+    if(tk.neg ? ok : !ok) return false;
+  }
+  return true;
+}
+// Teks aman-HTML dengan kata yang dicari disorot (<mark>). Kata kelas & huruf tunggal hanya disorot sebagai kata utuh.
+function sorotCari(teks, parsed){
+  const s = String(teks==null?'':teks);
+  if(!parsed || !parsed.pos.length) return escapeHtml(s);
+  const low = s.toLowerCase(), rentang = [], alnum = c=>/[a-z0-9]/.test(c||'');
+  parsed.pos.forEach(tk=>{
+    const cari = [tk.t]; if(tk.kind==='kelas' && tk.kelas){ cari.push(tk.kelas.toLowerCase()); Object.keys(KELAS_ANGKA_CARI).forEach(a=>{ if(KELAS_ANGKA_CARI[a]===tk.kelas) cari.push(a); }); }
+    [...new Set(cari)].forEach(c=>{
+      let i = 0;
+      while((i = low.indexOf(c, i)) !== -1){
+        const j = i + c.length, utuh = (tk.kind==='kelas' || tk.kind==='huruf');
+        if(!utuh || (!alnum(low[i-1]) && !alnum(low[j]))) rentang.push([i,j]);
+        i = j;
+      }
+    });
+  });
+  if(!rentang.length) return escapeHtml(s);
+  rentang.sort((a,b)=>a[0]-b[0]);
+  const gabung = [rentang[0].slice()];
+  for(const r of rentang.slice(1)){ const l = gabung[gabung.length-1]; if(r[0]<=l[1]) l[1] = Math.max(l[1], r[1]); else gabung.push(r.slice()); }
+  let out = '', pos = 0;
+  gabung.forEach(([a,b])=>{ out += escapeHtml(s.slice(pos,a)) + '<mark>' + escapeHtml(s.slice(a,b)) + '</mark>'; pos = b; });
+  return out + escapeHtml(s.slice(pos));
+}
+const PETUNJUK_CARI = '<b>Tips pencarian</b><br>&bull; Ketik <code>X</code> hanya menampilkan kelas X (tidak ikut XI/XII). Boleh juga <code>10</code>, <code>kelas x</code>.<br>&bull; Gabungkan kata: <code>uts ipa</code> (semua kata harus cocok).<br>&bull; Kecualikan: <code>-draft</code> &nbsp; Frasa: <code>"ulangan harian"</code><br>&bull; Filter khusus: <code>kelas:XI</code> <code>jenis:uas</code> <code>status:siap</code> <code>mapel:ipa</code> <code>program:b</code> <code>smt:ganjil</code> <code>ta:2026</code> <code>kode:ab12</code><br>&bull; Huruf kecil/besar dan aksen tidak berpengaruh. Tekan <b>Esc</b> untuk mengosongkan.';
 // ---------- UTIL ----------
 // Untuk teks soal yang dicetak: semua HTML di-escape, kecuali tag format sederhana (b, i, u, sub, sup, br).
 // Mencegah skrip nyasar (mis. dari hasil AI atau impor Excel) berjalan di jendela cetak.
