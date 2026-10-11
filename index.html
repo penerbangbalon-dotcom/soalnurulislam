@@ -943,7 +943,8 @@
           <div class="field"><label>Yang diisi</label>
             <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="remedial">Remedial UH / UTS / UAS (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option><option value="ekskul">Ekstrakurikuler (per kegiatan)</option></select></div>
           <div class="field" id="in-wrap-mapel"><label>Mata Pelajaran</label><select id="in-mapel"><option value="">— pilih kelas dulu —</option></select></div>
-          <div class="field hidden" id="in-wrap-ekskul"><label>Nama Kegiatan Ekstrakurikuler</label><input type="text" id="in-ekskul" list="in-ekskul-daftar" placeholder="mis. Pramuka" /><datalist id="in-ekskul-daftar"></datalist></div>
+          <div class="field hidden" id="in-wrap-ekskul"><label>Nama Kegiatan Ekstrakurikuler</label><input type="text" id="in-ekskul" list="in-ekskul-daftar" placeholder="Ketik atau pilih dari daftar" /><datalist id="in-ekskul-daftar"></datalist>
+            <div id="in-ekskul-chip" style="margin-top:4px;"></div></div>
         </div>
         <div class="toolbar" style="margin:0;">
           <button class="btn" onclick="muatInputNilai()">Muat Siswa</button>
@@ -7288,8 +7289,9 @@ const CSS_RAPOR = `
     
 
       .rp{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#000;line-height:1.3;}
-      .rp-logo{text-align:center;} .rp-logo img{height:84px;width:auto;}
-      .rp-judul{text-align:center;font-weight:bold;font-size:14px;line-height:1.4;margin:6px 0 14px;}
+      .rp-kepala{position:relative;display:flex;align-items:center;justify-content:center;min-height:68px;margin:0 0 8px;}
+      .rp-kepala img{position:absolute;left:0;top:50%;transform:translateY(-50%);height:68px;width:auto;}
+      .rp-judul{text-align:center;font-weight:bold;font-size:14px;line-height:1.35;margin:0;}
       table.rp-info{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;}
       table.rp-info td{padding:2px 4px;vertical-align:top;}
       table.rp-info td:nth-child(1),table.rp-info td:nth-child(3){white-space:nowrap;}
@@ -7376,8 +7378,8 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
   const namaSekolah = String(SEKOLAH.nama_aplikasi || SEKOLAH.nama_lembaga || '').toUpperCase();
   const jabKepala = SEKOLAH.jabatan_kepala || 'Kepala';
   return `<div class="rp">
-    <div class="rp-logo"><img src="${escapeHtml(logoSekolah())}" alt="Logo"></div>
-    <div class="rp-judul">LAPORAN HASIL BELAJAR<br>(RAPOR)<br>${esc2('PROGRAM '+String(program).toUpperCase())}</div>
+    <div class="rp-kepala"><img src="${escapeHtml(logoSekolah())}" alt="Logo">
+      <div class="rp-judul">LAPORAN HASIL BELAJAR<br>(RAPOR)<br>${esc2('PROGRAM '+String(program).toUpperCase())}</div></div>
     <table class="rp-info">
       <colgroup><col style="width:128px"><col><col style="width:122px"><col style="width:132px"></colgroup>
       <tr><td>Nama Peserta Didik</td><td><b>: ${esc2(nama)}</b></td><td>Kelas</td><td>: ${esc2(kelas)}${KELAS_TERBILANG[kelas]?' ('+KELAS_TERBILANG[kelas]+')':''}</td></tr>
@@ -8085,8 +8087,30 @@ function ambilEkskulKelas(program, kelas, ta, smt){
 // Kalimat otomatis bila keterangan dikosongkan guru.
 function keteranganEkskul(nama, e){
   if(e.keterangan && String(e.keterangan).trim()) return String(e.keterangan).trim();
-  const kata = { A:'sangat baik', B:'baik', C:'cukup', D:'kurang' }[e.predikat] || '';
-  return `${judulNama(nama)} ${kata} dalam mengikuti kegiatan ${e.kegiatan}.`;
+  return deskripsiEkskulOtomatis(nama, e.kegiatan, e.predikat);
+}
+const DESKRIPSI_EKSKUL = {
+  A:'{nama} sangat baik dalam mengikuti kegiatan {kegiatan}; sangat aktif, disiplin, dan menunjukkan keterampilan yang menonjol.',
+  B:'{nama} baik dalam mengikuti kegiatan {kegiatan}; aktif dan menunjukkan perkembangan keterampilan yang baik.',
+  C:'{nama} cukup baik dalam mengikuti kegiatan {kegiatan}; perlu meningkatkan keaktifan dan kesungguhan dalam berlatih.',
+  D:'{nama} masih kurang dalam mengikuti kegiatan {kegiatan}; perlu bimbingan serta peningkatan kehadiran dan keaktifan.' };
+function deskripsiEkskulOtomatis(nama, kegiatan, predikat){
+  const t = DESKRIPSI_EKSKUL[predikat]; if(!t) return '';
+  return t.replace('{nama}', judulNama(nama)).replace('{kegiatan}', kegiatan);
+}
+// Daftar kegiatan yang lazim di sekolah/PKBM (saran saja; guru boleh mengetik kegiatan lain).
+const SARAN_EKSKUL = ['Pramuka','Palang Merah Remaja (PMR)','Paskibra','Pembinaan Rohani / Keagamaan','Tilawah dan Baca Tulis Al-Qur\'an','Hadroh / Rebana','Kaligrafi','Muhadharah (Pidato)',
+  'Futsal','Sepak Bola','Bola Voli','Bulu Tangkis','Tenis Meja','Seni Tari','Seni Musik','Paduan Suara','Teknologi Informasi dan Komunikasi','Keterampilan / Kewirausahaan',
+  'Tata Boga','Menjahit','Jurnalistik','Karya Ilmiah Remaja (KIR)','English Club'];
+function isiSaranEkskul(tambahan){
+  const semua = [...new Set([...(tambahan||[]), ...SARAN_EKSKUL])];
+  document.getElementById('in-ekskul-daftar').innerHTML = semua.map(n=>`<option value="${esc2(n)}">`).join('');
+  document.getElementById('in-ekskul-chip').innerHTML = semua.slice(0,12).map(n=>`<button type="button" class="btn outline" style="padding:2px 8px;font-size:12px;margin:2px 2px 0 0;" onclick="document.getElementById('in-ekskul').value=this.textContent">${esc2(n)}</button>`).join('');
+}
+function pratinjauDeskripsiEkskul(i){
+  const s = inRoster[i]; if(!s) return;
+  const p = document.getElementById('in-ek-p-'+i).value;
+  document.getElementById('in-ek-k-'+i).placeholder = p ? 'Otomatis: '+deskripsiEkskulOtomatis(s.nama, inEkskulNama, p) : '';
 }
 let inEkskulNama = '';
 function isiKelasInput(){
@@ -8105,6 +8129,7 @@ function ubahModeInput(){
   const mode = document.getElementById('in-mode').value;
   document.getElementById('in-wrap-mapel').classList.toggle('hidden', mode==='sikap' || mode==='ekskul');
   document.getElementById('in-wrap-ekskul').classList.toggle('hidden', mode!=='ekskul');
+  if(mode==='ekskul') isiSaranEkskul();
   document.getElementById('in-tabel').innerHTML = '';
   document.getElementById('in-simpan-bar').classList.add('hidden');
 }
@@ -8159,16 +8184,16 @@ async function muatInputNilai(){
       bar.classList.add('hidden'); return;
     }
     const nama = [...new Set(semua.map(r=>r.kegiatan))];
-    document.getElementById('in-ekskul-daftar').innerHTML = nama.map(n=>`<option value="${esc2(n)}">`).join('');
+    isiSaranEkskul(nama);
     inEkskulNama = nama.find(n=>n.toLowerCase()===c.ekskul.toLowerCase()) || c.ekskul;   // satu ejaan per kegiatan
     const peta = new Map(semua.filter(r=>r.kegiatan===inEkskulNama).map(r=>[r.siswa_nisn, r]));
-    tabel.innerHTML = `<div class="card"><p class="muted" style="margin:0 0 8px;">Kegiatan: <b>${esc2(inEkskulNama)}</b> &bull; Kelas ${esc2(c.kelas)} &bull; ${esc2(labelSmt(c.smt))} ${esc2(c.ta)}. Pilih predikat hanya untuk siswa yang mengikuti kegiatan ini; biarkan <b>—</b> bila tidak mengikuti. Keterangan boleh dikosongkan (rapor memakai kalimat otomatis).</p>
+    tabel.innerHTML = `<div class="card"><p class="muted" style="margin:0 0 8px;">Kegiatan: <b>${esc2(inEkskulNama)}</b> &bull; Kelas ${esc2(c.kelas)} &bull; ${esc2(labelSmt(c.smt))} ${esc2(c.ta)}. Pilih predikat hanya untuk siswa yang mengikuti kegiatan ini; biarkan <b>—</b> bila tidak mengikuti. Kolom Keterangan boleh dikosongkan: rapor otomatis memakai deskripsi sesuai predikat (tampil abu-abu sebagai contoh); ketik sendiri bila ingin deskripsi khusus.</p>
       <table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th style="width:170px;">Predikat</th><th>Keterangan (opsional)</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
         const e = peta.get(s.nisn) || {};
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
-          <td><select id="in-ek-p-${i}"><option value="">—</option>${['A','B','C','D'].map(x=>`<option value="${x}"${e.predikat===x?' selected':''}>${NAMA_PREDIKAT_EKSKUL[x]}</option>`).join('')}</select></td>
-          <td><input type="text" id="in-ek-k-${i}" value="${esc2(e.keterangan||'')}" /></td></tr>`;
+          <td><select id="in-ek-p-${i}" onchange="pratinjauDeskripsiEkskul(${i})"><option value="">—</option>${['A','B','C','D'].map(x=>`<option value="${x}"${e.predikat===x?' selected':''}>${NAMA_PREDIKAT_EKSKUL[x]}</option>`).join('')}</select></td>
+          <td><input type="text" id="in-ek-k-${i}" value="${esc2(e.keterangan||'')}" placeholder="${e.predikat ? esc2('Otomatis: '+deskripsiEkskulOtomatis(s.nama, inEkskulNama, e.predikat)) : ''}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   } else if(c.mode==='tugas'){
     tabel.innerHTML = `<div class="card"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th style="width:110px;">Tugas (0-100)</th><th style="width:110px;">Praktik (0-100)</th></tr></thead><tbody>` +

@@ -1,5 +1,11 @@
 # Perubahan terbaru
 
+## v14.4 — Header rapor ringkas, daftar saran ekstrakurikuler, deskripsi otomatis per predikat
+Hanya `index.html` yang berubah; tanpa migrasi baru (tetap butuh `migrasi-v18-ekskul-nip.sql` dari v14.3).
+- **Header Rapor Semester**: logo kini di kiri, sejajar dengan judul *LAPORAN HASIL BELAJAR / (RAPOR) / PROGRAM PAKET C* (judul tetap di tengah halaman); jarak atas-bawah dipadatkan agar header tidak memakan tempat.
+- **Input Ekstrakurikuler**: ada daftar saran kegiatan yang lazim (Pramuka, PMR, Paskibra, Pembinaan Rohani/Keagamaan, Tilawah dan BTQ, Hadroh/Rebana, Kaligrafi, Muhadharah, Futsal, Sepak Bola, Bola Voli, Bulu Tangkis, Tenis Meja, Seni Tari, Seni Musik, Paduan Suara, TIK, Keterampilan/Kewirausahaan, Tata Boga, Menjahit, Jurnalistik, KIR, English Club) sebagai pilihan klik dan saran saat mengetik. Kegiatan lain tetap bisa diketik; daftar disesuaikan dengan kegiatan yang ada di sekolah Anda.
+- **Deskripsi otomatis** (bila Keterangan dikosongkan), contoh: A "... sangat baik dalam mengikuti kegiatan Pramuka; sangat aktif, disiplin, dan menunjukkan keterampilan yang menonjol." B "... baik ...; aktif dan menunjukkan perkembangan keterampilan yang baik." C "... cukup baik ...; perlu meningkatkan keaktifan dan kesungguhan dalam berlatih." D "... masih kurang ...; perlu bimbingan serta peningkatan kehadiran dan keaktifan." Contoh kalimat tampil di kolom Keterangan saat predikat dipilih. Kalimat bisa diubah di `DESKRIPSI_EKSKUL` (index.html).
+
 ## v14.3 — Ekstrakurikuler dan NIP pada Rapor Semester
 **Wajib jalankan `migrasi-v18-ekskul-nip.sql`** di Supabase SQL Editor (sekali; aman diulang), lalu unggah semua file ke GitHub. Sebelum migrasi dijalankan semua menu lama tetap normal; rapor tetap tercetak tanpa ekstrakurikuler/NIP. Hanya `index.html` yang berubah, ditambah file migrasi baru.
 - **Input Ekstrakurikuler** (menu Input Nilai Tambahan -> Yang diisi: *Ekstrakurikuler (per kegiatan)*): pilih Jenjang, Kelas, Tahun Ajaran, Semester, ketik nama kegiatan (mis. Pramuka; nama yang sudah pernah dipakai muncul sebagai saran), klik Muat Siswa, lalu pilih predikat **Sangat Baik / Baik / Cukup / Kurang** per siswa. Biarkan "—" bagi siswa yang tidak mengikuti; mengosongkan predikat menghapus data. Keterangan opsional.
