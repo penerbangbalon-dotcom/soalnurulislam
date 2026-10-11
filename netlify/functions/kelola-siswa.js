@@ -3,6 +3,7 @@
 // Hanya admin / super admin. Kata sandi awal siswa di absensi = tanggal lahir DDMMYYYY (bcrypt),
 // dibuat oleh fungsi database tambah_siswa_massal (lihat migrasi-v13-tambah-siswa.sql).
 //
+// Aksi: "ubah" { nisn, data:{ nama, kelas, jk, tanggal_lahir, tempat_lahir, nipd, hp, alamat } } (satu siswa)
 // Aksi: "tambah" { rows: [{ nama, nisn, jk, kelas, tanggal_lahir, tempat_lahir, nipd, hp, alamat }] } (maks 100 baris/permintaan)
 
 const { adaKonfigurasi, wajibAdmin, sb } = require('../lib/ujian-core');
@@ -71,6 +72,32 @@ function siapkanBaris(r, idx) {
   }
 }
 
+// Ubah data satu siswa di tabel `students` (tabel yang sama dengan aplikasi absensi, jadi otomatis sinkron).
+// NISN tidak bisa diubah (dipakai sebagai kunci nilai/ujian); kata sandi dan status tidak disentuh.
+function siapkanUbah(d) {
+  const nama = rapikan(d.nama);
+  if (!nama) throw new Error('Nama kosong');
+  // kelas_tetap: kolom Kelas tidak diubah di formulir -> jangan menyentuh kelas/jenjang/program (ejaan kelas lama dari absensi tetap).
+  const k = d.kelas_tetap ? null : normalKelas(d.kelas);
+  return {
+    nama, ...(k ? { kelas: k.kelas, jenjang: k.jenjang, program: k.program } : {}),
+    jk: normalJk(d.jk), tanggal_lahir: normalTanggal(d.tanggal_lahir),
+    tempat_lahir: rapikan(d.tempat_lahir) || null, nipd: rapikan(d.nipd) || null,
+    hp: rapikan(d.hp) || null, alamat: rapikan(d.alamat) || null,
+  };
+}
+async function ubahSiswa(body) {
+  const nisn = rapikan(body.nisn);
+  if (!/^\d{5,20}$/.test(nisn)) return resp(400, { error: 'NISN siswa tidak valid.' });
+  let data;
+  try { data = siapkanUbah(body.data || {}); } catch (e) { return resp(400, { error: e.message }); }
+  const hasil = await sb(`students?nisn=eq.${encodeURIComponent(nisn)}`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(data),
+  });
+  if (!hasil || !hasil.length) return resp(404, { error: 'Siswa dengan NISN tersebut tidak ditemukan.' });
+  return resp(200, { ok: true, siswa: hasil[0] });
+}
+
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
   if (!adaKonfigurasi()) return resp(500, { error: 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum diset di Vercel Environment Variables.' });
@@ -82,6 +109,7 @@ exports.handler = async function (event) {
   try { body = JSON.parse(event.body || '{}'); } catch (e) { return resp(400, { error: 'Body tidak valid' }); }
 
   try {
+    if (body.action === 'ubah') return await ubahSiswa(body);
     if (body.action !== 'tambah') return resp(400, { error: 'Aksi tidak dikenali' });
     const rows = Array.isArray(body.rows) ? body.rows : [];
     if (!rows.length) return resp(400, { error: 'Tidak ada data siswa.' });
@@ -117,4 +145,4 @@ exports.handler = async function (event) {
   }
 };
 
-exports._uji = { normalKelas, normalJk, normalTanggal, siapkanBaris };
+exports._uji = { normalKelas, normalJk, normalTanggal, siapkanBaris, siapkanUbah };

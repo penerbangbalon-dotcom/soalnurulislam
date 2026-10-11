@@ -1298,6 +1298,43 @@
         <div id="sw-preview" class="hidden" style="margin-top:12px;"></div>
       </div>
 
+      <div class="card" id="sw-edit-card">
+        <div class="toolbar">
+          <h3 style="margin:0;flex:1;">Daftar &amp; Edit Siswa <span class="muted" id="sw-daftar-total"></span></h3>
+          <button class="btn outline" onclick="loadDaftarSiswaEdit()">Muat Ulang</button>
+        </div>
+        <p class="muted" style="margin:0 0 8px;">Klik <b>Edit</b> untuk mengubah data siswa. Perubahan disimpan ke tabel siswa yang sama dengan <b>aplikasi absensi</b>, jadi di kedua aplikasi langsung sama.
+          NISN tidak bisa diubah (dipakai sebagai kunci nilai dan ujian). Kata sandi dan status siswa tidak berubah.</p>
+        <div id="sw-form-edit" class="hidden" style="border:1px solid var(--line,#ccc);border-radius:8px;padding:12px;margin-bottom:12px;background:#FBF9F1;">
+          <h4 style="margin:0 0 8px;">Edit: <span id="sw-e-judul"></span></h4>
+          <div class="grid2">
+            <div class="field"><label>Nama lengkap *</label><input type="text" id="sw-e-nama" /></div>
+            <div class="field"><label>NISN (tidak bisa diubah)</label><input type="text" id="sw-e-nisn" readonly style="background:#eee;" /></div>
+            <div class="field"><label>Kelas *</label><input type="text" id="sw-e-kelas" placeholder="Contoh: 8 A, 10 IPS 1, Kelas 5" /></div>
+            <div class="field"><label>Tanggal lahir *</label><input type="date" id="sw-e-tgl" /></div>
+            <div class="field"><label>Jenis kelamin</label><select id="sw-e-jk"><option value="">-</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
+            <div class="field"><label>Tempat lahir</label><input type="text" id="sw-e-tempat" /></div>
+            <div class="field"><label>NIPD</label><input type="text" id="sw-e-nipd" /></div>
+            <div class="field"><label>No. HP</label><input type="text" id="sw-e-hp" /></div>
+          </div>
+          <div class="field"><label>Alamat</label><input type="text" id="sw-e-alamat" /></div>
+          <div class="toolbar" style="justify-content:flex-end;">
+            <span class="muted" id="sw-e-status"></span>
+            <button class="btn outline" onclick="batalEditSiswa()">Batal</button>
+            <button class="btn gold" id="sw-e-simpan" onclick="simpanEditSiswa()">Simpan Perubahan</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input type="text" id="sw-cari" placeholder="Cari nama / NISN / NIPD / kelas..." oninput="swHal=50;renderDaftarSiswaEdit()" style="flex:1;min-width:180px;" />
+          <select id="sw-filter-kelas" onchange="swHal=50;renderDaftarSiswaEdit()"><option value="">Semua kelas</option></select>
+        </div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr><th>Nama</th><th>NISN</th><th>NIPD</th><th>Kelas</th><th>JK</th><th>Tgl. Lahir</th><th>Status</th><th></th></tr></thead>
+          <tbody id="sw-daftar-body"><tr><td colspan="8" class="muted">Memuat...</td></tr></tbody>
+        </table></div>
+        <div id="sw-daftar-lagi" style="margin-top:8px;"></div>
+      </div>
+
       <div class="card">
         <div class="toolbar">
           <h3 style="margin:0;flex:1;">Siswa Terbaru Ditambahkan <span class="muted" id="sw-total"></span></h3>
@@ -1786,6 +1823,76 @@ async function loadSiswaTerbaru(){
   }catch(err){
     body.innerHTML = `<tr><td colspan="5" class="error">${escapeHtml(err.message||String(err))}</td></tr>`;
   }
+  loadDaftarSiswaEdit();
+}
+// ---------- DAFTAR & EDIT SISWA (menyimpan ke tabel `students` yang sama dengan aplikasi absensi) ----------
+let swSemua = [], swHal = 50, swEditNisn = null, swKelasAwal = '';
+async function loadDaftarSiswaEdit(){
+  const body = document.getElementById('sw-daftar-body');
+  try{
+    const { data, error } = await ambilSemuaBaris(()=>supa.from('students')
+      .select('nisn, nipd, nama, jk, kelas, tempat_lahir, tanggal_lahir, hp, alamat, status').order('kelas').order('nama').order('nisn'));
+    if(error) throw error;
+    swSemua = data || [];
+    const sel = document.getElementById('sw-filter-kelas'), prev = sel.value;
+    const kelas = [...new Set(swSemua.map(s=>s.kelas).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'id',{ numeric:true }));
+    sel.innerHTML = '<option value="">Semua kelas</option>' + kelas.map(k=>`<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+    if(kelas.includes(prev)) sel.value = prev;
+    renderDaftarSiswaEdit();
+  }catch(err){
+    body.innerHTML = `<tr><td colspan="8" class="error">${escapeHtml(err.message||String(err))}</td></tr>`;
+  }
+}
+function swTersaring(){
+  const kata = (document.getElementById('sw-cari').value||'').toLowerCase().split(/\s+/).filter(Boolean);
+  const kl = document.getElementById('sw-filter-kelas').value;
+  return swSemua.filter(s=>{
+    if(kl && s.kelas!==kl) return false;
+    const t = [s.nama, s.nisn, s.nipd, s.kelas].map(x=>String(x||'').toLowerCase()).join(' ');
+    return kata.every(k=>t.includes(k));
+  });
+}
+function renderDaftarSiswaEdit(){
+  const list = swTersaring();
+  document.getElementById('sw-daftar-total').textContent = `(${list.length} dari ${swSemua.length} siswa)`;
+  document.getElementById('sw-daftar-body').innerHTML = list.slice(0, swHal).map(s=>`<tr${s.nisn===swEditNisn?' style="background:#FFF6D6;"':''}>
+    <td>${escapeHtml(s.nama)}</td><td>${escapeHtml(s.nisn||'-')}</td><td>${escapeHtml(s.nipd||'-')}</td><td>${escapeHtml(s.kelas||'-')}</td><td>${escapeHtml(s.jk||'-')}</td>
+    <td>${escapeHtml(s.tanggal_lahir||'-')}</td><td>${escapeHtml(s.status||'-')}</td>
+    <td><button class="btn outline" onclick="editSiswa(${jsq(s.nisn)})">Edit</button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">Tidak ada siswa yang cocok.</td></tr>';
+  document.getElementById('sw-daftar-lagi').innerHTML = list.length>swHal ? `<button class="btn outline" onclick="swHal+=50;renderDaftarSiswaEdit()">Tampilkan lagi (${list.length-swHal} tersisa)</button>` : '';
+}
+function editSiswa(nisn){
+  const s = swSemua.find(x=>x.nisn===nisn); if(!s) return alert('Data siswa tidak ditemukan. Klik Muat Ulang.');
+  swEditNisn = nisn; swKelasAwal = String(s.kelas||'').trim();
+  const set = (id,v)=>{ document.getElementById(id).value = v==null ? '' : v; };
+  set('sw-e-nama', s.nama); set('sw-e-nisn', s.nisn); set('sw-e-kelas', s.kelas); set('sw-e-tgl', s.tanggal_lahir ? String(s.tanggal_lahir).slice(0,10) : '');
+  set('sw-e-jk', s.jk); set('sw-e-tempat', s.tempat_lahir); set('sw-e-nipd', s.nipd); set('sw-e-hp', s.hp); set('sw-e-alamat', s.alamat);
+  document.getElementById('sw-e-judul').textContent = s.nama;
+  document.getElementById('sw-e-status').textContent = '';
+  const f = document.getElementById('sw-form-edit'); f.classList.remove('hidden');
+  f.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  renderDaftarSiswaEdit();
+}
+function batalEditSiswa(){ swEditNisn = null; document.getElementById('sw-form-edit').classList.add('hidden'); renderDaftarSiswaEdit(); }
+async function simpanEditSiswa(){
+  if(!swEditNisn) return;
+  const v = id=>document.getElementById(id).value;
+  const st = document.getElementById('sw-e-status'), btn = document.getElementById('sw-e-simpan');
+  const kelas = v('sw-e-kelas').trim();
+  const data = { nama:v('sw-e-nama'), kelas, kelas_tetap: kelas===swKelasAwal, tanggal_lahir:v('sw-e-tgl'), jk:v('sw-e-jk'),
+    tempat_lahir:v('sw-e-tempat'), nipd:v('sw-e-nipd'), hp:v('sw-e-hp'), alamat:v('sw-e-alamat') };
+  st.textContent = 'Menyimpan...'; st.className = 'muted'; btn.disabled = true;
+  try{
+    const r = await panggilKelolaSiswa({ action:'ubah', nisn:swEditNisn, data });
+    const i = swSemua.findIndex(x=>x.nisn===swEditNisn);
+    if(i>=0 && r.siswa) swSemua[i] = { ...swSemua[i], ...r.siswa };
+    dataNilaiSiap = false;   // roster nilai/rapor dimuat ulang agar nama/kelas baru dipakai
+    const nama = (r.siswa && r.siswa.nama) || data.nama;
+    swEditNisn = null; document.getElementById('sw-form-edit').classList.add('hidden');
+    renderDaftarSiswaEdit(); loadSiswaTerbaru();
+    alert(`Data ${nama} tersimpan dan sudah sama dengan aplikasi absensi.`);
+  }catch(err){ st.textContent = 'Gagal: '+err.message; st.className = 'error'; }
+  finally{ btn.disabled = false; }
 }
 function tampilHasilSiswa(r){
   const lewat = r.dilewati||[];

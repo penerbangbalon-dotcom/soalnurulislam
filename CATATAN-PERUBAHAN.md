@@ -1,5 +1,13 @@
 # Perubahan terbaru
 
+## v14.5 — Tombol Edit Data Siswa (sinkron dengan aplikasi absensi)
+Tanpa migrasi SQL baru. File berubah: `index.html` dan `netlify/functions/kelola-siswa.js` (adapter `api/kelola-siswa.js` tidak berubah; jumlah fungsi tetap 10). Unggah semua file lalu deploy ulang.
+- Menu **Data Siswa** (khusus Admin) kini punya kartu **Daftar & Edit Siswa**: seluruh siswa, pencarian (nama/NISN/NIPD/kelas), filter kelas, dan tombol **Edit** pada tiap baris.
+- Yang bisa diubah: nama, kelas, tanggal lahir, jenis kelamin, tempat lahir, NIPD, No. HP, alamat. Disimpan langsung ke tabel `students` yang **sama dengan aplikasi absensi**, jadi perubahan langsung terlihat di kedua aplikasi (dan sebaliknya).
+- **NISN tidak bisa diubah** (dipakai sebagai kunci nilai, ujian, dan rapor). Kata sandi dan status siswa tidak disentuh; mengubah tanggal lahir tidak mengganti kata sandi.
+- Bila kolom Kelas tidak diubah, ejaan kelas dari absensi dibiarkan apa adanya. Bila diubah, jenjang dan program ikut disesuaikan seperti pada Tambah Siswa.
+- Setelah menyimpan, data nilai/rapor dimuat ulang otomatis supaya nama/kelas baru dipakai.
+
 ## v14.4 — Header rapor ringkas, daftar saran ekstrakurikuler, deskripsi otomatis per predikat
 Hanya `index.html` yang berubah; tanpa migrasi baru (tetap butuh `migrasi-v18-ekskul-nip.sql` dari v14.3).
 - **Header Rapor Semester**: logo kini di kiri, sejajar dengan judul *LAPORAN HASIL BELAJAR / (RAPOR) / PROGRAM PAKET C* (judul tetap di tengah halaman); jarak atas-bawah dipadatkan agar header tidak memakan tempat.
