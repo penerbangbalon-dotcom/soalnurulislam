@@ -941,8 +941,9 @@
           <div class="field"><label>Semester</label>
             <select id="in-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
           <div class="field"><label>Yang diisi</label>
-            <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="remedial">Remedial UH / UTS / UAS (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option></select></div>
+            <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="remedial">Remedial UH / UTS / UAS (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option><option value="ekskul">Ekstrakurikuler (per kegiatan)</option></select></div>
           <div class="field" id="in-wrap-mapel"><label>Mata Pelajaran</label><select id="in-mapel"><option value="">— pilih kelas dulu —</option></select></div>
+          <div class="field hidden" id="in-wrap-ekskul"><label>Nama Kegiatan Ekstrakurikuler</label><input type="text" id="in-ekskul" list="in-ekskul-daftar" placeholder="mis. Pramuka" /><datalist id="in-ekskul-daftar"></datalist></div>
         </div>
         <div class="toolbar" style="margin:0;">
           <button class="btn" onclick="muatInputNilai()">Muat Siswa</button>
@@ -1212,7 +1213,8 @@
       <div class="card">
         <h3 style="margin-top:0;">Kepala PKBM</h3>
         <div class="grid2">
-          <div class="field"><label>Nama Kepala PKBM</label><input type="text" id="ttd-kepala-nama" placeholder="Nama lengkap & gelar" /></div>
+          <div class="field"><label>Nama Kepala PKBM</label><input type="text" id="ttd-kepala-nama" placeholder="Nama lengkap & gelar" />
+            <label style="margin-top:8px;">NIP (boleh dikosongkan)</label><input type="text" id="ttd-kepala-nip" placeholder="mis. 19800101 200501 1 001" /></div>
           <div class="field"><label>Foto Tanda Tangan (JPG/PNG)</label>
             <input type="file" accept="image/*" onchange="pilihTtd(this,'kepala')">
             <div id="ttd-kepala-prev"></div>
@@ -1235,7 +1237,8 @@
           <div class="field"><label>Kelas</label>
             <select id="ttd-wali-kelas" onchange="muatTtdWaliUntukKelas()"></select>
           </div>
-          <div class="field"><label>Nama Wali Kelas</label><input type="text" id="ttd-wali-nama" placeholder="Nama lengkap & gelar" /></div>
+          <div class="field"><label>Nama Wali Kelas</label><input type="text" id="ttd-wali-nama" placeholder="Nama lengkap & gelar" />
+            <label style="margin-top:8px;">NIP (boleh dikosongkan)</label><input type="text" id="ttd-wali-nip" placeholder="mis. 19800101 200501 1 001" /></div>
         </div>
         <div class="field"><label>Foto Tanda Tangan (JPG/PNG)</label>
           <input type="file" accept="image/*" onchange="pilihTtd(this,'wali')">
@@ -3407,7 +3410,7 @@ function isiCpTpModalSoal(cpId, tpId){
   const cps = (cpTpTersedia && mid) ? cpUntukMapel(mid).sort(urutKode) : [];
   const sel = cpEl('ts-cp');
   cpEl('ts-cptp-wrap').classList.toggle('hidden', !cpTpTersedia);
-  sel.innerHTML = '<option value="">— Tidak dikaitkan ke CP —</option>' + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}: ${escapeHtml(potong(c.deskripsi,60))}</option>`).join('');
+  sel.innerHTML = `<option value="">${cps.length ? '— Tidak dikaitkan ke CP —' : '— Mapel ini belum punya CP (isi dulu di menu CP & TP per Mapel) —'}</option>` + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}: ${escapeHtml(potong(c.deskripsi,60))}</option>`).join('');
   sel.value = (cpId && cps.some(c=>c.id===cpId)) ? cpId : '';
   isiTpModalSoal(tpId);
 }
@@ -3499,40 +3502,6 @@ function ringkasTp(t){
   let x = String(t.deskripsi||'').trim().replace(/[.;]+$/,'');
   x = x.replace(/^(?:peserta didik|siswa|warga belajar)\s+(?:dapat|mampu|dapat\/mampu)\s+/i, '');
   return x.charAt(0).toLowerCase()+x.slice(1);
-}
-async function htmlCapaianRapor(nisn, ta, smt, rows){
-  if(!cpTpTersedia || !cpList.length) return '';
-  try{
-    const peta = await hitungPenguasaanTp(nisn, ta, smt);
-    const baris = [];
-    rows.forEach(r=>{
-      const m = currentMapelList.find(x=>x.nama===r.mapel && x.program===r.program && x.kelas===r.kelas);
-      const cps = m ? cpUntukMapel(m.id).sort(urutKode) : [];
-      if(!cps.length) return;
-      const tpSemua = cps.flatMap(c=>tpUntukCp(c.id).sort(urutKode));
-      let tps = tpSemua.filter(t=>!t.semester || !smt || t.semester===smt);
-      if(!tps.length) tps = tpSemua;
-      const kkm = r.kkm!=null ? Number(r.kkm) : 70;
-      const tuntas = [], belum = []; let tanpaData = 0;
-      tps.forEach(t=>{
-        const a = peta.get(t.id);
-        if(a && a.maks>0) ((a.skor/a.maks*100) >= kkm ? tuntas : belum).push(t); else tanpaData++;
-      });
-      baris.push({ mapel:r.mapel, cps, tps, tuntas, belum, tanpaData });
-    });
-    if(!baris.length) return '';
-    const daftar = a=>a.map(ringkasTp).map(esc2).join('; ');
-    return `<div style="font-weight:bold;margin:8px 0 4px;font-size:13px;">CAPAIAN PEMBELAJARAN (CP) &amp; TUJUAN PEMBELAJARAN (TP)</div><table class="nilai">
-      <thead><tr><th class="c" style="width:28px;">No</th><th style="width:130px;">Mata Pelajaran</th><th>Capaian Pembelajaran (CP) &amp; Tujuan Pembelajaran (TP)</th></tr></thead>
-      <tbody>${baris.map((b,i)=>`<tr style="page-break-inside:avoid;"><td class="c">${i+1}</td><td><b>${esc2(b.mapel)}</b></td><td>
-        ${b.cps.map(c=>`<div><b>${esc2(c.kode||'CP')}${c.elemen?' ('+esc2(c.elemen)+')':''}:</b> ${esc2(c.deskripsi)}</div>`).join('')}
-        ${(b.tuntas.length || b.belum.length) ? `
-          ${b.tuntas.length ? `<div style="margin-top:4px;"><b>Ananda telah mampu</b> ${daftar(b.tuntas)}.</div>` : ''}
-          ${b.belum.length ? `<div style="margin-top:3px;"><b>Ananda perlu bimbingan/penguatan</b> pada ${daftar(b.belum)}.</div>` : ''}
-          ${b.tanpaData ? `<div class="catatan" style="margin:3px 0 0;">${b.tanpaData} TP lain belum diukur pada semester ini.</div>` : ''}
-        ` : `<div style="margin-top:4px;"><b>Tujuan Pembelajaran:</b> ${daftar(b.tps)}.</div>`}
-      </td></tr>`).join('')}</tbody></table>`;
-  }catch(e){ return ''; }   // kegagalan bagian CP/TP tidak boleh menggagalkan cetak rapor
 }
 
 // Impor Bank Soal: kolom opsional cp_kode / tp_kode (kode dari menu CP & TP) mengaitkan soal ke CP/TP
@@ -5633,9 +5602,13 @@ let ttdSementara = { kepala: null, wali: null };
 // Kepala PKBM (bukan null, supaya unique constraint (jenis,kelas) bekerja normal —
 // di Postgres nilai NULL tidak dianggap sama satu sama lain untuk keperluan unique).
 async function ambilTtd(jenis, kelas){
-  const { data, error } = await supa.from('pengaturan_ttd')
-    .select('nama, ttd_base64, tinggi_px').eq('jenis', jenis).eq('kelas', kelas||'').maybeSingle();
-  if(error){ console.error(error); return null; }
+  let { data, error } = await supa.from('pengaturan_ttd')
+    .select('nama, nip, ttd_base64, tinggi_px').eq('jenis', jenis).eq('kelas', kelas||'').maybeSingle();
+  if(error){   // kolom nip belum ada (migrasi-v18-ekskul-nip.sql belum dijalankan): ambil tanpa NIP
+    ({ data, error } = await supa.from('pengaturan_ttd')
+      .select('nama, ttd_base64, tinggi_px').eq('jenis', jenis).eq('kelas', kelas||'').maybeSingle());
+    if(error){ console.error(error); return null; }
+  }
   return data;
 }
 
@@ -5678,6 +5651,7 @@ async function loadTabTtd(){
   document.getElementById('ttd-kepala-prev').innerHTML = '';
   const kepala = await ambilTtd('kepala_pkbm', '');
   document.getElementById('ttd-kepala-nama').value = kepala?.nama || '';
+  document.getElementById('ttd-kepala-nip').value = kepala?.nip || '';
   document.getElementById('ttd-kepala-ukuran').value = kepala?.tinggi_px || 90;
   document.getElementById('ttd-kepala-ukuran-label').textContent = kepala?.tinggi_px || 90;
   if(kepala?.ttd_base64) pratinjauTtd('kepala', kepala.ttd_base64);
@@ -5689,9 +5663,10 @@ async function muatTtdWaliUntukKelas(){
   const kelas = document.getElementById('ttd-wali-kelas').value;
   ttdSementara.wali = null;
   document.getElementById('ttd-wali-prev').innerHTML = '';
-  if(!kelas){ document.getElementById('ttd-wali-nama').value = ''; document.getElementById('ttd-wali-ukuran').value = 90; document.getElementById('ttd-wali-ukuran-label').textContent = 90; return; }
+  if(!kelas){ document.getElementById('ttd-wali-nama').value = ''; document.getElementById('ttd-wali-nip').value = ''; document.getElementById('ttd-wali-ukuran').value = 90; document.getElementById('ttd-wali-ukuran-label').textContent = 90; return; }
   const data = await ambilTtd('wali_kelas', kelas);
   document.getElementById('ttd-wali-nama').value = data?.nama || '';
+  document.getElementById('ttd-wali-nip').value = data?.nip || '';
   document.getElementById('ttd-wali-ukuran').value = data?.tinggi_px || 90;
   document.getElementById('ttd-wali-ukuran-label').textContent = data?.tinggi_px || 90;
   if(data?.ttd_base64) pratinjauTtd('wali', data.ttd_base64);
@@ -5709,6 +5684,17 @@ async function muatDaftarWaliTtd(){
   }).join('');
 }
 
+// Simpan tanda tangan + NIP. Bila kolom nip belum ada di database (migrasi-v18 belum dijalankan),
+// tanda tangan tetap tersimpan tanpa NIP dan guru diberi tahu.
+async function upsertTtdDenganNip(payload, nipTeks){
+  const nip = String(nipTeks||'').trim() || null;
+  let { error } = await supa.from('pengaturan_ttd').upsert({ ...payload, nip }, { onConflict:'jenis,kelas' });
+  if(error && /nip/i.test(error.message||'')){
+    ({ error } = await supa.from('pengaturan_ttd').upsert(payload, { onConflict:'jenis,kelas' }));
+    if(!error && nip) alert('Tanda tangan tersimpan, tetapi NIP belum bisa disimpan: jalankan migrasi-v18-ekskul-nip.sql di Supabase SQL Editor dulu.');
+  }
+  return { error };
+}
 async function simpanTtdKepala(){
   const nama = document.getElementById('ttd-kepala-nama').value.trim();
   const tinggi_px = parseInt(document.getElementById('ttd-kepala-ukuran').value, 10) || 90;
@@ -5719,7 +5705,7 @@ async function simpanTtdKepala(){
   }
   const payload = { jenis:'kepala_pkbm', kelas:'', nama, tinggi_px, updated_at:new Date().toISOString() };
   if(ttdSementara.kepala) payload.ttd_base64 = ttdSementara.kepala;
-  const { error } = await supa.from('pengaturan_ttd').upsert(payload, { onConflict:'jenis,kelas' });
+  const { error } = await upsertTtdDenganNip(payload, document.getElementById('ttd-kepala-nip').value);
   if(error) return alert('Gagal menyimpan: '+error.message);
   ttdSementara.kepala = null;
   alert('Tanda tangan Kepala PKBM tersimpan. Rapor & Piagam yang dicetak berikutnya akan otomatis memakainya.');
@@ -5737,7 +5723,7 @@ async function simpanTtdWali(){
   }
   const payload = { jenis:'wali_kelas', kelas, nama, tinggi_px, updated_at:new Date().toISOString() };
   if(ttdSementara.wali) payload.ttd_base64 = ttdSementara.wali;
-  const { error } = await supa.from('pengaturan_ttd').upsert(payload, { onConflict:'jenis,kelas' });
+  const { error } = await upsertTtdDenganNip(payload, document.getElementById('ttd-wali-nip').value);
   if(error) return alert('Gagal menyimpan: '+error.message);
   ttdSementara.wali = null;
   document.getElementById('ttd-wali-prev').innerHTML = '';
@@ -5755,6 +5741,7 @@ async function hapusTtd(jenis, kelas, kunci){
   if(error) return alert('Gagal menghapus: '+error.message);
   ttdSementara[kunci] = null;
   document.getElementById(`ttd-${kunci}-nama`).value = '';
+  document.getElementById(`ttd-${kunci}-nip`).value = '';
   document.getElementById(`ttd-${kunci}-ukuran`).value = 90;
   document.getElementById(`ttd-${kunci}-ukuran-label`).textContent = 90;
   document.getElementById(`ttd-${kunci}-prev`).innerHTML = '';
@@ -5770,7 +5757,7 @@ function hapusTtdWaliTerpilih(){
 // Menyusun blok tanda tangan untuk Rapor/Piagam: kalau sudah ada foto tanda tangan
 // tersimpan, tampilkan gambarnya (jadi tidak perlu tanda tangan basah); kalau belum,
 // tampilkan garis kosong seperti biasa supaya tetap bisa ditandatangani manual.
-function blokTtd(labelJabatan, ttd){
+function blokTtd(labelJabatan, ttd, denganNip){
   const adaGambar = !!(ttd && ttd.ttd_base64);
   const tinggi = (ttd && ttd.tinggi_px) || 90;
   const gambarHtml = adaGambar
@@ -5778,7 +5765,8 @@ function blokTtd(labelJabatan, ttd){
     : '';
   const namaHtml = (ttd && ttd.nama) ? escapeHtml(ttd.nama) : '(...........................)';
   const marginGaris = adaGambar ? '2px' : '60px';
-  return `${labelJabatan}${gambarHtml}<div class="garis" style="margin-top:${marginGaris};">${namaHtml}</div>`;
+  const nipHtml = (denganNip && ttd && ttd.nip) ? `<div style="font-weight:normal;">NIP. ${escapeHtml(ttd.nip)}</div>` : '';
+  return `${labelJabatan}${gambarHtml}<div class="garis" style="margin-top:${marginGaris};">${namaHtml}</div>${nipHtml}`;
 }
 
 // ---------- ARSIP NILAI (salinan permanen, hanya-baca) ----------
@@ -7298,8 +7286,76 @@ const CSS_RAPOR = `
       .ttd .garis{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-weight:bold;}
       @media print{ button{display:none;} body{margin:12mm auto;} }
     
+
+      .rp{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#000;line-height:1.3;}
+      .rp-logo{text-align:center;} .rp-logo img{height:84px;width:auto;}
+      .rp-judul{text-align:center;font-weight:bold;font-size:14px;line-height:1.4;margin:6px 0 14px;}
+      table.rp-info{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;}
+      table.rp-info td{padding:2px 4px;vertical-align:top;}
+      table.rp-info td:nth-child(1),table.rp-info td:nth-child(3){white-space:nowrap;}
+      table.rp-nilai{width:100%;border-collapse:collapse;font-size:11.5px;}
+      table.rp-nilai th,table.rp-nilai td{border:1px solid #000;padding:4px 6px;vertical-align:top;}
+      table.rp-nilai th{background:#e9e9e9;text-align:center;}
+      table.rp-nilai td.c{text-align:center;}
+      table.rp-nilai td.cap{font-size:10.5px;text-align:justify;line-height:1.3;}
+      table.rp-nilai tr{page-break-inside:avoid;}
+      table.rp-ekskul{margin-top:10px;}
+      .rp-ringkas{display:flex;gap:22px;flex-wrap:wrap;font-size:12px;margin-top:10px;border-top:1px solid #000;border-bottom:1px solid #000;padding:5px 0;page-break-inside:avoid;}
+      .rp-bawah{display:flex;gap:14px;align-items:stretch;margin-top:12px;page-break-inside:avoid;}
+      .rp-kotak{flex:1;border:1px solid #000;padding:5px 8px;font-size:12px;line-height:1.4;}
+      .rp-kotak .jdl{font-weight:bold;text-align:center;background:#e9e9e9;margin:-5px -8px 4px;padding:3px 6px;border-bottom:1px solid #000;}
+      table.rp-hadir{border-collapse:collapse;font-size:12px;margin-top:0;width:240px;flex:none;border:1px solid #000;page-break-inside:avoid;}
+      table.rp-hadir th{background:#e9e9e9;border-bottom:1px solid #000;padding:3px 6px;text-align:center;}
+      table.rp-hadir td{padding:2px 6px;}
+      .rp-ttd{margin-top:22px;font-size:12px;text-align:center;page-break-inside:avoid;}
+      .rp-ttd .baris{display:flex;justify-content:space-between;}
+      .rp-ttd .kolom{width:240px;} .rp-ttd .tengah{width:260px;margin:18px auto 0;}
+      .rp-ttd .garis{font-weight:bold;}
       .halaman{page-break-after:always;} .halaman:last-child{page-break-after:auto;}
       .halaman + .halaman{margin-top:40px;} @media print{ .halaman + .halaman{margin-top:0;} }`;
+// ---------- RAPOR SEMESTER: format "Laporan Hasil Belajar (Rapor)" ----------
+// Format ini HANYA dipakai oleh Cetak Rapor Semester di menu Rekap Nilai Siswa (header: logo saja, tanpa nama & alamat sekolah).
+// Laporan lain (Leger, Transkrip, Laporan Siswa, dll.) tetap memakai kopSekolahHTML() seperti semula.
+const KELAS_TERBILANG = { VII:'tujuh', VIII:'delapan', IX:'sembilan', X:'sepuluh', XI:'sebelas', XII:'dua belas' };
+const judulNama = n => String(n||'').toLowerCase().replace(/(^|[\s.'’-])([a-zà-ÿ])/g, (m,p,c)=>p+c.toUpperCase());
+const nipdCache = new Map();
+async function nipdSiswa(nisn){            // NIPD diambil terpisah & aman: bila kolom/tabel tak tersedia, cukup NISN yang dicetak
+  if(nipdCache.has(nisn)) return nipdCache.get(nisn);
+  let v = '';
+  try{ const { data } = await supa.from('students').select('nipd').eq('nisn', nisn).maybeSingle(); v = (data && data.nipd) ? String(data.nipd).trim() : ''; }catch(e){ v = ''; }
+  nipdCache.set(nisn, v); return v;
+}
+// Kalimat "Capaian Kompetensi" tiap mapel (urutan sama dengan rows). Sumber: TP (atau CP bila TP kosong) dari menu CP & TP per Mapel.
+// 1) bila ada skor soal yang terkait TP -> TP >= KKM = "menunjukkan pemahaman", di bawah KKM = "perlu bimbingan";
+// 2) bila belum ada skor per TP -> mengikuti Nilai Akhir mapel terhadap KKM; 3) bila mapel belum punya CP/TP -> kalimat predikat.
+async function capaianKompetensiRapor(nama, nisn, ta, smt, rows){
+  const nm = judulNama(nama);
+  let peta = new Map();
+  if(cpTpTersedia && cpList.length){ try{ peta = await hitungPenguasaanTp(nisn, ta, smt); }catch(e){ peta = new Map(); } }
+  const butirTeks = x => x.cp_id ? ringkasTp(x) : String(x.deskripsi||'').trim().replace(/[.;]+$/,'');   // TP diringkas; CP apa adanya
+  const daftar = a => a.map(butirTeks).join('; ');
+  return rows.map(r=>{
+    if(r.na==null) return '-';
+    const m = currentMapelList.find(x=>x.nama===r.mapel && x.program===r.program && x.kelas===r.kelas);
+    const cps = (cpTpTersedia && m) ? cpUntukMapel(m.id).sort(urutKode) : [];
+    const kkm = r.kkm!=null ? Number(r.kkm) : 70;
+    if(!cps.length){
+      const pred = (predikatNilai(r.na).match(/\((.*)\)/)||[])[1] || predikatNilai(r.na);
+      return `${nm} mencapai predikat ${pred} pada muatan pelajaran ini.`;
+    }
+    const tpSemua = cps.flatMap(c=>tpUntukCp(c.id).sort(urutKode));
+    let butir = tpSemua.filter(t=>!t.semester || !smt || t.semester===smt);
+    if(!butir.length) butir = tpSemua;
+    if(!butir.length) butir = cps;
+    const tuntas = [], belum = [], tanpa = [];
+    butir.forEach(t=>{ const a = peta.get(t.id); if(a && a.maks>0) ((a.skor/a.maks*100) >= kkm ? tuntas : belum).push(t); else tanpa.push(t); });
+    if(!tuntas.length && !belum.length) (Number(r.na) >= kkm ? tuntas : belum).push(...tanpa);   // belum ada skor per TP
+    const bag = [];
+    if(tuntas.length) bag.push(`${nm} menunjukkan pemahaman dalam ${daftar(tuntas)}`);
+    if(belum.length) bag.push(tuntas.length ? `perlu bimbingan dalam ${daftar(belum)}` : `${nm} perlu bimbingan dalam ${daftar(belum)}`);
+    return bag.join('; ') + '.';
+  });
+}
 // Isi satu lembar rapor (HTML) untuk satu siswa; null bila siswa belum punya nilai pada semester itu.
 async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
   const rows = susunNilaiSiswa(nisn, ta, smt);
@@ -7307,49 +7363,65 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
   const nama = s ? s.nama : nisn;
   const kelas = rows[0].kelas, program = rows[0].program;
-  const adaTugas = rows.some(r=>r.tugas!=null), adaPraktik = rows.some(r=>r.praktik!=null);
-  const nas = rows.map(r=>r.na).filter(x=>x!=null);
-  const rata = nas.length ? rataRata(nas) : null;
-  const belumTuntas = rows.filter(r=>r.tuntas===false).length;
-  const peringkat = peringkatRaporSemester(nisn, ta, smt, kelas, program);
-  const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
-  const [hadirRek, ttdWali] = await Promise.all([ ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilWali(kelas) ]);
+  const [hadirRek, ttdWali, nipd, capaian, ekskul] = await Promise.all([
+    ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilWali(kelas), nipdSiswa(nisn), capaianKompetensiRapor(nama, nisn, ta, smt, rows),
+    ambilEkskulKelas(program, kelas, ta, smt).then(r=>(r.data||[]).filter(e=>e.siswa_nisn===nisn), ()=>[]) ]);
   const cel = v => v==null ? '-' : fmtN(v);
-  const blokCp = await htmlCapaianRapor(nisn, ta, smt, rows);   // CP & TP per mapel (v17)
-  return `${kopSekolahHTML()}
-    <h1>LAPORAN HASIL BELAJAR (RAPOR)</h1>
-    <div class="sub">${esc2(labelSmt(smt))} &mdash; Tahun Ajaran ${esc2(ta)}</div>
-    <table class="info">
-      <tr><td class="k">Nama Siswa</td><td>: ${esc2(nama)}</td><td class="k">Jenjang</td><td>: ${program==='Paket C'?'Paket C (Setara SMA/MA)':'Paket B (Setara SMP/MTs)'}</td></tr>
-      <tr><td class="k">NISN</td><td>: ${esc2(nisn)}</td><td class="k">Kelas</td><td>: ${esc2(kelas)}</td></tr>
+  const hari = v => v==null ? '-' : v+' hari';
+  const nasSiswa = rows.map(r=>r.na).filter(x=>x!=null);
+  const rataNa = nasSiswa.length ? rataRata(nasSiswa) : null;
+  let peringkat = null; try{ peringkat = peringkatRaporSemester(nisn, ta, smt, kelas, program); }catch(e){ peringkat = null; }
+  const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
+  let catWali = ''; try{ catWali = cat ? catatanWali({ ...cat, siswa_nama: cat.siswa_nama || nama }) : ''; }catch(e){ catWali = ''; }
+  const namaSekolah = String(SEKOLAH.nama_aplikasi || SEKOLAH.nama_lembaga || '').toUpperCase();
+  const jabKepala = SEKOLAH.jabatan_kepala || 'Kepala';
+  return `<div class="rp">
+    <div class="rp-logo"><img src="${escapeHtml(logoSekolah())}" alt="Logo"></div>
+    <div class="rp-judul">LAPORAN HASIL BELAJAR<br>(RAPOR)<br>${esc2('PROGRAM '+String(program).toUpperCase())}</div>
+    <table class="rp-info">
+      <colgroup><col style="width:128px"><col><col style="width:122px"><col style="width:132px"></colgroup>
+      <tr><td>Nama Peserta Didik</td><td><b>: ${esc2(nama)}</b></td><td>Kelas</td><td>: ${esc2(kelas)}${KELAS_TERBILANG[kelas]?' ('+KELAS_TERBILANG[kelas]+')':''}</td></tr>
+      <tr><td>NISN / NIPD</td><td>: ${esc2(nisn)}${nipd?' / '+esc2(nipd):''}</td><td>Fase</td><td>: ${esc2(FASE_KELAS[kelas]||'-')}</td></tr>
+      <tr><td>Sekolah</td><td>: ${esc2(namaSekolah)}</td><td>Semester</td><td>: ${smt==='Genap'?'II (Dua)':'I (Satu)'}</td></tr>
+      <tr><td>Alamat</td><td>: ${esc2(SEKOLAH.alamat||'-')}</td><td>Tahun Pelajaran</td><td>: ${esc2(ta)}</td></tr>
     </table>
-    <table class="nilai">
-      <thead><tr><th class="c">No</th><th>Mata Pelajaran</th><th class="c">UH</th><th class="c">UTS</th><th class="c">UAS</th>${adaTugas?'<th class="c">Tugas</th>':''}${adaPraktik?'<th class="c">Praktik</th>':''}<th class="c">Nilai Akhir</th><th>Predikat</th><th class="c">KKM</th><th>Ket.</th></tr></thead>
-      <tbody>
-      ${rows.map((r,i)=>`<tr${r.tuntas===false?' style="color:#b3261e;"':''}><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.uh)}${r.rem&&r.rem.uh?'*':''}</td><td class="c">${cel(r.uts)}${r.rem&&r.rem.uts?'*':''}</td><td class="c">${cel(r.uas)}${r.rem&&r.rem.uas?'*':''}</td>${adaTugas?`<td class="c">${cel(r.tugas)}</td>`:''}${adaPraktik?`<td class="c">${cel(r.praktik)}</td>`:''}<td class="c"><b>${cel(r.na)}</b></td><td>${r.na==null?'-':esc2(predikatNilai(r.na))}</td><td class="c">${fmtN(r.kkm)}</td><td>${ketTuntas(r.tuntas)}</td></tr>`).join('')}
-      </tbody>
+    <table class="rp-nilai">
+      <colgroup><col style="width:30px"><col style="width:175px"><col style="width:52px"><col></colgroup>
+      <thead><tr><th>No</th><th>Muatan Pelajaran</th><th>Nilai Akhir</th><th>Capaian Kompetensi</th></tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.na)}</td><td class="cap">${esc2(capaian[i])}</td></tr>`).join('')}</tbody>
     </table>
-    ${blokCp}
-    <div class="ringkasan">
-      <div><b>Jumlah Mapel:</b> ${rows.length}</div>
-      <div><b>Rata-rata Nilai Akhir:</b> ${cel(rata)}${rata!=null?' ('+esc2(predikatNilai(rata))+')':''}</div>
+    ${ekskul.length ? `<table class="rp-nilai rp-ekskul">
+      <colgroup><col style="width:30px"><col style="width:175px"><col style="width:70px"><col></colgroup>
+      <thead><tr><th>No</th><th>Ekstrakurikuler</th><th>Predikat</th><th>Keterangan</th></tr></thead>
+      <tbody>${ekskul.map((e,i)=>`<tr><td class="c">${i+1}</td><td>${esc2(e.kegiatan)}</td><td class="c">${esc2(NAMA_PREDIKAT_EKSKUL[e.predikat]||e.predikat)}</td><td class="cap">${esc2(keteranganEkskul(nama, e))}</td></tr>`).join('')}</tbody>
+    </table>` : ''}
+    <div class="rp-ringkas">
+      <div><b>Jumlah Mata Pelajaran:</b> ${rows.length}</div>
+      <div><b>Rata-rata Nilai:</b> ${rataNa!=null ? fmtN(rataNa)+' ('+esc2(predikatNilai(rataNa))+')' : '-'}</div>
       ${peringkat ? `<div><b>Peringkat di Kelas:</b> ke-${peringkat.peringkat} dari ${peringkat.total} siswa</div>` : ''}
-      <div><b>Belum tuntas KKM:</b> ${belumTuntas} mapel</div>
     </div>
-    <table class="nilai" style="max-width:520px;">
-      <thead><tr><th colspan="5">Kehadiran</th></tr><tr><th class="c">Hadir</th><th class="c">Sakit</th><th class="c">Izin</th><th class="c">Alpa</th><th class="c">Persentase</th></tr></thead>
-      <tbody>${hadirRek
-        ? `<tr><td class="c">${hadirRek.hadir} hari</td><td class="c">${hadirRek.sakit} hari</td><td class="c">${hadirRek.izin} hari</td><td class="c">${hadirRek.alpa} hari</td><td class="c">${hadirRek.persen!=null?hadirRek.persen.toFixed(1)+'%':'-'}</td></tr>`
-        : '<tr><td colspan="5" class="c">Data kehadiran belum tersedia</td></tr>'}</tbody>
-    </table>
-    <div class="kotak"><b>Sikap:</b> ${cat && cat.sikap ? esc2(cat.sikap)+' ('+esc2(NAMA_SIKAP[cat.sikap])+')' : '-'}<br>
-      <b>Catatan Wali Kelas:</b> ${catatanWali(cat) ? esc2(catatanWali(cat)) : '-'}</div>
-    <div class="catatan">UH = rata-rata ulangan harian; UTS/UAS = nilai terbaru. ${esc2(teksBobotNilai())}.${rows.some(r=>r.na==null)?' Tanda "-" berarti nilai belum final.':''}${rows.some(r=>r.rem)?' Tanda * = nilai setelah remedial.':''}</div>
-    <div class="ttd">
-      <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali)}</div>
-      <div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
+    <div class="rp-bawah">
+      <table class="rp-hadir">
+        <tr><th colspan="2">Ketidakhadiran</th></tr>
+        <tr><td>Sakit</td><td>: ${hari(hadirRek ? hadirRek.sakit : null)}</td></tr>
+        <tr><td>Izin</td><td>: ${hari(hadirRek ? hadirRek.izin : null)}</td></tr>
+        <tr><td>Tanpa Keterangan</td><td>: ${hari(hadirRek ? hadirRek.alpa : null)}</td></tr>
+        <tr><td>Persentase Kehadiran</td><td>: ${hadirRek && hadirRek.persen!=null ? fmtN(hadirRek.persen)+'%' : '-'}</td></tr>
+      </table>
+      <div class="rp-kotak">
+        <div class="jdl">Sikap dan Catatan Wali Kelas</div>
+        <div><b>Sikap:</b> ${cat && cat.sikap ? esc2(cat.sikap+' ('+(NAMA_SIKAP[cat.sikap]||'')+')') : '-'}</div>
+        <div><b>Catatan:</b> ${esc2(catWali) || '-'}</div>
+      </div>
     </div>
-`;
+    <div class="rp-ttd">
+      <div class="baris">
+        <div class="kolom">&nbsp;<br>Orang Tua,<div style="margin-top:60px;">……………………………………</div></div>
+        <div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas,', ttdWali, true)}</div>
+      </div>
+      <div class="tengah">Mengetahui,<br>${blokTtd(esc2(jabKepala)+',', ttdKepala, true)}</div>
+    </div>
+  </div>`;
 }
 function bukaDokumenRapor(win, judul, isi){
   win.document.open();
@@ -7994,6 +8066,29 @@ async function cetakTranskripMassal(){
 // INPUT NILAI TAMBAHAN (Tugas, Praktik, Sikap, Kehadiran)
 // ============================================================
 let inRoster = [];
+// ---------- EKSTRAKURIKULER (tabel ekstrakurikuler_siswa, migrasi-v18-ekskul-nip.sql) ----------
+const NAMA_PREDIKAT_EKSKUL = { A:'Sangat Baik', B:'Baik', C:'Cukup', D:'Kurang' };
+const ekskulCache = new Map();   // program##kelas##ta##smt -> Promise<{data,error}>
+function ambilEkskulKelas(program, kelas, ta, smt){
+  const k = [program, kelas, ta, smt].join('##');
+  if(!ekskulCache.has(k)){
+    ekskulCache.set(k, (async()=>{
+      try{
+        const { data, error } = await supa.from('ekstrakurikuler_siswa').select('*')
+          .eq('program', program).eq('kelas', kelas).eq('tahun_ajaran', ta).eq('semester', smt).order('kegiatan');
+        return error ? { data:[], error } : { data:data||[], error:null };
+      }catch(e){ return { data:[], error:e }; }
+    })());
+  }
+  return ekskulCache.get(k).then(r=>{ if(r.error) ekskulCache.delete(k); return r; });
+}
+// Kalimat otomatis bila keterangan dikosongkan guru.
+function keteranganEkskul(nama, e){
+  if(e.keterangan && String(e.keterangan).trim()) return String(e.keterangan).trim();
+  const kata = { A:'sangat baik', B:'baik', C:'cukup', D:'kurang' }[e.predikat] || '';
+  return `${judulNama(nama)} ${kata} dalam mengikuti kegiatan ${e.kegiatan}.`;
+}
+let inEkskulNama = '';
 function isiKelasInput(){
   const pr = document.getElementById('in-program').value;
   const sel = document.getElementById('in-kelas');
@@ -8008,7 +8103,8 @@ function isiMapelInput(){
 }
 function ubahModeInput(){
   const mode = document.getElementById('in-mode').value;
-  document.getElementById('in-wrap-mapel').classList.toggle('hidden', mode==='sikap');
+  document.getElementById('in-wrap-mapel').classList.toggle('hidden', mode==='sikap' || mode==='ekskul');
+  document.getElementById('in-wrap-ekskul').classList.toggle('hidden', mode!=='ekskul');
   document.getElementById('in-tabel').innerHTML = '';
   document.getElementById('in-simpan-bar').classList.add('hidden');
 }
@@ -8024,9 +8120,11 @@ async function loadInputNilai(){
 function ctxInput(){
   const c = { program:document.getElementById('in-program').value, kelas:document.getElementById('in-kelas').value,
     ta:document.getElementById('in-ta').value, smt:document.getElementById('in-smt').value, mode:document.getElementById('in-mode').value,
-    mapel:document.getElementById('in-mapel').value };
+    mapel:document.getElementById('in-mapel').value, ekskul:document.getElementById('in-ekskul').value.trim() };
   if(!c.program || !c.kelas || !c.ta || !c.smt){ alert('Pilih Jenjang, Kelas, Tahun Ajaran, dan Semester dulu.'); return null; }
-  if(c.mode!=='sikap' && !c.mapel){ alert('Pilih mata pelajaran dulu.'); return null; }
+  if(c.mode==='ekskul' && !c.ekskul){ alert('Isi nama kegiatan ekstrakurikuler dulu (mis. Pramuka).'); return null; }
+  if(c.mode!=='sikap' && c.mode!=='ekskul' && !c.mapel){ alert('Pilih mata pelajaran dulu.'); return null; }
+  if(c.mode==='ekskul') return c;   // ekskul memakai tabel sendiri (migrasi-v18), bukan tabel nilai tambahan v7
   if(!dbV7Tersedia){ alert('Jalankan migrasi-v7.sql di Supabase SQL Editor dulu sebelum menyimpan nilai tambahan.'); return null; }
   return c;
 }
@@ -8053,6 +8151,24 @@ async function muatInputNilai(){
         const sel = (k, pre) => { const a = asli[k]; const rendah = a==null || a<kkm;
           return `<td${a!=null&&rendah?' style="color:#b3261e;font-weight:600;"':''}>${a==null?'<span class="muted">-</span>':fmtN(a)}</td><td><input type="text" inputmode="decimal" id="${pre}${i}" value="${m['rem_'+k]!=null?m['rem_'+k]:''}" />${onl['rem_'+k]!=null ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(onl['rem_'+k])}</b>${m['rem_'+k]!=null ? ' (dikalahkan nilai manual)' : ' (dipakai)'}</div>` : ''}</td>`; };
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>${sel('uh','in-ru-')}${sel('uts','in-rt-')}${sel('uas','in-ra-')}</tr>`;
+      }).join('') + '</tbody></table></div>';
+  } else if(c.mode==='ekskul'){
+    const { data: semua, error } = await ambilEkskulKelas(c.program, c.kelas, c.ta, c.smt);
+    if(error){
+      tabel.innerHTML = '<p style="color:#b3261e;"><b>Tabel ekstrakurikuler belum ada di database</b> — jalankan <code>migrasi-v18-ekskul-nip.sql</code> di Supabase SQL Editor dulu. ('+esc2(error.message||String(error))+')</p>';
+      bar.classList.add('hidden'); return;
+    }
+    const nama = [...new Set(semua.map(r=>r.kegiatan))];
+    document.getElementById('in-ekskul-daftar').innerHTML = nama.map(n=>`<option value="${esc2(n)}">`).join('');
+    inEkskulNama = nama.find(n=>n.toLowerCase()===c.ekskul.toLowerCase()) || c.ekskul;   // satu ejaan per kegiatan
+    const peta = new Map(semua.filter(r=>r.kegiatan===inEkskulNama).map(r=>[r.siswa_nisn, r]));
+    tabel.innerHTML = `<div class="card"><p class="muted" style="margin:0 0 8px;">Kegiatan: <b>${esc2(inEkskulNama)}</b> &bull; Kelas ${esc2(c.kelas)} &bull; ${esc2(labelSmt(c.smt))} ${esc2(c.ta)}. Pilih predikat hanya untuk siswa yang mengikuti kegiatan ini; biarkan <b>—</b> bila tidak mengikuti. Keterangan boleh dikosongkan (rapor memakai kalimat otomatis).</p>
+      <table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th style="width:170px;">Predikat</th><th>Keterangan (opsional)</th></tr></thead><tbody>` +
+      inRoster.map((s,i)=>{
+        const e = peta.get(s.nisn) || {};
+        return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
+          <td><select id="in-ek-p-${i}"><option value="">—</option>${['A','B','C','D'].map(x=>`<option value="${x}"${e.predikat===x?' selected':''}>${NAMA_PREDIKAT_EKSKUL[x]}</option>`).join('')}</select></td>
+          <td><input type="text" id="in-ek-k-${i}" value="${esc2(e.keterangan||'')}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   } else if(c.mode==='tugas'){
     tabel.innerHTML = `<div class="card"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th style="width:110px;">Tugas (0-100)</th><th style="width:110px;">Praktik (0-100)</th></tr></thead><tbody>` +
@@ -8134,7 +8250,25 @@ async function simpanInputNilai(){
   if(!inRoster.length) return alert('Klik "Muat Siswa" dulu.');
   const btn = document.getElementById('in-simpan-btn'); btn.disabled = true;
   try{
-    if(c.mode!=='sikap'){
+    if(c.mode==='ekskul'){
+      const { data: semua, error: eMuat } = await ambilEkskulKelas(c.program, c.kelas, c.ta, c.smt);
+      if(eMuat) throw new Error('Tabel ekstrakurikuler belum ada: jalankan migrasi-v18-ekskul-nip.sql di Supabase SQL Editor dulu.');
+      const upsert = [], hapus = [];
+      inRoster.forEach((s,i)=>{
+        const predikat = document.getElementById('in-ek-p-'+i).value;
+        const ket = document.getElementById('in-ek-k-'+i).value.trim() || null;
+        const ada = semua.find(r=>r.siswa_nisn===s.nisn && r.kegiatan===inEkskulNama);
+        if(!predikat){ if(ada) hapus.push(ada.id); }
+        else upsert.push({ siswa_nisn:s.nisn, siswa_nama:s.nama, program:c.program, kelas:c.kelas, tahun_ajaran:c.ta, semester:c.smt, kegiatan:inEkskulNama, predikat, keterangan:ket, updated_at:new Date().toISOString() });
+      });
+      if(upsert.length){
+        const { error } = await supa.from('ekstrakurikuler_siswa').upsert(upsert, { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester,kegiatan' });
+        if(error) throw error;
+      }
+      if(hapus.length){ const { error } = await supa.from('ekstrakurikuler_siswa').delete().in('id', hapus); if(error) throw error; }
+      ekskulCache.clear();
+      alert(`Ekstrakurikuler ${inEkskulNama} tersimpan: ${upsert.length} siswa${hapus.length?`, ${hapus.length} dikosongkan`:''}.`);
+    } else if(c.mode!=='sikap'){
       const upsert = [], hapus = [];
       const KOMPS = c.mode==='remedial' ? [['rem_uh','in-ru-'],['rem_uts','in-rt-'],['rem_uas','in-ra-']] : [['tugas','in-t-'],['praktik','in-p-']];
       for(let i=0;i<inRoster.length;i++){

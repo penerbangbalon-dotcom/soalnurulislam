@@ -1,5 +1,29 @@
 # Perubahan terbaru
 
+## v14.3 — Ekstrakurikuler dan NIP pada Rapor Semester
+**Wajib jalankan `migrasi-v18-ekskul-nip.sql`** di Supabase SQL Editor (sekali; aman diulang), lalu unggah semua file ke GitHub. Sebelum migrasi dijalankan semua menu lama tetap normal; rapor tetap tercetak tanpa ekstrakurikuler/NIP. Hanya `index.html` yang berubah, ditambah file migrasi baru.
+- **Input Ekstrakurikuler** (menu Input Nilai Tambahan -> Yang diisi: *Ekstrakurikuler (per kegiatan)*): pilih Jenjang, Kelas, Tahun Ajaran, Semester, ketik nama kegiatan (mis. Pramuka; nama yang sudah pernah dipakai muncul sebagai saran), klik Muat Siswa, lalu pilih predikat **Sangat Baik / Baik / Cukup / Kurang** per siswa. Biarkan "—" bagi siswa yang tidak mengikuti; mengosongkan predikat menghapus data. Keterangan opsional.
+- **Rapor Semester**: tabel *Ekstrakurikuler* (No | Ekstrakurikuler | Predikat | Keterangan) tercetak di bawah tabel nilai, hanya bila siswa punya data. Keterangan kosong diganti kalimat otomatis, mis. "Taufik Hidayat sangat baik dalam mengikuti kegiatan Pramuka."
+- **NIP**: kolom NIP (opsional) pada menu Tanda Tangan Digital untuk Kepala dan tiap Wali Kelas. Dicetak sebagai "NIP. ..." di bawah nama pada Rapor Semester saja (piagam dan laporan lain tidak berubah). Bila NIP dikosongkan, barisnya tidak dicetak.
+- Tabel baru: `ekstrakurikuler_siswa`; kolom baru `pengaturan_ttd.nip`.
+
+## v14.2 — Rapor Semester: unsur rapor lama dikembalikan ke format baru
+Hanya `index.html` yang berubah; tanpa migrasi. Format Rpr-1 (v14.1) tetap, ditambah kembali:
+- **Rata-rata Nilai + predikat** dan **Peringkat di Kelas** (ke-n dari N siswa), di bawah tabel nilai.
+- **Persentase Kehadiran** pada kotak Ketidakhadiran (Sakit / Izin / Tanpa Keterangan / Persentase).
+- Kotak **Sikap dan Catatan Wali Kelas** (dari Input Nilai Tambahan; catatan otomatis bila kosong).
+Berlaku untuk cetak satu siswa maupun satu kelas. Bagian yang gagal dimuat (peringkat/catatan) menampilkan "-" dan tidak menggagalkan cetak. Ekstrakurikuler dan NIP tetap belum ada.
+
+## v14.1 — Format Rapor Semester mengikuti contoh (khusus Rekap Nilai Siswa)
+Hanya **Rekap Nilai Siswa -> Cetak Rapor Semester** (satu siswa maupun satu kelas) yang berubah. Leger, Transkrip, Laporan Siswa, Syarat Rapor, dan semua cetakan lain tetap memakai header lama. Tidak perlu migrasi baru.
+- **Header**: hanya **logo** (tanpa nama sekolah/yayasan, NPSN, SK, dan alamat), disusul judul 3 baris *LAPORAN HASIL BELAJAR / (RAPOR) / PROGRAM PAKET C*.
+- **Identitas 2 kolom**: Nama Peserta Didik, NISN / NIPD, Sekolah, Alamat | Kelas (mis. XI (sebelas)), Fase, Semester (I (Satu)/II (Dua)), Tahun Pelajaran. Nama sekolah dan alamat tetap ada di blok identitas ini, persis seperti contoh. NIPD diambil dari data siswa bila tersedia.
+- **Tabel nilai**: No | Muatan Pelajaran | Nilai Akhir | Capaian Kompetensi. Kolom UH/UTS/UAS/Tugas/Praktik/KKM/Predikat tidak dicetak lagi (tampilan Rekap di layar tidak berubah).
+- **Capaian Kompetensi** (menyatu dengan fitur CP & TP v14.0): *"{Nama} menunjukkan pemahaman dalam {TP}; perlu bimbingan dalam {TP}."* TP diambil dari menu CP & TP per Mapel (TP semester itu). Aturan: bila ada skor soal yang terkait TP, TP >= KKM mapel = menunjukkan pemahaman, di bawah KKM = perlu bimbingan; bila belum ada skor per TP, mengikuti Nilai Akhir mapel terhadap KKM; bila mapel hanya punya CP, rumusan CP dipakai; bila mapel belum punya CP/TP, ditulis kalimat predikat (mis. "mencapai predikat Baik pada muatan pelajaran ini"); nilai belum final = "-".
+- **Ketidakhadiran** (Sakit / Izin / Tanpa Keterangan, dalam hari) dan tanda tangan **Orang Tua, Wali Kelas, Kepala** (Mengetahui).
+- **Tidak ada di v14.1** (dikembalikan di v14.2): ringkasan rata-rata/peringkat, kotak Sikap dan Catatan Wali Kelas, persentase kehadiran. Masih belum ada: bagian ekstrakurikuler (aplikasi belum punya data ekstrakurikuler) dan baris NIP (tabel tanda tangan belum punya kolom NIP).
+- File berubah: index.html saja.
+
 ## v14.0 — Menu CP & TP per Mapel, terhubung ke Bank Soal (generate soal berdasarkan CP) dan Rapor
 **Wajib jalankan `migrasi-v17-cp-tp.sql`** di Supabase SQL Editor (sekali; aman diulang), lalu unggah semua file ke GitHub (Vercel deploy otomatis). Data lama tidak berubah. Sebelum migrasi dijalankan, semua menu lama tetap normal dan menu CP & TP menampilkan petunjuk migrasi. **Tidak ada fungsi serverless baru** (tetap 10; batas Hobby 12).
 
@@ -18,7 +42,7 @@
 - Import Excel Bank Soal: kolom opsional `cp_kode` & `tp_kode` (template dan ekspor ikut diperbarui; kode tidak ditemukan -> soal tetap masuk tanpa tautan, dengan peringatan).
 - Buat Paket Ujian: filter **CP** pada daftar pilihan soal (dengan jumlah soal per CP), sehingga paket bisa disusun per CP.
 
-**4. Rapor Semester mencantumkan CP & TP.** Setelah tabel nilai, muncul bagian **Capaian Pembelajaran (CP) & Tujuan Pembelajaran (TP)** per mapel (hanya mapel yang punya CP). Bila siswa punya skor pada soal yang terkait TP (ujian berstatus dinilai pada tahun ajaran & semester itu, termasuk remedial), tertulis deskripsi otomatis: *"Ananda telah mampu ..."* (TP dengan penguasaan >= KKM mapel) dan *"Ananda perlu bimbingan/penguatan pada ..."* (di bawah KKM). TP yang belum punya data tidak dinilai (ditulis "n TP lain belum diukur"). Bila belum ada soal terkait TP, rapor menampilkan CP dan daftar TP semester itu. Berlaku untuk cetak satu siswa maupun massal. Kegagalan bagian ini tidak menggagalkan cetak rapor.
+**4. Rapor Semester mencantumkan CP & TP** (sejak v14.1 menyatu di kolom Capaian Kompetensi; lihat bagian v14.1). Setelah tabel nilai, muncul bagian **Capaian Pembelajaran (CP) & Tujuan Pembelajaran (TP)** per mapel (hanya mapel yang punya CP). Bila siswa punya skor pada soal yang terkait TP (ujian berstatus dinilai pada tahun ajaran & semester itu, termasuk remedial), tertulis deskripsi otomatis: *"Ananda telah mampu ..."* (TP dengan penguasaan >= KKM mapel) dan *"Ananda perlu bimbingan/penguatan pada ..."* (di bawah KKM). TP yang belum punya data tidak dinilai (ditulis "n TP lain belum diukur"). Bila belum ada soal terkait TP, rapor menampilkan CP dan daftar TP semester itu. Berlaku untuk cetak satu siswa maupun massal. Kegagalan bagian ini tidak menggagalkan cetak rapor.
 > Agar deskripsi capaian di rapor terisi: (a) isi CP/TP, (b) buat soal yang terkait TP (via Generate AI berdasarkan CP/TP atau manual), (c) pakai soal itu di paket ujian. Soal yang sudah ada sebelumnya bisa dikaitkan lewat Edit Soal atau impor ulang dengan kolom `cp_kode`/`tp_kode`.
 
 **File berubah/baru:** `index.html`, `netlify/functions/generate-soal.js` (adapter `api/generate-soal.js` tidak berubah), baru: `migrasi-v17-cp-tp.sql`. Tabel baru: `capaian_pembelajaran`, `tujuan_pembelajaran`; kolom baru `bank_soal.cp_id`, `bank_soal.tp_id` (hapus CP/TP tidak menghapus soal, hanya melepas tautan).

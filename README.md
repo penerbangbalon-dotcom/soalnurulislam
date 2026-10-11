@@ -120,6 +120,7 @@ generator-soal/
 ├── ujian.html                     # Ujian online siswa
 ├── netlify.toml                   # Konfigurasi Netlify
 ├── logo.png                       # Logo untuk kop soal cetak
+├── migrasi-v18-ekskul-nip.sql     # Jalankan sekali: tabel ekstrakurikuler + kolom NIP tanda tangan
 ├── migrasi-v17-cp-tp.sql          # Jalankan sekali: tabel CP & TP + tautan ke Bank Soal
 ├── migrasi-v7.sql                 # Jalankan sekali: Ulangan Harian, pengaturan nilai/KKM, nilai tambahan
 ├── migrasi-lengkap.sql                 # Jalankan sekali di Supabase (izin tombol Reset, kolom Kelas, dll)
