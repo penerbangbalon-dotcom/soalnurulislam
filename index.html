@@ -247,6 +247,7 @@
         <div class="item admin-only hidden" data-tab="siswa" onclick="showTab('siswa')">Data Siswa</div>
         <div class="item admin-only hidden" data-tab="sekolah" onclick="showTab('sekolah')">Identitas Sekolah</div>
         <div class="item super-only hidden" data-tab="user" onclick="showTab('user')">Manajemen User</div>
+        <div class="item super-only hidden" data-tab="cadangan" onclick="showTab('cadangan')">Cadangan Data</div>
       </div>
     </div>
   </nav>
@@ -275,7 +276,7 @@
           <option value="belum">Belum dipakai di paket</option>
           <option value="sudah">Sudah dipakai di paket</option>
         </select>
-        <input type="text" id="filter-cari" placeholder="Cari pertanyaan / topik..." style="max-width:220px;" oninput="onCariSoalInput()" />
+        <input type="text" id="filter-cari" placeholder="Cari pertanyaan / topik / mapel..." style="max-width:240px;" oninput="onCariSoalInput()" />
         <button class="btn outline" onclick="openTambahSoal()">+ Tambah Soal Manual</button>
         <button class="btn outline" onclick="document.getElementById('file-import').click()">Import Excel/CSV</button>
         <button class="btn outline" onclick="unduhTemplateSoal()">Unduh Template</button>
@@ -511,7 +512,7 @@
           <option value="UTS">UTS</option><option value="UAS">UAS</option>
           <option value="Ulangan Harian">Ulangan Harian</option><option value="Remedial">Remedial</option>
         </select>
-        <input type="text" id="ms-cari" placeholder="Cari nama / NISN..." oninput="renderMonSiswa()" style="max-width:220px;">
+        <input type="text" id="ms-cari" placeholder="Cari nama / NISN / mapel..." oninput="renderMonSiswa()" style="max-width:220px;">
         <select id="ms-urut" onchange="renderMonSiswa()">
           <option value="nama">Urut: Nama A-Z</option>
           <option value="langgar">Urut: Pelanggaran terbanyak</option>
@@ -526,6 +527,29 @@
           <thead><tr><th style="width:26%;">Siswa</th><th>Mata pelajaran yang sudah dikerjakan</th><th style="width:150px;">Aksi</th></tr></thead>
           <tbody id="ms-body"><tr><td colspan="3" class="muted">Memuat data...</td></tr></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ===== TAB: CADANGAN DATA (khusus Super Admin) ===== -->
+    <section id="tab-cadangan" class="hidden">
+      <h2>Cadangan Data</h2>
+      <p class="muted">Halaman ini <b>khusus Super Admin</b>. Unduh satu file berisi seluruh data aplikasi (siswa, soal, paket ujian, sesi &amp; jawaban,
+        nilai, arsip nilai, absensi, pengaturan) lalu simpan di komputer / flashdisk. Unduh secara berkala, misalnya sebelum dan sesudah masa ujian.</p>
+      <div class="card">
+        <h3 style="margin-top:0;">Unduh Cadangan</h3>
+        <p class="muted">Hanya membaca data, tidak mengubah apa pun. Prosesnya bisa memakan waktu satu sampai beberapa menit; jangan tutup halaman sampai file terunduh.</p>
+        <button class="btn" id="cad-unduh-btn" onclick="unduhCadangan()">Unduh Cadangan Data</button>
+        <p id="cad-unduh-status" class="muted" style="margin-top:10px;"></p>
+        <p class="muted" style="margin-top:10px;"><b>Simpan file ini dengan aman.</b> Isinya data pribadi siswa dan kata sandi siswa/admin yang terenkripsi. Jangan dikirim ke sembarang orang.
+          Akun login guru/admin (Supabase Auth) tidak ikut tercakup.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Pulihkan dari File Cadangan</h3>
+        <p class="muted">Hanya dipakai saat darurat (misalnya data hilang atau pindah ke database baru). Pemulihan <b>tidak pernah menghapus</b> data: baris di file akan
+          ditambahkan, dan baris dengan id yang sama akan <b>ditimpa</b> oleh isi file. Sebelum memakainya, sebaiknya hubungi orang yang membantu Anda mengelola aplikasi ini.</p>
+        <input type="file" id="cad-file" accept=".json,application/json" style="max-width:360px;">
+        <div style="margin-top:10px;"><button class="btn danger" id="cad-pulih-btn" onclick="pulihkanCadangan()">Pulihkan dari File</button></div>
+        <p id="cad-pulih-status" class="muted" style="margin-top:10px;"></p>
       </div>
     </section>
 
@@ -611,7 +635,7 @@
           </div>
         </div>
         <div class="toolbar" style="margin:14px 0 0;">
-          <input type="text" id="bu-cari" placeholder="Cari nama / NISN..." oninput="renderBelumUjian()" style="min-width:220px;" />
+          <input type="text" id="bu-cari" placeholder="Cari nama / NISN / mapel..." oninput="renderBelumUjian()" style="min-width:220px;" />
           <label style="display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer;">
             <input type="checkbox" id="bu-hanya" onchange="renderBelumUjian()" /> Hanya siswa yang belum ujian atau sesinya macet
           </label>
@@ -869,7 +893,7 @@
           <div class="field"><label>Tahun Ajaran</label><select id="rm-ta" onchange="isiMapelRemedial()"></select></div>
           <div class="field"><label>Semester</label>
             <select id="rm-smt" onchange="isiMapelRemedial()"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
-          <div class="field"><label>Cari Siswa (nama / NISN)</label><input type="text" id="rm-cari" placeholder="Ketik nama atau NISN..." oninput="renderRemedial()" /></div>
+          <div class="field"><label>Cari Siswa / Mapel (nama / NISN / mata pelajaran)</label><input type="text" id="rm-cari" placeholder="Ketik nama, NISN, atau mapel..." oninput="clearTimeout(window._rmCariT);window._rmCariT=setTimeout(renderRemedial,200)" /></div>
         </div>
         <div class="grid3">
           <div class="field"><label>Yang dianggap perlu remedial</label>
@@ -1113,7 +1137,7 @@
         <button class="btn gold" onclick="muatSyaratRapor()">Tampilkan</button>
       </div>
       <div class="toolbar">
-        <input type="text" id="sr-cari" placeholder="Cari nama / NISN..." oninput="renderSyaratRapor()" style="max-width:220px;">
+        <input type="text" id="sr-cari" placeholder="Cari nama / NISN / mapel yang kurang..." oninput="renderSyaratRapor()" style="max-width:280px;">
         <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink);"><input type="checkbox" id="sr-hanya" onchange="renderSyaratRapor()" style="width:auto;"> Hanya yang belum memenuhi syarat</label>
         <button class="btn outline" onclick="unduhSyaratRapor()">Unduh Excel</button>
         <button class="btn outline" onclick="cetakSyaratRapor()">Cetak Daftar</button>
@@ -2080,10 +2104,10 @@ async function hapusUser(userId, email){
 
 // ---------- NAV ----------
 function showTab(tab){
-  if(tab==='user' && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
+  if((tab==='user' || tab==='cadangan') && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','cptp','tugas','nilaitugas','syaratrapor','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','sekolah','siswa'].forEach(t=>{
+  ['bank','cptp','tugas','nilaitugas','syaratrapor','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -2547,12 +2571,14 @@ async function loadBankSoal(){
   const cari = document.getElementById('filter-cari').value.trim();
   const filterPakai = (document.getElementById('filter-pakai')||{}).value || '';
   const filterCp = (document.getElementById('filter-cp')||{}).value || '';
+  // Pencarian juga mencocokkan nama mata pelajaran: ambil id mapel yang namanya memuat kata yang dicari.
+  const idMapelCari = cari ? currentMapelList.filter(m=>normCari(m.nama).includes(normCari(cari))).map(m=>m.id) : [];
   const bangun = ()=>{
     let q = supa.from('bank_soal').select('*, mata_pelajaran(nama)').order('created_at', { ascending:false }).order('id');
     if(mapelId) q = q.eq('mapel_id', mapelId);
     if(jenis) q = q.eq('jenis', jenis);
     if(filterCp==='tanpa') q = q.is('cp_id', null); else if(filterCp) q = q.eq('cp_id', filterCp);
-    if(cari) q = q.or(`pertanyaan.ilike.%${cari}%,topik.ilike.%${cari}%`);
+    if(cari) q = q.or(`pertanyaan.ilike.%${cari}%,topik.ilike.%${cari}%${idMapelCari.length?`,mapel_id.in.(${idMapelCari.join(',')})`:''}`);
     return q;
   };
   let { data, error } = await ambilSemuaBaris(bangun);
@@ -5615,19 +5641,21 @@ async function loadMonSiswa(){
 // Sesi milik siswa yang lolos filter Tahun Ajaran & Jenis (dipakai tampilan dan tombol Reset Semua)
 function msItemTersaring(st){
   const ta = document.getElementById('ms-ta').value, jenis = document.getElementById('ms-jenis').value;
-  return st.items.filter(i=>(!ta || i.p.tahun_ajaran===ta) && (!jenis || i.p.jenis_ujian===jenis))
+  const cari = document.getElementById('ms-cari').value;
+  // Pencarian: tiap kata harus cocok dengan nama, NISN, mapel, judul paket, atau jenis ujian. Hasilnya per mapel:
+  // mencari nama siswa menampilkan semua mapelnya, mencari mapel menampilkan mapel itu saja.
+  return st.items.filter(i=>(!ta || i.p.tahun_ajaran===ta) && (!jenis || i.p.jenis_ujian===jenis)
+      && cocokKataCari(cari, st.nama, st.nisn, msNamaMapel(i.p), i.p.judul, i.p.jenis_ujian))
     .sort((a,b)=>String((a.p.mata_pelajaran&&a.p.mata_pelajaran.nama)||a.p.judul).localeCompare(String((b.p.mata_pelajaran&&b.p.mata_pelajaran.nama)||b.p.judul),'id'));
 }
 function msNamaMapel(p){ return (p.mata_pelajaran && p.mata_pelajaran.nama) || p.judul; }
 function renderMonSiswa(){
   const body = document.getElementById('ms-body');
   const kelas = document.getElementById('ms-kelas').value;
-  const cari = document.getElementById('ms-cari').value.trim().toLowerCase();
   const hanyaLanggar = document.getElementById('ms-langgar').checked;
   const urut = document.getElementById('ms-urut').value;
   let daftar = ms.siswa.map(st=>({ st, items: msItemTersaring(st) })).filter(x=>x.items.length);
   if(kelas) daftar = daftar.filter(x=>x.st.kelas===kelas);
-  if(cari) daftar = daftar.filter(x=>(x.st.nama||'').toLowerCase().includes(cari) || String(x.st.nisn||'').toLowerCase().includes(cari));
   const langgar = x => x.items.reduce((a,i)=>a+(Number(i.s.pelanggaran)||0),0);
   if(hanyaLanggar) daftar = daftar.filter(x=>langgar(x)>0);
   daftar.sort((a,b)=> urut==='langgar' ? (langgar(b)-langgar(a)) || a.st.nama.localeCompare(b.st.nama,'id') : a.st.nama.localeCompare(b.st.nama,'id'));
@@ -5693,13 +5721,93 @@ async function msResetSemua(nisn){
   if(!items.length) return alert('Tidak ada mapel untuk direset pada filter ini.');
   const daftar = items.slice(0,15).map(i=>'• '+msNamaMapel(i.p)+' ('+(i.p.jenis_ujian||'-')+')').join('\n') + (items.length>15 ? `\n• ...dan ${items.length-15} lainnya` : '');
   const adaManual = items.some(i=>i.s.mode_ujian==='manual');
-  if(!confirm(`Reset SEMUA mapel (${items.length}) milik ${st.nama}?\n\n${daftar}\n\nSemua jawaban dan nilai di mapel di atas DIHAPUS dan siswa harus mengerjakan ulang dari awal.\nSalinan nilai lama tetap ada di Arsip Nilai.${adaManual?'\n\n⚠ Termasuk nilai yang diinput manual (ujian cetak): harus diinput ulang.':''}\n\n(Hanya mapel sesuai filter Tahun Ajaran & Jenis yang sedang tampil.)`)) return;
+  if(!confirm(`Reset SEMUA mapel (${items.length}) milik ${st.nama}?\n\n${daftar}\n\nSemua jawaban dan nilai di mapel di atas DIHAPUS dan siswa harus mengerjakan ulang dari awal.\nSalinan nilai lama tetap ada di Arsip Nilai.${adaManual?'\n\n⚠ Termasuk nilai yang diinput manual (ujian cetak): harus diinput ulang.':''}\n\n(Hanya mapel yang sedang tampil sesuai filter Tahun Ajaran, Jenis, dan pencarian.)`)) return;
   try{
     const n = await msHapusSesi(items.map(i=>i.id));
     if(n < items.length) alert(`Hanya ${n} dari ${items.length} sesi yang terhapus. Klik Refresh untuk melihat sisanya; bila berulang, periksa izin hapus di database (migrasi-lengkap.sql).`);
     else alert(`${n} mapel ${st.nama} berhasil direset.`);
   }catch(e){ alert('Gagal reset: '+e.message); }
   loadMonSiswa();
+}
+
+// ---------- CADANGAN DATA (khusus Super Admin) ----------
+// Membaca/menulis lewat /api/cadangan-data (service key ada di server). Data dibaca per 500 baris supaya muat
+// di batas ukuran respons Vercel, lalu digabung di browser menjadi satu file JSON.
+async function panggilCadangan(payload){
+  const { data:{ session } } = await supa.auth.getSession();
+  const res = await fetch('/api/cadangan-data', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}` },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || `Gagal (${res.status})`);
+  return data;
+}
+async function unduhCadangan(){
+  const btn = document.getElementById('cad-unduh-btn'), st = document.getElementById('cad-unduh-status');
+  btn.disabled = true;
+  try{
+    st.textContent = 'Menyiapkan...';
+    const { tabel } = await panggilCadangan({ action:'daftar' });
+    const hasil = {}, jumlah = {};
+    for(let i=0; i<tabel.length; i++){
+      const t = tabel[i].t, ukuran = tabel[i].u || 300, rows = [];
+      for(let dari=0; ; dari+=ukuran){
+        st.textContent = `Membaca tabel ${i+1}/${tabel.length}: ${t} (${rows.length} baris)...`;
+        const r = await panggilCadangan({ action:'baca', tabel:t, dari, jumlah:ukuran });
+        rows.push(...r.baris);
+        if(r.baris.length < ukuran) break;
+      }
+      hasil[t] = rows; jumlah[t] = rows.length;
+    }
+    const tgl = new Date().toISOString().slice(0,10);
+    const berkas = { format:'pkbm-cadangan-v1', dibuat:new Date().toISOString(), jumlah, tabel:hasil };
+    const blob = new Blob([JSON.stringify(berkas)], { type:'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `cadangan-pkbm-${tgl}.json`; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
+    const total = Object.values(jumlah).reduce((x,y)=>x+y,0);
+    st.innerHTML = `<span style="color:#2F6B34;font-weight:600;">Selesai.</span> ${tabel.length} tabel, ${total} baris disimpan ke file cadangan-pkbm-${tgl}.json (ukuran ${(blob.size/1048576).toFixed(1)} MB). Pindahkan file ini ke tempat yang aman.`;
+  }catch(e){
+    st.innerHTML = `<span style="color:#b3261e;">Gagal: ${escapeHtml(e.message||String(e))}. File TIDAK dibuat; cobalah lagi.</span>`;
+  }finally{ btn.disabled = false; }
+}
+async function pulihkanCadangan(){
+  const btn = document.getElementById('cad-pulih-btn'), st = document.getElementById('cad-pulih-status');
+  const f = document.getElementById('cad-file').files[0];
+  if(!f) return alert('Pilih file cadangan (.json) dulu.');
+  let berkas;
+  try{ berkas = JSON.parse(await f.text()); }catch(e){ return alert('File tidak bisa dibaca. Pastikan ini file cadangan yang diunduh dari menu ini.'); }
+  if(!berkas || berkas.format!=='pkbm-cadangan-v1' || !berkas.tabel) return alert('Bukan file cadangan yang dikenali.');
+  const ringkas = Object.entries(berkas.jumlah||{}).filter(([,n])=>n>0).map(([t,n])=>`${t}: ${n}`).join('\n');
+  const ketik = prompt(`Pulihkan dari file ini?\n\nDibuat: ${berkas.dibuat||'-'}\n\n${ringkas}\n\nBaris di file akan ditambahkan, dan baris dengan id yang sama akan DITIMPA oleh isi file. Tidak ada data yang dihapus.\n\nKetik PULIHKAN untuk melanjutkan:`);
+  if(ketik !== 'PULIHKAN') return alert('Dibatalkan.');
+  btn.disabled = true;
+  try{
+    const { tabel } = await panggilCadangan({ action:'daftar' });
+    let total = 0;
+    for(let i=0; i<tabel.length; i++){
+      const t = tabel[i].t, data = berkas.tabel[t];
+      if(!Array.isArray(data) || !data.length) continue;
+      let batch = [], ukuran = 0, terkirim = 0;
+      const kirim = async ()=>{
+        if(!batch.length) return;
+        await panggilCadangan({ action:'tulis', tabel:t, baris:batch });
+        terkirim += batch.length; total += batch.length; batch = []; ukuran = 0;
+        st.textContent = `Memulihkan tabel ${i+1}/${tabel.length}: ${t} (${terkirim}/${data.length})...`;
+      };
+      for(const row of data){
+        const n = JSON.stringify(row).length;
+        if(batch.length>=200 || (batch.length && ukuran+n > 1000000)) await kirim();
+        batch.push(row); ukuran += n;
+      }
+      await kirim();
+    }
+    st.innerHTML = `<span style="color:#2F6B34;font-weight:600;">Selesai.</span> ${total} baris dipulihkan. Muat ulang halaman, lalu periksa data.`;
+  }catch(e){
+    st.innerHTML = `<span style="color:#b3261e;">Berhenti karena galat: ${escapeHtml(e.message||String(e))}. Sebagian data mungkin sudah masuk; aman diulang dengan file yang sama.</span>`;
+  }finally{ btn.disabled = false; }
 }
 
 // ---------- TANDA TANGAN DIGITAL (KEPALA PKBM & WALI KELAS) ----------
@@ -6083,8 +6191,13 @@ function renderBelumUjian(){
     p.jenis_ujian!=='Remedial' &&
     (f.jenis==='formal' ? p.jenis_ujian!=='Ulangan Harian' : (!f.jenis || p.jenis_ujian===f.jenis)));
 
+  // Pencarian mapel: bila kata yang diketik cocok dengan mapel/judul paket, tampilkan hanya kolom mapel itu (semua siswa).
+  // Bila tidak ada mapel yang cocok, kata dipakai untuk mencari nama / NISN siswa seperti sebelumnya.
+  const paketMapel = f.cari ? paketF.filter(p=>cocokKataCari(f.cari, p.mata_pelajaran?.nama, p.judul)) : [];
+  const modeMapel = paketMapel.length>0;
+  const paketTampil = modeMapel ? paketMapel : paketF;
   const peta = new Map();
-  paketF.forEach(p=>{
+  paketTampil.forEach(p=>{
     const k = p.program+'|'+p.kelas;
     if(!peta.has(k)) peta.set(k, { program:p.program, kelas:p.kelas, paket:[] });
     peta.get(k).paket.push(p);
@@ -6102,7 +6215,7 @@ function renderBelumUjian(){
     });
     g.siswaPerlu = g.rows.filter(r=>r.belum||r.macet||r.susulan).length;
     g.tampil = g.rows.filter(r=>(!f.hanya || r.belum || r.macet || r.susulan) &&
-      (!f.cari || r.s.nama.toLowerCase().includes(f.cari) || String(r.s.nisn).toLowerCase().includes(f.cari)));
+      (!f.cari || modeMapel || cocokKataCari(f.cari, r.s.nama, r.s.nisn)));
     if(f.urut) g.tampil.sort((a,b)=>(b.belum+b.macet+b.susulan)-(a.belum+a.macet+a.susulan) || a.s.nama.localeCompare(b.s.nama,'id'));
   });
   bu.grup = grup;
@@ -6117,7 +6230,7 @@ function renderBelumUjian(){
   const totSiswa = grup.reduce((n,g)=>n+g.totalSiswa,0);
   const totPerlu = grup.reduce((n,g)=>n+g.siswaPerlu,0);
   const totMacet = grup.reduce((n,g)=>n+g.kolom.reduce((m,k)=>m+k.macet,0),0);
-  stat.innerHTML = `<b>${totSiswa}</b> siswa &bull; <b>${paketF.length}</b> paket ujian &bull; `+
+  stat.innerHTML = `<b>${totSiswa}</b> siswa &bull; <b>${paketTampil.length}</b> paket ujian${modeMapel ? ' <span class="muted">(sesuai pencarian mapel)</span>' : ''} &bull; `+
     (totPerlu ? `<span style="color:#b3261e;font-weight:600;">${totPerlu} siswa belum lengkap</span>` : '<span style="color:#1F5A25;font-weight:600;">semua siswa sudah mengikuti ujian</span>')+
     (totMacet ? ` &bull; <span style="color:#8A2E1E;">${totMacet} sesi macet (nilai bisa dihitung di menu Perlu Dinilai)</span>` : '');
 
@@ -7814,8 +7927,8 @@ function kumpulkanRemedial(){
   if(!ta || !smt) return out;
   daftarSiswaNilai.forEach(s=>{
     if(s.nonaktif) return;
-    if(q && !(String(s.nama).toLowerCase().includes(q) || String(s.nisn).toLowerCase().includes(q))) return;
     susunNilaiSiswa(s.nisn, ta, smt).forEach(r=>{
+      if(q && !cocokKataCari(q, s.nama, s.nisn, r.mapel)) return;   // cari nama / NISN / mata pelajaran
       if((pr && r.program!==pr) || (kl && r.kelas!==kl) || (mp && r.mapel!==mp)) return;
       const kb = ['uh','uts','uas'].filter(k=>r[k]!=null && r.kkm!=null && r[k]<r.kkm);
       const naBelum = r.tuntas===false;
@@ -8831,7 +8944,7 @@ function renderSyaratRapor(){
   const q = document.getElementById('sr-cari').value.trim().toLowerCase(), hanya = document.getElementById('sr-hanya').checked;
   const semua = syaratData.siswa;
   const urut = semua.slice().sort((a,b)=>a.program.localeCompare(b.program) || BU_URUT_KELAS.indexOf(a.kelas)-BU_URUT_KELAS.indexOf(b.kelas) || a.nama.localeCompare(b.nama,'id'));
-  const tampil = urut.filter(s=>(!q || s.nama.toLowerCase().includes(q) || s.nisn.toLowerCase().includes(q)) && (!hanya || !s.memenuhi));
+  const tampil = urut.filter(s=>(!q || cocokKataCari(q, s.nama, s.nisn, (s.kekurangan||[]).join(' '))) && (!hanya || !s.memenuhi));
   syaratData.tampil = tampil;
   const ok = semua.filter(s=>s.memenuhi).length;
   const k = (fn)=>semua.filter(fn).length;
@@ -8941,6 +9054,14 @@ function kelasDariKata(t){
   return null;
 }
 function kataUtuhCari(teksNorm){ return new Set(teksNorm.split(/[^a-z0-9]+/).filter(Boolean)); }
+// Pencarian kata sederhana untuk kotak "Cari nama / NISN / mapel": setiap kata harus ada (cocok sebagian, tanpa peduli
+// huruf besar/kecil & aksen) di salah satu bidang yang diberikan. Angka NISN dan huruf tunggal tetap cocok sebagian.
+function cocokKataCari(q, ...bidang){
+  const kata = normCari(q).split(' ').filter(Boolean);
+  if(!kata.length) return true;
+  const teks = normCari(bidang.map(b=>b==null?'':String(b)).join(' | '));
+  return kata.every(k=>teks.includes(k));
+}
 // Mengurai kotak pencarian menjadi daftar kata. medanTersedia = nama filter khusus yang boleh dipakai di halaman itu.
 function parsePencarian(q, medanTersedia){
   const tokens = [], re = /(-?)(?:([a-zA-Z]+):)?(?:"([^"]*)"|(\S+))/g; let m;

@@ -1,5 +1,24 @@
 # Perubahan terbaru
 
+## v14.7 — Menu "Cadangan Data" (khusus Super Admin) + pencarian mapel
+Tanpa migrasi SQL. File berubah: `index.html`; file baru: `netlify/functions/cadangan-data.js` dan `api/cadangan-data.js`. Unggah SEMUA file lalu deploy ulang. Jumlah fungsi Vercel menjadi 11 (batas paket gratis 12).
+- Menu baru **Cadangan Data** (hanya Super Admin; server juga menolak peran lain).
+- **Unduh Cadangan Data**: satu klik menghasilkan satu file `cadangan-pkbm-TAHUN-BULAN-TANGGAL.json` berisi 37 tabel (siswa, bank soal, paket, sesi & jawaban, nilai, arsip nilai, absensi, tugas, CP/TP, ekstrakurikuler, pengaturan, dst). Hanya membaca. Bila ada tabel yang gagal dibaca, file TIDAK dibuat (tidak ada cadangan setengah jadi).
+- **Pulihkan dari File**: untuk keadaan darurat. Menambah baris yang hilang dan menimpa baris ber-id sama; TIDAK pernah menghapus. Wajib mengetik PULIHKAN. Aman diulang bila terputus.
+- Tidak tercakup: akun login guru/admin (Supabase Auth). File berisi data pribadi siswa dan kata sandi terenkripsi; simpan dengan aman.
+- Sertakan juga perubahan v14.6 di bawah (pencarian mapel).
+
+## v14.6 — Kolom pencarian kini bisa mencari mata pelajaran
+Hanya `index.html` yang berubah; tanpa migrasi SQL. Unggah `index.html` ke GitHub, Vercel deploy otomatis.
+Menu yang SUDAH mencari mapel sejak sebelumnya (tidak diubah): Daftar Paket, Ujian Terlaksana, Perlu Dinilai, Arsip Nilai.
+Menu yang kini DITAMBAH pencarian mapel:
+1. **Bank Soal**: kotak cari kini mencocokkan juga nama mata pelajaran (selain pertanyaan dan topik).
+2. **Monitoring per Siswa**: cari nama / NISN / mapel / judul paket / jenis ujian. Mencari nama menampilkan semua mapel siswa itu; mencari mapel menampilkan mapel itu saja. Beberapa kata digabung (DAN), misalnya `budi matematika`. Tombol *Reset Semua Mapel* hanya mereset mapel yang sedang tampil (daftarnya ada di jendela konfirmasi).
+3. **Belum Mengikuti Ujian**: bila kata yang diketik cocok dengan mapel/judul paket, tabel hanya menampilkan kolom mapel itu untuk semua siswa; bila tidak ada mapel yang cocok, kata dipakai mencari nama / NISN seperti sebelumnya.
+4. **Remedial**: cari nama / NISN / mata pelajaran (pencarian ditunda 0,2 detik agar tetap ringan).
+5. **Syarat Rapor**: cari nama / NISN / mapel yang masih kurang (mapel atau tugas yang belum diikuti/dikumpulkan siswa).
+Tidak diubah karena daftarnya hanya berisi identitas siswa atau terkait satu tugas: pilihan siswa di Laporan Siswa, Rekap Nilai, Transkrip, Data Siswa, dan Penilaian Tugas.
+
 ## v14.5 — Tombol Edit Data Siswa (sinkron dengan aplikasi absensi)
 Tanpa migrasi SQL baru. File berubah: `index.html` dan `netlify/functions/kelola-siswa.js` (adapter `api/kelola-siswa.js` tidak berubah; jumlah fungsi tetap 10). Unggah semua file lalu deploy ulang.
 - Menu **Data Siswa** (khusus Admin) kini punya kartu **Daftar & Edit Siswa**: seluruh siswa, pencarian (nama/NISN/NIPD/kelas), filter kelas, dan tombol **Edit** pada tiap baris.
