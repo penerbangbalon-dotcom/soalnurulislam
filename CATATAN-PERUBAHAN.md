@@ -312,3 +312,8 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 ## Rekap Nilai Siswa: tombol Tampil / Tidak tampil di rapor cetak
 - Kolom baru "Di Rapor Cetak" (setelah Status). Tombol per mapel per siswa per semester; mapel "Tidak tampil" tidak ikut dicetak di rapor (rata-rata di rapor dihitung dari mapel yang tampil). Rekap, Leger, dan Transkrip tidak berubah.
 - Migrasi baru: migrasi-v22-rapor-mapel-sembunyi.sql (tabel rapor_mapel_sembunyi). Sebelum dijalankan, semua mapel tetap tampil dan tombol memberi peringatan.
+
+## Rekap Nilai Siswa menampilkan SEMUA mapel (v15_6)
+- Bila Tahun Ajaran & Semester dipilih, Rekap menampilkan semua mapel jenjang/kelas siswa; yang belum bernilai diberi keterangan "belum ada nilai" (+ "di luar jurusan" bila jurusan mapel berbeda).
+- Tombol "Di Rapor Cetak": bawaan Tampil; mapel belum bernilai & di luar jurusan bawaannya Tidak tampil. Klik untuk mengubah; pilihan manual disimpan (tabel rapor_mapel_sembunyi, kolom sembunyi).
+- migrasi-v22 diperbarui (kolom sembunyi). Jalankan migrasi-v22 sebelum memakai tombol.
