@@ -1,5 +1,12 @@
 # Perubahan terbaru
 
+## v15.9 — Peringkat di Piagam & Rekap Nilai dibedakan dari peringkat Rapor
+File berubah: `index.html`. Tanpa migrasi SQL; unggah file lalu deploy ulang.
+- **Label jelas**: di Piagam dan cetak Rekap Nilai (Laporan Siswa), peringkat kini tertulis "Peringkat Ujian UTS ke-5 dari 36 siswa" (mengikuti jenis ujian). Rapor tetap "Peringkat di Kelas" (berdasarkan rata-rata Nilai Akhir semua mapel), jadi kedua peringkat tidak lagi terkesan bertentangan.
+- **Jenis ujian ikut filter**: bila filter Jenis Ujian dipilih (mis. UTS), pembanding antar siswa hanya memakai ujian jenis itu. Bila "Semua", memakai semua kecuali Ulangan Harian dan Remedial (seperti sebelumnya).
+- **Nilai sama = peringkat sama**, mengikuti aturan rapor (sebelumnya urutan data menentukan).
+- **Siswa yang belum mengikuti semua ujian**: bila jumlah ujiannya kurang dari jumlah yang lazim diikuti teman sekelas, ia tidak ikut diperingkat. Di piagam peringkatnya tidak dicetak; di rekap nilai tertulis "belum ditampilkan (belum mengikuti semua ujian)".
+
 ## v15.8 — Kaitkan soal ke CP/TP secara massal
 File berubah: `index.html`. Tanpa migrasi SQL baru (memakai kolom `bank_soal.cp_id` / `tp_id` dari migrasi-v17); unggah file lalu deploy ulang.
 - **Kaitkan dari soal terpilih** (Bank Soal): centang soal, klik **🔗 Kaitkan ke CP/TP**, pilih CP dan TP, simpan sekali untuk semuanya. Bisa untuk soal yang dicentang atau **semua hasil filter** (termasuk halaman lain). Filter "(Soal tanpa CP)" tetap dipakai untuk menyaring soal yang belum berkait. Kosongkan CP untuk melepas kaitan.

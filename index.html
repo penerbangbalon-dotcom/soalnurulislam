@@ -7082,33 +7082,53 @@ async function cetakKartuUjianSiswa(){
   win.document.close();
 }
 
-// Menghitung peringkat siswa dibanding siswa lain di kelas/jenjang yang sama, dalam
-// tahun ajaran & semester yang sama (dirata-ratakan dari semua ujian yang sudah dinilai
-// tuntas pada cakupan itu). Hanya bisa dihitung kalau filter Tahun Ajaran & Semester
-// sudah dipilih spesifik (bukan "Semua"), supaya perbandingannya adil (periode sama).
-async function hitungPeringkatKelas(kelas, program, ta, smt, nisnTarget){
+// Menghitung PERINGKAT UJIAN siswa dibanding siswa lain di kelas/jenjang yang sama, dalam
+// tahun ajaran & semester yang sama (rata-rata skor ujian yang sudah dinilai tuntas).
+// Ini BUKAN peringkat rapor (rapor memakai rata-rata Nilai Akhir semua mapel).
+// - jenisUjian diisi (mis. "UTS"): hanya ujian jenis itu; kosong: semua kecuali Ulangan Harian & Remedial.
+// - Nilai sama = peringkat sama (seperti rapor): peringkat = jumlah siswa dengan rata-rata lebih tinggi + 1.
+// - Siswa yang mengikuti ujian lebih sedikit dari jumlah ujian umum di kelasnya (modus) tidak ikut diperingkat,
+//   supaya rata-rata dari sedikit ujian tidak menyaingi siswa yang mengikuti semuanya. Hasilnya ditandai tidakLengkap.
+// Hanya bisa dihitung kalau Tahun Ajaran & Semester dipilih spesifik (bukan "Semua").
+async function hitungPeringkatKelas(kelas, program, ta, smt, nisnTarget, jenisUjian){
   if(!kelas || !program || !ta || !smt) return null;
-  const { data, error } = await ambilSemuaBaris(()=>supa.from('sesi_ujian')
-    .select('siswa_nisn, total_skor, paket_ujian!inner(kelas,program,tahun_ajaran,semester,diarsipkan)')
-    .eq('status','dinilai').not('total_skor','is',null)
-    .eq('paket_ujian.diarsipkan', false)
-    .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program)
-    .eq('paket_ujian.tahun_ajaran', ta).eq('paket_ujian.semester', smt)
-    .neq('paket_ujian.jenis_ujian', 'Ulangan Harian')
-    .neq('paket_ujian.jenis_ujian', 'Remedial')
-    .order('id'));
-  if(error || !data || !data.length) return null;
-  const map = new Map();
-  data.forEach(r=>{
-    if(!map.has(r.siswa_nisn)) map.set(r.siswa_nisn, []);
-    map.get(r.siswa_nisn).push(Number(r.total_skor));
+  const { data, error } = await ambilSemuaBaris(()=>{
+    let q = supa.from('sesi_ujian')
+      .select('siswa_nisn, paket_ujian_id, total_skor, paket_ujian!inner(kelas,program,tahun_ajaran,semester,diarsipkan,jenis_ujian)')
+      .eq('status','dinilai').not('total_skor','is',null)
+      .eq('paket_ujian.diarsipkan', false)
+      .eq('paket_ujian.kelas', kelas).eq('paket_ujian.program', program)
+      .eq('paket_ujian.tahun_ajaran', ta).eq('paket_ujian.semester', smt);
+    if(jenisUjian) q = q.eq('paket_ujian.jenis_ujian', jenisUjian);
+    else q = q.neq('paket_ujian.jenis_ujian', 'Ulangan Harian').neq('paket_ujian.jenis_ujian', 'Remedial');
+    return q.order('id');
   });
-  const rataPerSiswa = [...map.entries()]
-    .map(([nisn, arr])=>({ nisn, rata: arr.reduce((a,b)=>a+b,0)/arr.length }))
-    .sort((a,b)=>b.rata-a.rata);
-  const idx = rataPerSiswa.findIndex(x=>x.nisn===nisnTarget);
-  if(idx<0) return null;
-  return { peringkat: idx+1, total: rataPerSiswa.length };
+  if(error || !data || !data.length) return null;
+  const map = new Map();   // nisn -> { skor:[], paket:Set }
+  data.forEach(r=>{
+    if(!map.has(r.siswa_nisn)) map.set(r.siswa_nisn, { skor:[], paket:new Set() });
+    const m = map.get(r.siswa_nisn);
+    m.skor.push(Number(r.total_skor)); m.paket.add(r.paket_ujian_id);
+  });
+  if(!map.has(nisnTarget)) return null;
+  // jumlah ujian "umum" = jumlah ujian yang paling sering diikuti siswa di kelas ini (modus)
+  const hitJumlah = new Map();
+  map.forEach(m=>hitJumlah.set(m.paket.size,(hitJumlah.get(m.paket.size)||0)+1));
+  let modus = 0, terbanyak = -1;
+  hitJumlah.forEach((n,jml)=>{ if(n>terbanyak || (n===terbanyak && jml>modus)){ terbanyak = n; modus = jml; } });
+  const daftar = [...map.entries()]
+    .filter(([,m])=>m.paket.size>=modus)
+    .map(([nisn,m])=>({ nisn, rata: m.skor.reduce((a,b)=>a+b,0)/m.skor.length }));
+  const target = daftar.find(x=>x.nisn===nisnTarget);
+  if(!target) return { peringkat:null, total:daftar.length, tidakLengkap:true, modus };
+  return { peringkat: daftar.filter(x=>x.rata>target.rata+1e-9).length + 1, total: daftar.length, tidakLengkap:false };
+}
+// Label peringkat ujian (dibedakan dari "Peringkat di Kelas" pada rapor).
+const labelPeringkatUjian = jenis => jenis ? `Peringkat Ujian ${jenis}` : 'Peringkat Ujian';
+function teksPeringkatUjian(pr, jenisRekap){
+  if(!pr) return '';
+  if(pr.tidakLengkap) return `${labelPeringkatUjian(jenisRekap)}: belum ditampilkan (belum mengikuti semua ujian)`;
+  return `${labelPeringkatUjian(jenisRekap)} ke-${pr.peringkat} dari ${pr.total} siswa`;
 }
 
 function kopSekolahHTML(logoSize){
@@ -7176,9 +7196,9 @@ async function cetakRapor(){
   const nilaiValid = rows.filter(s=>s.status==='dinilai' && s.total_skor!=null).map(s=>Number(s.total_skor));
   const rata = nilaiValid.length ? (nilaiValid.reduce((a,b)=>a+b,0)/nilaiValid.length) : null;
   const adaBelumFinal = rows.some(s=>s.status==='selesai');
-  const peringkat = await hitungPeringkatKelas(p0.kelas, p0.program, ta, smt, nisn);
-  const rekapHadir = await ambilRekapKehadiran(nisn, p0.program, p0.kelas, ta, smt);
   const jenisRekap = tentukanJenisUjianRekap(rows);
+  const peringkat = await hitungPeringkatKelas(p0.kelas, p0.program, ta, smt, nisn, document.getElementById('lap-filter-jenis').value || null);
+  const rekapHadir = await ambilRekapKehadiran(nisn, p0.program, p0.kelas, ta, smt);
   const judulRekap = jenisRekap ? `REKAP NILAI ${jenisRekap}` : 'REKAP NILAI UJIAN ONLINE (TRANSKRIP)';
   const periodeRapor = formatPeriode(escapeHtml(smt), escapeHtml(ta), 'Semua Tahun Ajaran &amp; Semester');
   const [ttdKepala, ttdWali] = await Promise.all([ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', p0.kelas)]);
@@ -7233,7 +7253,7 @@ async function cetakRapor(){
       <div><b>Jumlah Mata Pelajaran/Ujian:</b> ${rows.length}</div>
       <div><b>Rata-rata Nilai:</b> ${rata!=null?rata.toFixed(1):'-'}</div>
       <div><b>Predikat:</b> ${rata!=null?predikatNilai(rata):'-'}</div>
-      ${peringkat ? `<div><b>Peringkat di Kelas:</b> ke-${peringkat.peringkat} dari ${peringkat.total} siswa</div>` : ''}
+      ${peringkat ? `<div><b>${escapeHtml(teksPeringkatUjian(peringkat, jenisRekap))}</b></div>` : ''}
     </div>
     ${rekapHadir ? `<table class="nilai" style="margin-bottom:6px;">
       <thead><tr><th colspan="5">Rekapitulasi Kehadiran</th></tr>
@@ -7295,7 +7315,7 @@ async function cetakPiagam(){
   const smt = document.getElementById('lap-filter-smt').value;
   const nilaiValid = rows.map(s=>Number(s.total_skor));
   const rata = nilaiValid.reduce((a,b)=>a+b,0)/nilaiValid.length;
-  const peringkat = await hitungPeringkatKelas(p0.kelas, p0.program, ta, smt, nisn);
+  const peringkat = await hitungPeringkatKelas(p0.kelas, p0.program, ta, smt, nisn, document.getElementById('lap-filter-jenis').value || null);
   const nomorPiagam = await ambilNomorPiagamBerikutnya(nisn, nama, p0.kelas, p0.program);
   if(!nomorPiagam) return; // dibatalkan / gagal, pesan sudah ditampilkan di dalam fungsi
   const jenisRekap = tentukanJenisUjianRekap(rows);
@@ -7353,7 +7373,7 @@ async function cetakPiagam(){
       ${dilewati ? `<div class="catatan">*${dilewati} mata pelajaran belum ditampilkan karena nilai essay-nya belum selesai dinilai guru.</div>` : ''}
       <div class="ringkasan-piagam">
         <b>Rata-rata Nilai: ${rata.toFixed(1)}</b> &nbsp;&mdash;&nbsp; <b>Predikat: ${predikatNilai(rata)}</b>
-        ${peringkat ? ` &nbsp;&mdash;&nbsp; <b>Peringkat ke-${peringkat.peringkat} dari ${peringkat.total} siswa</b>` : ''}
+        ${(peringkat && !peringkat.tidakLengkap) ? ` &nbsp;&mdash;&nbsp; <b>${escapeHtml(teksPeringkatUjian(peringkat, jenisRekap))}</b>` : ''}
       </div>
       <div class="ttd">
         <div class="kolom">${tglTtd()}<br>${blokTtd(SEKOLAH.jabatan_kepala||'Kepala', ttdKepala)}</div>
