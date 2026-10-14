@@ -993,7 +993,7 @@
           <div class="field"><label>UAS</label><input type="number" id="pn-b-uas" min="0" max="100" /></div>
         </div>
         <div class="grid3">
-          <div class="field"><label>Tugas (isi 0 bila tidak dipakai)</label><input type="number" id="pn-b-tugas" min="0" max="100" /></div>
+          <div class="field"><label>Tugas (0 = otomatis 20% bila ada nilai tugas)</label><input type="number" id="pn-b-tugas" min="0" max="100" /></div>
           <div class="field"><label>Praktik (isi 0 bila tidak dipakai)</label><input type="number" id="pn-b-praktik" min="0" max="100" /></div>
           <div class="field"><label>Bila komponen belum ada</label>
             <select id="pn-mode"><option value="sebagian">Hitung dari komponen yang sudah ada</option><option value="lengkap">Nilai Akhir hanya jika semua komponen berbobot ada</option></select></div>
@@ -7122,6 +7122,7 @@ function ambilKKM(program, kelas, mapel){
 function teksBobotNilai(){
   const b = pengNilai.bobot;
   const bagian = ['uh','uts','uas','tugas','praktik','hadir'].filter(k=>b[k]>0).map(k=>`${NAMA_KOMP[k]} ${b[k]}%`);
+  if(!(b.tugas>0)) bagian.push(`Tugas otomatis ${BOBOT_TUGAS_OTOMATIS}% (bila ada nilai tugas)`);
   return 'Bobot Nilai Akhir: ' + (bagian.join(' · ') || '-') + (pengNilai.mode==='lengkap' ? ' (dihitung hanya jika semua komponen berbobot ada)' : ' (komponen yang belum ada diabaikan, bobot disesuaikan)') + ` · KKM standar ${fmtN(pengNilai.kkm)}`;
 }
 
@@ -7330,8 +7331,12 @@ function terapkanRemedial(asli, rem, kkm){
   if(asli!=null && eff<=asli) return null;            // tidak menurunkan / tidak mengubah nilai asli
   return eff;
 }
+// Bobot Tugas OTOMATIS: bila bobot Tugas di Pengaturan Nilai masih 0 tetapi siswa punya nilai Tugas (online atau manual),
+// nilai itu tetap ikut Nilai Akhir dengan bobot ini (dihitung proporsional bersama komponen lain). Isi bobot Tugas > 0
+// di Pengaturan Nilai untuk memakai bobot sendiri. Ubah angkanya di sini bila perlu.
+const BOBOT_TUGAS_OTOMATIS = 20;
 function hitungMapel(list, man, kkm){
-  const b = pengNilai.bobot;
+  const b = { ...pengNilai.bobot };
   const uhs = list.filter(r=>r.komp==='uh').map(r=>r.skor);
   const terbaru = k => {
     const a = list.filter(r=>r.komp===k).sort((x,y)=>new Date(y.waktu_selesai||0)-new Date(x.waktu_selesai||0));
@@ -7344,6 +7349,7 @@ function hitungMapel(list, man, kkm){
     const eff = man ? terapkanRemedial(v[k], man['rem_'+k]!=null ? man['rem_'+k] : null, kkm) : null;
     if(eff!=null){ rem[k] = { asli: v[k], rem: man['rem_'+k] }; v[k] = eff; }
   });
+  if(v.tugas!=null && !(b.tugas>0)) b.tugas = BOBOT_TUGAS_OTOMATIS;   // nilai tugas yang ada selalu masuk Nilai Akhir
   const aktifBobot = ['uh','uts','uas','tugas','praktik','hadir'].filter(k=>(b[k]||0)>0);
   const ada = aktifBobot.filter(k=>v[k]!=null);
   let na = null;
@@ -8421,7 +8427,7 @@ async function muatInputNilai(){
         const kk = `${s.nisn}##${[c.ta, c.smt, c.kelas, c.program, c.mapel].join('||')}`;
         const m = manualMap.get(kk) || {}, tOn = tugasOnlineMap.get(kk);
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
-          <td><input type="text" inputmode="decimal" id="in-t-${i}" value="${m.tugas!=null?m.tugas:''}" />${tOn ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(tOn.tugas)}</b> (rata-rata ${tOn.n} tugas)${m.tugas!=null ? ' (dikalahkan nilai manual)' : ' (dipakai)'}</div>` : ''}</td>
+          <td><input type="text" inputmode="decimal" id="in-t-${i}" value="${m.tugas!=null?m.tugas:''}" />${tOn ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(tOn.tugas)}</b> (rata-rata ${tOn.n} tugas)${m.tugas!=null ? ' (dikalahkan nilai manual)' : ' (dipakai, otomatis masuk Nilai Akhir)'}</div>` : ''}</td>
           <td><input type="text" inputmode="decimal" id="in-p-${i}" value="${m.praktik!=null?m.praktik:''}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   } else {

@@ -1,5 +1,13 @@
 # Perubahan terbaru
 
+## v14.8 — Nilai Tugas otomatis masuk Nilai Akhir
+Hanya `index.html` yang berubah; tanpa migrasi SQL. Unggah `index.html` ke GitHub, Vercel/Netlify deploy otomatis.
+- **Penyebab**: bobot Tugas bawaan = 0%, sehingga nilai Tugas (rata-rata tugas online maupun input manual) sudah terhitung tetapi diabaikan saat menghitung Nilai Akhir.
+- **Perbaikan**: bila bobot Tugas di Pengaturan Nilai masih 0 dan siswa punya nilai Tugas pada suatu mapel, nilai itu tetap ikut Nilai Akhir dengan **bobot otomatis 20%** (proporsional bersama UH/UTS/UAS). Mapel tanpa nilai tugas tidak berubah. Isi bobot Tugas > 0 di Pengaturan Nilai bila ingin bobot sendiri; angka otomatis bisa diubah di konstanta `BOBOT_TUGAS_OTOMATIS` (index.html).
+- Berlaku di semua tempat: Rekap Nilai, Leger, Transkrip, Laporan Siswa, dan Rapor Semester (semuanya memakai satu fungsi `hitungMapel`).
+- Tugas yang masih berstatus *dikumpulkan* (belum dinilai) belum dihitung; tugas wajib yang tidak dikerjakan setelah tenggat/ditutup dihitung 0.
+- Teks bobot di Rekap dan label Pengaturan Nilai diperbarui; Input Nilai Tambahan menampilkan "dipakai, otomatis masuk Nilai Akhir".
+
 ## v14.7 — Menu "Cadangan Data" (khusus Super Admin) + pencarian mapel
 Tanpa migrasi SQL. File berubah: `index.html`; file baru: `netlify/functions/cadangan-data.js` dan `api/cadangan-data.js`. Unggah SEMUA file lalu deploy ulang. Jumlah fungsi Vercel menjadi 11 (batas paket gratis 12).
 - Menu baru **Cadangan Data** (hanya Super Admin; server juga menolak peran lain).
