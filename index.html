@@ -229,6 +229,9 @@
       <div class="ghead" onclick="toggleGroup('nilai')"><span>Laporan Nilai</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="syaratrapor" onclick="showTab('syaratrapor')">Syarat Rapor</div>
+        <div class="item" data-tab="pelanggaran" onclick="showTab('pelanggaran')">Catatan Pelanggaran</div>
+        <div class="item" data-tab="suratpanggilan" onclick="showTab('suratpanggilan')">Surat Panggilan Orang Tua</div>
+        <div class="item" data-tab="kenaikan" onclick="showTab('kenaikan')">Kenaikan Kelas</div>
         <div class="item" data-tab="laporan" onclick="showTab('laporan')">Laporan Siswa</div>
         <div class="item" data-tab="rekapnilai" onclick="showTab('rekapnilai')">Rekap Nilai Siswa</div>
         <div class="item" data-tab="leger" onclick="showTab('leger')">Leger Nilai (Excel)</div>
@@ -344,7 +347,7 @@
           <div class="field"><label>Mata Pelajaran</label><select id="pk-mapel" onchange="syncPaketProgramKelas();loadSoalUntukPaket()"></select></div>
         </div>
         <div class="grid3 hidden" id="pk-rem-wrap">
-          <div class="field"><label>Komponen yang Diremedial</label><select id="pk-rem-komp"><option value="uh">Ulangan Harian (UH)</option><option value="uts" selected>UTS</option><option value="uas">UAS</option></select></div>
+          <div class="field"><label>Komponen yang Diremedial</label><select id="pk-rem-komp"><option value="uts" selected>UTS</option><option value="uas">UAS</option></select></div>
         </div>
         <div class="grid3">
           <div class="field"><label>Program</label><select id="pk-program"><option>Paket B</option><option>Paket C</option></select></div>
@@ -850,7 +853,7 @@
           <div class="field"><label>Mata Pelajaran</label><select id="pr-mapel" onchange="prHitung()"></select></div>
         </div>
         <div class="grid3">
-          <div class="field"><label>Komponen yang Diremedial</label><select id="pr-komp" onchange="prHitung()"><option value="uh">Ulangan Harian (UH)</option><option value="uts" selected>UTS</option><option value="uas">UAS</option></select></div>
+          <div class="field"><label>Komponen yang Diremedial</label><select id="pr-komp" onchange="prHitung()"><option value="uts" selected>UTS</option><option value="uas">UAS</option></select></div>
           <div class="field"><label>Tahun Ajaran</label><select id="pr-ta" onchange="prHitung()"></select></div>
           <div class="field"><label>Semester</label><select id="pr-smt" onchange="prHitung()"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
         </div>
@@ -965,7 +968,7 @@
           <div class="field"><label>Semester</label>
             <select id="in-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
           <div class="field"><label>Yang diisi</label>
-            <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="remedial">Remedial UH / UTS / UAS (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option><option value="ekskul">Ekstrakurikuler (per kegiatan)</option></select></div>
+            <select id="in-mode" onchange="ubahModeInput()"><option value="tugas">Nilai Tugas &amp; Praktik (per mapel)</option><option value="remedial">Remedial UTS / UAS (per mapel)</option><option value="sikap">Sikap &amp; Kehadiran (per siswa)</option><option value="ekskul">Ekstrakurikuler (per kegiatan)</option></select></div>
           <div class="field" id="in-wrap-mapel"><label>Mata Pelajaran</label><select id="in-mapel"><option value="">— pilih kelas dulu —</option></select></div>
           <div class="field hidden" id="in-wrap-ekskul"><label>Nama Kegiatan Ekstrakurikuler</label><input type="text" id="in-ekskul" list="in-ekskul-daftar" placeholder="Ketik atau pilih dari daftar" /><datalist id="in-ekskul-daftar"></datalist>
             <div id="in-ekskul-chip" style="margin-top:4px;"></div></div>
@@ -1002,6 +1005,28 @@
           <div class="field"><label>Kehadiran (isi 0 bila tidak dipakai)</label><input type="number" id="pn-b-hadir" min="0" max="100" />
             <p class="muted" style="margin:4px 0 0;font-size:12px;">Persentase kehadiran siswa pada semester itu ikut menjadi komponen Nilai Akhir tiap mapel. Memakai data di Input Nilai Tambahan (isi lewat menu Syarat Rapor &rarr; Simpan kehadiran ke nilai).</p></div>
           <div></div><div></div>
+        </div>
+        <h3 style="margin-top:14px;">Poin Pelanggaran &amp; Predikat Sikap Otomatis</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:12.5px;">Total poin pelanggaran semester menentukan predikat Sikap (lihat menu Catatan Pelanggaran). Poin ujian + tugas dibatasi agar pindah tab yang tidak disengaja tidak berlebihan.</p>
+        <div class="grid3">
+          <div class="field"><label>Alpa (poin per hari)</label><input type="number" id="pn-pl-alpa" min="0" /></div>
+          <div class="field"><label>Terlambat (poin per kali)</label><input type="number" id="pn-pl-terlambat" min="0" /></div>
+          <div class="field"><label>Pelanggaran saat ujian (per kejadian)</label><input type="number" id="pn-pl-ujian" min="0" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Pelanggaran saat tugas (per kejadian)</label><input type="number" id="pn-pl-tugas" min="0" /></div>
+          <div class="field"><label>Tambahan bila diakhiri otomatis</label><input type="number" id="pn-pl-akhir" min="0" /></div>
+          <div class="field"><label>Maks. poin dari ujian + tugas</label><input type="number" id="pn-pl-maks" min="0" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Ujian dianggap diakhiri otomatis bila pelanggaran &ge;</label><input type="number" id="pn-pl-batas" min="0" /></div>
+          <div class="field"><label>Catatan manual: Ringan</label><input type="number" id="pn-pl-ringan" min="0" /></div>
+          <div class="field"><label>Catatan manual: Sedang / Berat</label><div style="display:flex;gap:6px;"><input type="number" id="pn-pl-sedang" min="0" /><input type="number" id="pn-pl-berat" min="0" /></div></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Sikap A bila poin &le;</label><input type="number" id="pn-pl-a" min="0" /></div>
+          <div class="field"><label>Sikap B bila poin &le;</label><input type="number" id="pn-pl-b" min="0" /></div>
+          <div class="field"><label>Sikap C bila poin &le; (selebihnya D)</label><input type="number" id="pn-pl-c" min="0" /></div>
         </div>
         <h3 style="margin-top:14px;">Syarat Mendapat Rapor</h3>
         <p class="muted" style="margin:0 0 8px;">Dipakai di menu <b>Syarat Rapor</b>, tab Syarat Rapor di halaman siswa, dan peringatan saat mencetak rapor.</p>
@@ -1120,6 +1145,70 @@
           <tbody id="nt-body"><tr><td colspan="7" class="muted">Pilih tugas terlebih dahulu.</td></tr></tbody>
         </table>
       </div>
+    </section>
+
+    <!-- ===== TAB: CATATAN PELANGGARAN ===== -->
+    <section id="tab-pelanggaran" class="hidden">
+      <h2>Catatan Pelanggaran</h2>
+      <p class="muted">Rekap pelanggaran per siswa per semester: <b>alpa</b> dan <b>terlambat</b> dari aplikasi absensi, <b>pelanggaran saat ujian dan tugas</b> (pindah tab/aplikasi, paste) yang tercatat otomatis, serta <b>catatan manual</b> guru atau wali kelas. Total poin menentukan <b>predikat Sikap otomatis</b> (A/B/C/D) yang dipakai di Input Nilai Tambahan dan Rapor. Poin dan ambang batas diatur di Pengaturan Nilai.</p>
+      <div class="card">
+        <div class="grid3">
+          <div class="field"><label>Jenjang</label><select id="pl-program" onchange="isiKelasPel('pl')"><option value="">— pilih —</option><option>Paket B</option><option>Paket C</option></select></div>
+          <div class="field"><label>Kelas</label><select id="pl-kelas"><option value="">— pilih jenjang dulu —</option></select></div>
+          <div class="field"><label>Tahun Ajaran</label><select id="pl-ta"></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Semester</label><select id="pl-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+          <div class="field"><label>Cari nama / NISN</label><input type="text" id="pl-cari" oninput="renderTabelPelanggaran()" /></div>
+          <div class="field"><label>&nbsp;</label><button class="btn gold" onclick="tampilkanPelanggaran()">Tampilkan</button> <button class="btn outline" onclick="unduhPelanggaranExcel()">⬇ Excel</button></div>
+        </div>
+      </div>
+      <div id="pl-isi"></div>
+      <div id="pl-rincian" style="margin-top:12px;"></div>
+    </section>
+
+    <!-- ===== TAB: SURAT PANGGILAN ORANG TUA ===== -->
+    <section id="tab-suratpanggilan" class="hidden">
+      <h2>Surat Panggilan Orang Tua</h2>
+      <p class="muted">Pilih siswa dari daftar pelanggaran, lengkapi jadwal menghadap, lalu cetak. Surat memakai kop lembaga, tanggal surat mengikuti hari saat dicetak, dan ditandatangani Wali Kelas serta Ketua/Kepala PKBM (atur di menu Tanda Tangan).</p>
+      <div class="card">
+        <div class="grid3">
+          <div class="field"><label>Jenjang</label><select id="sp-program" onchange="isiKelasPel('sp')"><option value="">— pilih —</option><option>Paket B</option><option>Paket C</option></select></div>
+          <div class="field"><label>Kelas</label><select id="sp-kelas"><option value="">— pilih jenjang dulu —</option></select></div>
+          <div class="field"><label>Tahun Ajaran</label><select id="sp-ta"></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Semester</label><select id="sp-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+          <div class="field"><label>Cari nama / NISN</label><input type="text" id="sp-cari" oninput="renderDaftarSurat()" /></div>
+          <div class="field"><label>&nbsp;</label><button class="btn gold" onclick="tampilkanDaftarSurat()">Tampilkan</button></div>
+        </div>
+      </div>
+      <div id="sp-isi"></div>
+      <div id="sp-form" style="margin-top:12px;"></div>
+    </section>
+
+    <!-- ===== TAB: KENAIKAN KELAS ===== -->
+    <section id="tab-kenaikan" class="hidden">
+      <h2>Kenaikan Kelas</h2>
+      <p class="muted">Dipakai di akhir tahun ajaran (Semester Genap). Sistem memberi <b>saran</b> dari nilai akhir Semester Genap, kehadiran, dan Sikap; wali kelas memutuskan <b>Naik / Tidak Naik</b> (kelas IX dan XII: <b>Lulus / Tidak Lulus</b>), atau <b>Pindah / Keluar</b>. Keputusan yang berbeda dari saran wajib beralasan. Kelas baru terisi otomatis (mis. 10 IPS 1 menjadi 11 IPS 1). Keputusan tercetak di Rapor Semester Genap.</p>
+      <div class="card">
+        <div class="grid3">
+          <div class="field"><label>Jenjang</label><select id="kn-program" onchange="isiKelasPel('kn')"><option value="">— pilih —</option><option>Paket B</option><option>Paket C</option></select></div>
+          <div class="field"><label>Kelas</label><select id="kn-kelas"><option value="">— pilih jenjang dulu —</option></select></div>
+          <div class="field"><label>Tahun Ajaran</label><select id="kn-ta"></select></div>
+        </div>
+        <button class="btn gold" onclick="tampilkanKenaikan()">Tampilkan &amp; Hitung Saran</button>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Kriteria saran naik kelas</h3>
+        <div class="grid3">
+          <div class="field"><label>Maks. mapel belum tuntas (di bawah KKM)</label><input type="number" id="kn-maks" min="0" max="50" /></div>
+          <div class="field"><label>Minimal kehadiran % (0 = tidak dipakai)</label><input type="number" id="kn-hadir" min="0" max="100" /></div>
+          <div class="field"><label>&nbsp;</label><label style="font-weight:normal;"><input type="checkbox" id="kn-sikapd" /> Sikap D menahan kenaikan</label></div>
+        </div>
+        <button class="btn outline" onclick="simpanKriteriaKenaikan()">Simpan Kriteria</button>
+      </div>
+      <div id="kn-isi"></div>
     </section>
 
     <!-- ===== TAB: SYARAT RAPOR ===== -->
@@ -2107,7 +2196,7 @@ function showTab(tab){
   if((tab==='user' || tab==='cadangan') && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','cptp','tugas','nilaitugas','syaratrapor','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
+  ['bank','cptp','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -2119,6 +2208,9 @@ function showTab(tab){
   if(tab==='tugas') loadTugasGuru();
   if(tab==='nilaitugas') loadPenilaianTugas();
   if(tab==='syaratrapor') loadSyaratRapor();
+  if(tab==='pelanggaran') loadPelanggaran();
+  if(tab==='suratpanggilan') loadSuratPanggilan();
+  if(tab==='kenaikan') loadKenaikan();
   if(tab==='terlaksana') loadTerlaksana();
   if(tab==='paketremedial') loadPaketRemedial();
   if(tab==='pending') loadPerluDinilai();
@@ -6502,7 +6594,7 @@ async function tampilkanLaporanSiswa(){
   };
   const remTerbaik = new Map();
   (sesiData||[]).filter(s=>s.paket_ujian && s.paket_ujian.jenis_ujian==='Remedial' && s.status==='dinilai' && s.total_skor!=null
-      && ['uh','uts','uas'].includes(s.paket_ujian.remedial_komponen)).forEach(s=>{
+      && ['uts','uas'].includes(s.paket_ujian.remedial_komponen)).forEach(s=>{
     const k = kunciRem(s.paket_ujian, s.paket_ujian.remedial_komponen), v = Number(s.total_skor);
     if(!remTerbaik.has(k) || v>remTerbaik.get(k)) remTerbaik.set(k, v);
   });
@@ -7144,7 +7236,7 @@ function manEfektif(kunci){
   const h = hadirNilaiMap.get(`${nisn}##${p[0]}##${p[1]}`);
   if(!o && !t && h==null) return m;
   const r = { ...(m||{}) };
-  if(o) ['rem_uh','rem_uts','rem_uas'].forEach(k=>{ if(r[k]==null && o[k]!=null) r[k] = o[k]; });
+  if(o) ['rem_uts','rem_uas'].forEach(k=>{ if(r[k]==null && o[k]!=null) r[k] = o[k]; });
   if(t && r.tugas==null) r.tugas = t.tugas;
   if(h!=null && r.hadir==null) r.hadir = h;
   return r;
@@ -7183,6 +7275,7 @@ let catatanMap = new Map();     // nisn##ta##smt -> baris catatan_siswa_semester
 let catatanBaris = [];
 
 async function siapkanDataNilai(){
+  kosongkanCachePel();   // poin pelanggaran dihitung ulang setelah data/pengaturan dimuat
   const [arsip, manual, cat, peng, tgs, tjw] = await Promise.all([
     (async ()=>{
       const kolom = 'siswa_nisn, siswa_nama, paket_id, paket_judul, jenis_ujian, mapel_nama, program, kelas, semester, tahun_ajaran, status, total_skor, waktu_selesai';
@@ -7215,7 +7308,7 @@ async function siapkanDataNilai(){
       kkm: peng.data.kkm!=null ? Number(peng.data.kkm) : 70,
       kkm_mapel: peng.data.kkm_mapel || {},
       remedial: { mode:'kkm', ...(peng.data.remedial||{}) },
-      syarat: gabungSyarat(peng.data.syarat_rapor)
+      syarat: gabungSyarat(peng.data.syarat_rapor), pel: gabungPel(peng.data.pelanggaran)
     };
   }
   manualBaris = manual.error ? [] : (manual.data||[]);
@@ -7237,7 +7330,7 @@ async function siapkanDataNilai(){
 
   const semua = arsip.data || [];
   remOnlineMap = new Map();
-  semua.filter(r=>r.jenis_ujian==='Remedial' && r.status==='dinilai' && r.total_skor!=null && r.siswa_nisn && ['uh','uts','uas'].includes(r.remedial_komponen)).forEach(r=>{
+  semua.filter(r=>r.jenis_ujian==='Remedial' && r.status==='dinilai' && r.total_skor!=null && r.siswa_nisn && ['uts','uas'].includes(r.remedial_komponen)).forEach(r=>{
     const n = normSmtTa(r);
     const k = `${r.siswa_nisn}##${[n.ta, n.smt, r.kelas, r.program, r.mapel_nama].join('||')}`;
     if(!remOnlineMap.has(k)) remOnlineMap.set(k, {});
@@ -7314,7 +7407,7 @@ async function pastikanPengNilaiTermuat(){
         kkm: data.kkm!=null ? Number(data.kkm) : 70,
         kkm_mapel: data.kkm_mapel || {},
         remedial: { mode:'kkm', ...(data.remedial||{}) },
-        syarat: gabungSyarat(data.syarat_rapor)
+        syarat: gabungSyarat(data.syarat_rapor), pel: gabungPel(data.pelanggaran)
       };
     }
     pengNilaiTermuat = true;
@@ -7345,7 +7438,7 @@ function hitungMapel(list, man, kkm){
   const uh = uhs.length ? uhs.reduce((a,c)=>a+c,0)/uhs.length : null;
   const v = { uh, uts:terbaru('uts'), uas:terbaru('uas'), tugas: man && man.tugas!=null ? man.tugas : null, praktik: man && man.praktik!=null ? man.praktik : null, hadir: man && man.hadir!=null ? man.hadir : null };
   const rem = {};   // komponen yang memakai nilai remedial: { uts:{ asli, rem } }
-  ['uh','uts','uas'].forEach(k=>{
+  ['uts','uas'].forEach(k=>{   // remedial hanya untuk UTS dan UAS (UH tidak diremedial)
     const eff = man ? terapkanRemedial(v[k], man['rem_'+k]!=null ? man['rem_'+k] : null, kkm) : null;
     if(eff!=null){ rem[k] = { asli: v[k], rem: man['rem_'+k] }; v[k] = eff; }
   });
@@ -7599,6 +7692,8 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
   const nasSiswa = rows.map(r=>r.na).filter(x=>x!=null);
   const rataNa = nasSiswa.length ? rataRata(nasSiswa) : null;
   let peringkat = null; try{ peringkat = peringkatRaporSemester(nisn, ta, smt, kelas, program); }catch(e){ peringkat = null; }
+  let kepNaik = null;
+  if(smt==='Genap'){ try{ const kk = await muatKeputusanKenaikan(ta); kepNaik = teksKeputusanRapor(kk.map.get(nisn)); }catch(e){ kepNaik = null; } }
   const cat = catatanMap.get(`${nisn}##${ta}##${smt}`) || null;
   let catWali = ''; try{ catWali = cat ? catatanWali({ ...cat, siswa_nama: cat.siswa_nama || nama }) : ''; }catch(e){ catWali = ''; }
   const namaSekolah = String(SEKOLAH.nama_aplikasi || SEKOLAH.nama_lembaga || '').toUpperCase();
@@ -7642,6 +7737,7 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
         <div><b>Catatan:</b> ${esc2(catWali) || '-'}</div>
       </div>
     </div>
+    ${kepNaik ? `<div style="margin:8px 0 0;border:1px solid #333;padding:6px 10px;font-size:13px;"><b>Keputusan:</b> ${esc2(kepNaik)}</div>` : ''}
     <div class="rp-ttd">
       <div class="baris">
         <div class="kolom">&nbsp;<br>Orang Tua,<div style="margin-top:60px;">……………………………………</div></div>
@@ -7936,7 +8032,7 @@ function kumpulkanRemedial(){
     susunNilaiSiswa(s.nisn, ta, smt).forEach(r=>{
       if(q && !cocokKataCari(q, s.nama, s.nisn, r.mapel)) return;   // cari nama / NISN / mata pelajaran
       if((pr && r.program!==pr) || (kl && r.kelas!==kl) || (mp && r.mapel!==mp)) return;
-      const kb = ['uh','uts','uas'].filter(k=>r[k]!=null && r.kkm!=null && r[k]<r.kkm);
+      const kb = ['uts','uas'].filter(k=>r[k]!=null && r.kkm!=null && r[k]<r.kkm);
       const naBelum = r.tuntas===false;
       if(dasar==='na' ? !naBelum : !(naBelum || kb.length)) return;
       const sudah = r.rem ? Object.keys(r.rem) : [];
@@ -8392,7 +8488,7 @@ async function muatInputNilai(){
     const kkm = ambilKKM(c.program, c.kelas, c.mapel);
     const modeRem = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
     tabel.innerHTML = `<div class="card"><p class="muted" style="margin:0 0 8px;">KKM mapel ini: <b>${fmtN(kkm)}</b>. Aturan: <b>${esc2({kkm:'nilai remedial maksimal = KKM',tertinggi:'ambil nilai tertinggi',rata:'rata-rata nilai asli & remedial',nonaktif:'remedial dinonaktifkan (nilai remedial diabaikan)'}[modeRem])}</b> (ubah di Pengaturan Nilai). Isi kolom Remedial hanya untuk komponen yang nilainya di bawah KKM (ditandai merah); yang sudah tuntas diabaikan.</p>
-      <table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>UH asli</th><th style="width:90px;">Remedial UH</th><th>UTS asli</th><th style="width:90px;">Remedial UTS</th><th>UAS asli</th><th style="width:90px;">Remedial UAS</th></tr></thead><tbody>` +
+      <table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>UTS asli</th><th style="width:90px;">Remedial UTS</th><th>UAS asli</th><th style="width:90px;">Remedial UAS</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
         const key = [c.ta, c.smt, c.kelas, c.program, c.mapel].join('||');
         const m = manualMap.get(`${s.nisn}##${key}`) || {};
@@ -8401,7 +8497,7 @@ async function muatInputNilai(){
         const asli = hitungMapel(rowsS, null);
         const sel = (k, pre) => { const a = asli[k]; const rendah = a==null || a<kkm;
           return `<td${a!=null&&rendah?' style="color:#b3261e;font-weight:600;"':''}>${a==null?'<span class="muted">-</span>':fmtN(a)}</td><td><input type="text" inputmode="decimal" id="${pre}${i}" value="${m['rem_'+k]!=null?m['rem_'+k]:''}" />${onl['rem_'+k]!=null ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(onl['rem_'+k])}</b>${m['rem_'+k]!=null ? ' (dikalahkan nilai manual)' : ' (dipakai)'}</div>` : ''}</td>`; };
-        return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>${sel('uh','in-ru-')}${sel('uts','in-rt-')}${sel('uas','in-ra-')}</tr>`;
+        return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>${sel('uts','in-rt-')}${sel('uas','in-ra-')}</tr>`;
       }).join('') + '</tbody></table></div>';
   } else if(c.mode==='ekskul'){
     const { data: semua, error } = await ambilEkskulKelas(c.program, c.kelas, c.ta, c.smt);
@@ -8427,7 +8523,7 @@ async function muatInputNilai(){
         const kk = `${s.nisn}##${[c.ta, c.smt, c.kelas, c.program, c.mapel].join('||')}`;
         const m = manualMap.get(kk) || {}, tOn = tugasOnlineMap.get(kk);
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
-          <td><input type="text" inputmode="decimal" id="in-t-${i}" value="${m.tugas!=null?m.tugas:''}" />${tOn ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(tOn.tugas)}</b> (rata-rata ${tOn.n} tugas)${m.tugas!=null ? ' (dikalahkan nilai manual)' : ' (dipakai, otomatis masuk Nilai Akhir)'}</div>` : ''}</td>
+          <td><input type="text" inputmode="decimal" id="in-t-${i}" value="${m.tugas!=null ? m.tugas : (tOn ? bulat1(tOn.tugas) : '')}"${(m.tugas==null && tOn) ? ` data-otomatis="${bulat1(tOn.tugas)}" style="background:#EEF4FF;" title="Terisi otomatis dari nilai tugas online. Ketik angka lain untuk menimpa; kosongkan untuk kembali ke nilai online."` : ''} />${tOn ? `<div class="muted" style="font-size:11px;margin-top:2px;">Online: <b>${fmtN(tOn.tugas)}</b> (rata-rata ${tOn.n} tugas)${m.tugas!=null ? ' (dikalahkan nilai manual)' : ' (terisi otomatis, ikut Nilai Akhir)'}</div>` : ''}</td>
           <td><input type="text" inputmode="decimal" id="in-p-${i}" value="${m.praktik!=null?m.praktik:''}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
   } else {
@@ -8440,18 +8536,21 @@ async function muatInputNilai(){
         <div class="field"><label>&nbsp;</label><button class="btn gold" id="in-abs-btn" onclick="tarikAbsensiKeInput()">📥 Tarik Data Absensi</button></div>
       </div>
       <p class="muted" id="in-abs-info" style="margin:6px 0 0;">Mengisi kolom Hadir, Sakit, Izin, dan Alpa dari aplikasi absensi (hari efektif = hari aktif sekolah tanpa hari libur, hari ini belum dihitung). Hasilnya bisa diedit sebelum menekan Simpan.</p></div>
+      <div id="in-sk-banner"></div>
       <div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Sikap</th><th style="width:70px;">Hadir</th><th style="width:80px;">Sakit</th><th style="width:80px;">Izin</th><th style="width:80px;">Alpa</th><th>Catatan wali kelas</th></tr></thead><tbody>` +
       inRoster.map((s,i)=>{
         const k = catatanMap.get(`${s.nisn}##${c.ta}##${c.smt}`) || {};
         const sikap = k.sikap||'';
         return `<tr><td>${i+1}</td><td>${esc2(s.nama)}</td><td>${esc2(s.nisn)}</td>
-          <td><select id="in-sk-${i}"><option value="">—</option>${['A','B','C','D'].map(x=>`<option value="${x}"${sikap===x?' selected':''}>${x} (${NAMA_SIKAP[x]})</option>`).join('')}</select></td>
+          <td><select id="in-sk-${i}" onchange="cekSikapPenyesuaian(${i})"><option value="">—</option>${['A','B','C','D'].map(x=>`<option value="${x}"${sikap===x?' selected':''}>${x} (${NAMA_SIKAP[x]})</option>`).join('')}</select>
+            <div id="in-sk-info-${i}" class="muted" style="font-size:11px;margin-top:2px;"></div><input type="text" id="in-sk-al-${i}" class="hidden" placeholder="Alasan penyesuaian (wajib)" style="margin-top:3px;" /></td>
           <td><input type="number" min="0" id="in-h-${i}" value="${k.hadir!=null?k.hadir:''}" /></td>
           <td><input type="number" min="0" id="in-s-${i}" value="${k.sakit!=null?k.sakit:''}" /></td>
           <td><input type="number" min="0" id="in-i-${i}" value="${k.izin!=null?k.izin:''}" /></td>
           <td><input type="number" min="0" id="in-a-${i}" value="${k.alpa!=null?k.alpa:''}" /></td>
           <td><input type="text" id="in-c-${i}" value="${esc2(k.catatan||'')}" /></td></tr>`;
       }).join('') + '</tbody></table></div>';
+    isiSikapOtomatis(c);
   }
 }
 // Tanggal pertama ada data di aplikasi absensi. Hari sebelum tanggal ini tidak punya catatan sama sekali,
@@ -8521,12 +8620,14 @@ async function simpanInputNilai(){
       alert(`Ekstrakurikuler ${inEkskulNama} tersimpan: ${upsert.length} siswa${hapus.length?`, ${hapus.length} dikosongkan`:''}.`);
     } else if(c.mode!=='sikap'){
       const upsert = [], hapus = [];
-      const KOMPS = c.mode==='remedial' ? [['rem_uh','in-ru-'],['rem_uts','in-rt-'],['rem_uas','in-ra-']] : [['tugas','in-t-'],['praktik','in-p-']];
+      const KOMPS = c.mode==='remedial' ? [['rem_uts','in-rt-'],['rem_uas','in-ra-']] : [['tugas','in-t-'],['praktik','in-p-']];
       for(let i=0;i<inRoster.length;i++){
         const s = inRoster[i];
         for(const [komp, pre] of KOMPS){
           const id = pre+i;
-          const n = angkaAtauNull(document.getElementById(id).value);
+          const el = document.getElementById(id);
+          // Angka yang terisi otomatis dari nilai online dan tidak diubah tidak disimpan sebagai nilai manual (supaya tetap mengikuti nilai online)
+          const n = (el.dataset.otomatis!=null && el.value.trim()===el.dataset.otomatis) ? null : angkaAtauNull(el.value);
           if(Number.isNaN(n) || (n!=null && (n<0 || n>100))) throw new Error(`Nilai ${komp} untuk ${s.nama} harus angka 0-100.`);
           const ada = manualBaris.find(r=>r.siswa_nisn===s.nisn && r.program===c.program && r.kelas===c.kelas && r.tahun_ajaran===c.ta && r.semester===c.smt && r.mapel_nama===c.mapel && r.komponen===komp);
           if(n==null){ if(ada) hapus.push(ada.id); }
@@ -8547,12 +8648,22 @@ async function simpanInputNilai(){
         const ang = id => { const n = angkaAtauNull(document.getElementById(id).value); if(Number.isNaN(n) || (n!=null && (n<0 || !Number.isInteger(n)))) throw new Error(`Jumlah hadir/sakit/izin/alpa untuk ${s.nama} harus bilangan bulat 0 atau lebih.`); return n; };
         const hadir = ang('in-h-'+i), sakit = ang('in-s-'+i), izin = ang('in-i-'+i), alpa = ang('in-a-'+i);
         const cat = document.getElementById('in-c-'+i).value.trim() || null;
+        const oto = inSikapAuto[i]; let tambahan = {};
+        if(oto){   // sikap otomatis dari poin pelanggaran; mengubahnya wajib beralasan
+          const beda = !!sikap && sikap!==oto.auto, alasan = (document.getElementById('in-sk-al-'+i).value||'').trim();
+          if(beda && !alasan) throw new Error(`Alasan penyesuaian sikap ${s.nama} wajib diisi karena berbeda dari hasil otomatis (${oto.auto}).`);
+          tambahan = { sikap_disesuaikan:beda, sikap_alasan: beda ? alasan : null, poin_pelanggaran:oto.poin };
+        }
         const ada = catatanMap.get(`${s.nisn}##${c.ta}##${c.smt}`);
         if(!sikap && hadir==null && sakit==null && izin==null && alpa==null && !cat){ if(ada) hapus.push(ada.id); }
-        else upsert.push({ siswa_nisn:s.nisn, siswa_nama:s.nama, program:c.program, kelas:c.kelas, tahun_ajaran:c.ta, semester:c.smt, sikap, hadir, sakit:sakit||0, izin:izin||0, alpa:alpa||0, catatan:cat, updated_at:new Date().toISOString() });
+        else upsert.push({ siswa_nisn:s.nisn, siswa_nama:s.nama, program:c.program, kelas:c.kelas, tahun_ajaran:c.ta, semester:c.smt, sikap, hadir, sakit:sakit||0, izin:izin||0, alpa:alpa||0, catatan:cat, ...tambahan, updated_at:new Date().toISOString() });
       }
       if(upsert.length){
-        const { error } = await supa.from('catatan_siswa_semester').upsert(upsert, { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester' });
+        let { error } = await supa.from('catatan_siswa_semester').upsert(upsert, { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester' });
+        if(error && /sikap_disesuaikan|sikap_alasan|poin_pelanggaran/i.test(error.message||'')){   // migrasi-v19 belum dijalankan
+          ({ error } = await supa.from('catatan_siswa_semester').upsert(upsert.map(({ sikap_disesuaikan, sikap_alasan, poin_pelanggaran, ...r })=>r), { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester' }));
+          if(!error) alert('Tersimpan, tetapi tanda "disesuaikan" dan alasannya belum bisa disimpan: jalankan migrasi-v19-pelanggaran.sql di Supabase SQL Editor.');
+        }
         if(error) throw error;
       }
       if(hapus.length){ const { error } = await supa.from('catatan_siswa_semester').delete().in('id', hapus); if(error) throw error; }
@@ -8577,6 +8688,7 @@ async function loadPengaturanNilai(){
   document.getElementById('pn-mode').value = pengNilai.mode;
   document.getElementById('pn-rem-mode').value = (pengNilai.remedial && pengNilai.remedial.mode) || 'kkm';
   document.getElementById('pn-kkm').value = pengNilai.kkm;
+  isiFormPoinPel();
   document.getElementById('pn-banner').innerHTML = dbV7Tersedia ? '' : '<b style="color:#b3261e;">Tabel pengaturan belum ada di database — jalankan migrasi-v7.sql di Supabase SQL Editor dulu.</b>';
   const urut = currentMapelList.filter(m=>!m.tidak_diujikan).slice().sort((a,c)=>(a.program+a.kelas+a.nama).localeCompare(c.program+c.kelas+c.nama,'id'));
   document.getElementById('pn-kkm-body').innerHTML = urut.map(m=>{
@@ -8613,7 +8725,13 @@ async function simpanPengaturanNilai(){
       hadir:{ aktif:document.getElementById('pn-sy-hd-aktif').checked, min_persen:angkaSy('pn-sy-hd-min','Minimal kehadiran') } };
     if(syarat.ujian.aktif && !jenis.length) throw new Error('Pilih minimal satu jenis ujian (UTS / UAS / Ulangan Harian) untuk syarat ujian, atau matikan syarat ujian.');
   }catch(e){ return alert(e.message); }
-  const { error } = await supa.from('pengaturan_nilai').upsert({ id:'umum', bobot, mode:document.getElementById('pn-mode').value, kkm, kkm_mapel:kkmMapel, remedial:{ mode:document.getElementById('pn-rem-mode').value }, syarat_rapor:syarat, updated_at:new Date().toISOString() });
+  let pel; try{ pel = bacaFormPoinPel(); }catch(e){ return alert(e.message); }
+  const payloadPeng = { id:'umum', bobot, mode:document.getElementById('pn-mode').value, kkm, kkm_mapel:kkmMapel, remedial:{ mode:document.getElementById('pn-rem-mode').value }, syarat_rapor:syarat, updated_at:new Date().toISOString() };
+  let { error } = await supa.from('pengaturan_nilai').upsert({ ...payloadPeng, pelanggaran:pel });
+  if(error && /pelanggaran/i.test(error.message||'')){   // migrasi-v19 belum dijalankan: simpan pengaturan lama saja
+    ({ error } = await supa.from('pengaturan_nilai').upsert(payloadPeng));
+    if(!error) alert('Pengaturan nilai tersimpan, tetapi poin pelanggaran BELUM tersimpan: jalankan migrasi-v19-pelanggaran.sql di Supabase SQL Editor dulu.');
+  }
   if(error) return alert('Gagal menyimpan: '+error.message+(/syarat_rapor/i.test(error.message)?' — jalankan migrasi-v16-tugas-syarat-rapor.sql di Supabase SQL Editor dulu.':/remedial/i.test(error.message)?' — jalankan migrasi-v14-remedial.sql di Supabase SQL Editor dulu.':''));
   alert('Pengaturan nilai tersimpan. Berlaku untuk Rekap Nilai, Leger, Transkrip, Rapor, dan Syarat Rapor.'); syaratCache.clear();
   await loadPengaturanNilai();
@@ -9142,6 +9260,545 @@ function srcGambarAman(g){ return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Z
 function jsq(v){ return escapeHtml(JSON.stringify(String(v==null?'':v))); }
 function escapeHtml(str){
   return (str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============================================================
+// CATATAN PELANGGARAN, SIKAP OTOMATIS & SURAT PANGGILAN ORANG TUA (v14.9; migrasi-v19-pelanggaran.sql)
+// Poin pelanggaran = alpa + terlambat (rekap absensi) + pelanggaran saat ujian/tugas (pindah tab, paste; dibaca otomatis)
+// + catatan manual guru. Total poin menentukan predikat Sikap A/B/C/D lewat ambang di Pengaturan Nilai.
+// ============================================================
+const DEF_PEL = { alpa:3, terlambat:1, ujian:1, tugas:1, akhir:5, maks_sistem:10, batas_ujian:3,
+  manual:{ ringan:2, sedang:5, berat:10 }, ambang:{ A:5, B:15, C:30 } };
+function gabungPel(raw){
+  const r = raw || {};
+  return { ...DEF_PEL, ...r, manual:{ ...DEF_PEL.manual, ...(r.manual||{}) }, ambang:{ ...DEF_PEL.ambang, ...(r.ambang||{}) } };
+}
+function cfgPel(){ return pengNilai.pel || gabungPel(null); }
+function predikatDariPoin(p){ const a = cfgPel().ambang; return p<=a.A ? 'A' : p<=a.B ? 'B' : p<=a.C ? 'C' : 'D'; }
+const NAMA_KAT_PEL = { ringan:'Ringan', sedang:'Sedang', berat:'Berat' };
+const pelCache = new Map();   // program##kelas##ta##smt -> Promise<Map nisn -> data pelanggaran>
+function kosongkanCachePel(){ pelCache.clear(); }
+function muatPelanggaranKelas(program, kelas, ta, smt){
+  const k = [program, kelas, ta, smt].join('##');
+  if(!pelCache.has(k)) pelCache.set(k, bangunPelanggaranKelas(program, kelas, ta, smt).catch(e=>{ pelCache.delete(k); throw e; }));
+  return pelCache.get(k);
+}
+async function bangunPelanggaranKelas(program, kelas, ta, smt){
+  const cfg = cfgPel(), peta = new Map(), peringatan = [];
+  const ambil = (nisn, nama)=>{ if(!peta.has(nisn)) peta.set(nisn, { nisn, nama:nama||nisn, alpa:0, terlambat:0, adaAbsensi:false, ujian:[], tugas:[], manual:[] }); return peta.get(nisn); };
+  daftarSiswaNilai.filter(s=>!s.nonaktif && s.kelasRomawi===kelas && s.programLabel===program).forEach(s=>ambil(s.nisn, s.nama));
+  // 1) Alpa dan terlambat dari aplikasi absensi
+  try{
+    const rg = rentangDefaultAbsensi(ta, smt); let awal = rg.awal; const akhir = rg.akhir;
+    const mulai = await tanggalMulaiAbsensi(); if(mulai && mulai > awal) awal = mulai;
+    if(awal <= akhir){
+      const { data, error } = await supa.rpc('tarik_absensi_nilai', { p_start:awal, p_end:akhir, p_program:program, p_kelas:kelas });
+      if(error) peringatan.push('Rekap absensi gagal dimuat: '+error.message);
+      else (data||[]).forEach(r=>{ const d = ambil(r.siswa_nisn, r.siswa_nama); d.alpa = Number(r.alpa)||0; d.terlambat = Number(r.terlambat)||0; d.adaAbsensi = true; });
+    }
+  }catch(e){ peringatan.push('Rekap absensi gagal dimuat: '+(e.message||e)); }
+  // Alpa yang sudah disimpan/diedit guru di Input Nilai Tambahan didahulukan (sama seperti rapor)
+  catatanBaris.filter(r=>r.program===program && r.kelas===kelas && r.tahun_ajaran===ta && r.semester===smt && r.hadir!=null).forEach(r=>{
+    const d = peta.get(r.siswa_nisn); if(d){ d.alpa = Number(r.alpa)||0; d.adaAbsensi = true; }
+  });
+  // 2) Pelanggaran saat ujian (UH/UTS/UAS/Remedial): pindah tab/aplikasi, paste
+  try{
+    const rp = await ambilSemuaBaris(()=>supa.from('paket_ujian').select('id, judul, jenis_ujian, semester, tahun_ajaran, mata_pelajaran(nama)').eq('program', program).eq('kelas', kelas).order('id'));
+    if(rp.error) throw rp.error;
+    const paket = new Map();
+    (rp.data||[]).forEach(p=>{ const n = normSemesterTA(p.semester, p.tahun_ajaran); if(n.tahun_ajaran===ta && n.semester===smt) paket.set(p.id, p); });
+    const ids = [...paket.keys()];
+    for(let i=0;i<ids.length;i+=80){
+      const rs = await ambilSemuaBaris(()=>supa.from('sesi_ujian').select('paket_ujian_id, siswa_nisn, siswa_nama, pelanggaran').in('paket_ujian_id', ids.slice(i,i+80)).gt('pelanggaran', 0).order('id'));
+      if(rs.error) throw rs.error;
+      (rs.data||[]).forEach(x=>{
+        const p = paket.get(x.paket_ujian_id), d = ambil(x.siswa_nisn, x.siswa_nama);
+        d.ujian.push({ judul:p.judul, jenis:p.jenis_ujian, mapel:(p.mata_pelajaran&&p.mata_pelajaran.nama)||'', jumlah:Number(x.pelanggaran)||0, akhir: cfg.batas_ujian>0 && Number(x.pelanggaran)>=cfg.batas_ujian });
+      });
+    }
+  }catch(e){ peringatan.push('Pelanggaran ujian gagal dimuat: '+(e.message||e)); }
+  // 3) Pelanggaran saat mengerjakan tugas
+  try{
+    const rt = await ambilSemuaBaris(()=>supa.from('tugas').select('id, judul, mapel_nama').eq('program', program).eq('kelas', kelas).eq('tahun_ajaran', ta).eq('semester', smt).order('id'));
+    if(rt.error) throw rt.error;
+    const tg = new Map((rt.data||[]).map(t=>[t.id, t])), ids = [...tg.keys()];
+    for(let i=0;i<ids.length;i+=80){
+      const rj = await ambilSemuaBaris(()=>supa.from('tugas_jawaban').select('tugas_id, siswa_nisn, siswa_nama, pelanggaran, diakhiri_otomatis').in('tugas_id', ids.slice(i,i+80)).gt('pelanggaran', 0).order('id'));
+      if(rj.error) throw rj.error;
+      (rj.data||[]).forEach(x=>{ const t = tg.get(x.tugas_id), d = ambil(x.siswa_nisn, x.siswa_nama);
+        d.tugas.push({ judul:t.judul, mapel:t.mapel_nama||'', jumlah:Number(x.pelanggaran)||0, akhir:!!x.diakhiri_otomatis }); });
+    }
+  }catch(e){ peringatan.push('Pelanggaran tugas gagal dimuat: '+(e.message||e)); }
+  // 4) Catatan manual
+  let manualTersedia = true;
+  const rm = await ambilSemuaBaris(()=>supa.from('catatan_pelanggaran').select('*').eq('program', program).eq('kelas', kelas).eq('tahun_ajaran', ta).eq('semester', smt).order('tanggal').order('id'));
+  if(rm.error){ manualTersedia = false; peringatan.push('Tabel catatan pelanggaran belum ada: jalankan migrasi-v19-pelanggaran.sql di Supabase SQL Editor.'); }
+  else (rm.data||[]).forEach(r=>ambil(r.siswa_nisn, r.siswa_nama).manual.push(r));
+  // Hitung poin
+  peta.forEach(d=>{
+    const sesi = d.ujian.reduce((a,x)=>a+x.jumlah,0), ses2 = d.tugas.reduce((a,x)=>a+x.jumlah,0);
+    const akhir = d.ujian.filter(x=>x.akhir).length + d.tugas.filter(x=>x.akhir).length;
+    d.poinAbsensi = d.alpa*cfg.alpa + d.terlambat*cfg.terlambat;
+    d.poinSistem = Math.min(cfg.maks_sistem, sesi*cfg.ujian + ses2*cfg.tugas + akhir*cfg.akhir);
+    d.poinManual = d.manual.reduce((a,x)=>a+(Number(x.poin)||0),0);
+    d.pelUjian = sesi; d.pelTugas = ses2;
+    d.total = d.poinAbsensi + d.poinSistem + d.poinManual;
+    d.sikap = predikatDariPoin(d.total);
+  });
+  return { peta, peringatan, manualTersedia };
+}
+function urutPelanggaran(peta, q){
+  const cari = String(q||'').trim().toLowerCase();
+  return [...peta.values()].filter(d=>!cari || d.nama.toLowerCase().includes(cari) || String(d.nisn).toLowerCase().includes(cari))
+    .sort((a,b)=>b.total-a.total || a.nama.localeCompare(b.nama,'id'));
+}
+function isiKelasPel(pre){
+  const pr = document.getElementById(pre+'-program').value, sel = document.getElementById(pre+'-kelas');
+  const opsi = pr ? (KELAS_PER_PROGRAM[pr]||[]) : [];
+  sel.innerHTML = opsi.length ? opsi.map(k=>`<option value="${k}">Kelas ${k}</option>`).join('') : '<option value="">— pilih jenjang dulu —</option>';
+}
+async function siapkanFilterPel(pre){
+  if(!await siapkanDataNilai()) return false;
+  const selTa = document.getElementById(pre+'-ta'), prev = selTa.value, opsi = opsiTahunAjaranNilai();
+  selTa.innerHTML = opsi.map(t=>`<option>${esc2(t)}</option>`).join('');
+  selTa.value = opsi.includes(prev) ? prev : taBerjalan();
+  const smt = document.getElementById(pre+'-smt');
+  if(smt && !smt.dataset.diatur){ smt.value = semesterBerjalan(); smt.dataset.diatur = '1'; }
+  return true;
+}
+function ctxPel(pre){
+  const c = { program:document.getElementById(pre+'-program').value, kelas:document.getElementById(pre+'-kelas').value,
+    ta:document.getElementById(pre+'-ta').value, smt:document.getElementById(pre+'-smt').value };
+  if(!c.program || !c.kelas || !c.ta || !c.smt){ alert('Pilih Jenjang, Kelas, Tahun Ajaran, dan Semester dulu.'); return null; }
+  return c;
+}
+function htmlPeringatanPel(arr){ return arr && arr.length ? `<div style="background:#FFF8E6;border:1px solid #E5C97A;border-radius:3px;padding:8px 12px;margin:8px 0;font-size:13px;">${arr.map(esc2).join('<br>')}</div>` : ''; }
+function badgeSikap(p){ const w = { A:'#1F5A25', B:'#2F6B34', C:'#7A5300', D:'#b3261e' }[p]; return `<b style="color:${w};">${p}</b> <span class="muted">(${NAMA_SIKAP[p]})</span>`; }
+
+// ---------- MENU CATATAN PELANGGARAN ----------
+let plData = null;
+async function loadPelanggaran(){ await siapkanFilterPel('pl'); }
+async function tampilkanPelanggaran(){
+  const c = ctxPel('pl'); if(!c) return;
+  if(!await siapkanDataNilai()) return;
+  const box = document.getElementById('pl-isi'); box.innerHTML = '<p class="muted">Memuat data pelanggaran...</p>';
+  document.getElementById('pl-rincian').innerHTML = '';
+  try{
+    const h = await muatPelanggaranKelas(c.program, c.kelas, c.ta, c.smt);
+    plData = { ...c, ...h }; renderTabelPelanggaran();
+  }catch(e){ box.innerHTML = `<p style="color:#b3261e;">Gagal memuat: ${esc2(e.message||e)}</p>`; }
+}
+function renderTabelPelanggaran(){
+  if(!plData) return;
+  const box = document.getElementById('pl-isi'), rows = urutPelanggaran(plData.peta, document.getElementById('pl-cari').value);
+  const cfg = cfgPel();
+  if(!rows.length){ box.innerHTML = htmlPeringatanPel(plData.peringatan) + '<p class="muted">Tidak ada siswa pada pilihan ini.</p>'; return; }
+  box.innerHTML = htmlPeringatanPel(plData.peringatan) +
+    `<p class="muted" style="margin:6px 0;">Poin: alpa ${cfg.alpa}/hari, terlambat ${cfg.terlambat}/kali, pelanggaran ujian ${cfg.ujian} dan tugas ${cfg.tugas} per kejadian (+${cfg.akhir} bila diakhiri otomatis; maks. ${cfg.maks_sistem} dari sumber ini), catatan manual ${cfg.manual.ringan}/${cfg.manual.sedang}/${cfg.manual.berat}. Sikap: A sampai ${cfg.ambang.A} poin, B sampai ${cfg.ambang.B}, C sampai ${cfg.ambang.C}, selebihnya D. Ubah di Pengaturan Nilai.</p>
+    <div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>Alpa</th><th>Terlambat</th><th>Ujian</th><th>Tugas</th><th>Catatan Manual</th><th>Total Poin</th><th>Sikap Otomatis</th><th></th></tr></thead><tbody>` +
+    rows.map((d,i)=>`<tr${d.total>0?'':' style="color:#777;"'}><td>${i+1}</td><td>${esc2(d.nama)}<br><span class="muted">${esc2(d.nisn)}</span></td>
+      <td>${d.adaAbsensi?d.alpa:'<span class="muted">-</span>'}</td><td>${d.adaAbsensi?d.terlambat:'<span class="muted">-</span>'}</td><td>${d.pelUjian||0}x</td><td>${d.pelTugas||0}x</td><td>${d.manual.length}</td>
+      <td><b>${d.total}</b></td><td>${badgeSikap(d.sikap)}</td>
+      <td><button class="btn outline" onclick="bukaRincianPel('${esc2(d.nisn)}')">Rincian / Catat</button></td></tr>`).join('') + '</tbody></table></div>';
+}
+function bukaRincianPel(nisn){
+  const d = plData && plData.peta.get(nisn); if(!d) return;
+  const el = document.getElementById('pl-rincian');
+  const li = a => a.length ? `<ul style="margin:4px 0 0;padding-left:18px;">${a.join('')}</ul>` : '<span class="muted">Tidak ada.</span>';
+  const hari = new Date().toISOString().slice(0,10);
+  el.innerHTML = `<div class="card"><h3 style="margin-top:0;">${esc2(d.nama)} <span class="muted" style="font-weight:normal;">(${esc2(d.nisn)}) &bull; Kelas ${esc2(plData.kelas)} &bull; ${esc2(labelSmt(plData.smt))} ${esc2(plData.ta)}</span></h3>
+    <p style="margin:0 0 8px;">Total <b>${d.total} poin</b> (absensi ${d.poinAbsensi} + ujian/tugas ${d.poinSistem} + manual ${d.poinManual}) &rarr; Sikap otomatis ${badgeSikap(d.sikap)}</p>
+    <p style="margin:6px 0 2px;"><b>Absensi:</b> ${d.adaAbsensi ? `alpa ${d.alpa} hari, terlambat ${d.terlambat} kali` : '<span class="muted">belum ada data absensi pada periode ini</span>'}</p>
+    <p style="margin:6px 0 2px;"><b>Pelanggaran saat ujian:</b></p>${li(d.ujian.map(x=>`<li>${esc2(x.jenis)} ${esc2(x.mapel)} &mdash; ${x.jumlah}x pindah tab/aplikasi atau paste${x.akhir?' (ujian diakhiri otomatis)':''}</li>`))}
+    <p style="margin:6px 0 2px;"><b>Pelanggaran saat tugas:</b></p>${li(d.tugas.map(x=>`<li>${esc2(x.mapel)} &ndash; ${esc2(x.judul)} &mdash; ${x.jumlah}x${x.akhir?' (dikumpulkan otomatis)':''}</li>`))}
+    <p style="margin:6px 0 2px;"><b>Catatan manual:</b></p>${li(d.manual.map(x=>`<li>${esc2(fmtTglId(x.tanggal))} &mdash; <b>${esc2(NAMA_KAT_PEL[x.kategori]||x.kategori)}</b> (${x.poin} poin): ${esc2(x.keterangan)} <a href="#" onclick="hapusCatatanPel(${x.id});return false;" style="color:#b3261e;">hapus</a></li>`))}
+    ${plData.manualTersedia ? `<div style="margin-top:12px;border-top:1px solid #ddd;padding-top:10px;"><b>Tambah catatan pelanggaran</b>
+      <div class="grid3" style="margin-top:6px;">
+        <div class="field"><label>Tanggal</label><input type="date" id="plm-tgl" value="${hari}" /></div>
+        <div class="field"><label>Kategori</label><select id="plm-kat"><option value="ringan">Ringan (${cfgPel().manual.ringan} poin)</option><option value="sedang">Sedang (${cfgPel().manual.sedang} poin)</option><option value="berat">Berat (${cfgPel().manual.berat} poin)</option></select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn gold" onclick="tambahCatatanPel('${esc2(d.nisn)}')">+ Simpan Catatan</button></div>
+      </div>
+      <div class="field"><label>Keterangan (apa yang terjadi)</label><input type="text" id="plm-ket" maxlength="300" placeholder="mis. Tidak mengikuti upacara tanpa keterangan; berkata kasar kepada teman" /></div></div>` : ''}
+    </div>`;
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+async function tambahCatatanPel(nisn){
+  const d = plData && plData.peta.get(nisn); if(!d) return;
+  const ket = document.getElementById('plm-ket').value.trim(), tgl = document.getElementById('plm-tgl').value, kat = document.getElementById('plm-kat').value;
+  if(!ket) return alert('Isi keterangan pelanggarannya.');
+  if(!tgl) return alert('Isi tanggal kejadian.');
+  let email = null; try{ email = (await supa.auth.getUser()).data.user?.email || null; }catch(e){}
+  const { error } = await supa.from('catatan_pelanggaran').insert({ siswa_nisn:nisn, siswa_nama:d.nama, program:plData.program, kelas:plData.kelas, tahun_ajaran:plData.ta, semester:plData.smt,
+    tanggal:tgl, kategori:kat, poin:cfgPel().manual[kat], keterangan:ket, dicatat_oleh:email });
+  if(error) return alert('Gagal menyimpan: '+error.message);
+  kosongkanCachePel(); await tampilkanPelanggaran(); bukaRincianPel(nisn);
+}
+async function hapusCatatanPel(id){
+  if(!confirm('Hapus catatan pelanggaran ini?')) return;
+  const nisn = [...plData.peta.values()].find(d=>d.manual.some(x=>x.id===id))?.nisn;
+  const { error } = await supa.from('catatan_pelanggaran').delete().eq('id', id);
+  if(error) return alert('Gagal menghapus: '+error.message);
+  kosongkanCachePel(); await tampilkanPelanggaran(); if(nisn) bukaRincianPel(nisn);
+}
+function unduhPelanggaranExcel(){
+  if(!plData) return alert('Tampilkan data dulu.');
+  const aoa = [['No','Nama','NISN','Alpa','Terlambat','Pelanggaran Ujian','Pelanggaran Tugas','Catatan Manual','Poin Absensi','Poin Ujian/Tugas','Poin Manual','Total Poin','Sikap Otomatis']];
+  urutPelanggaran(plData.peta, '').forEach((d,i)=>aoa.push([i+1, d.nama, d.nisn, d.alpa, d.terlambat, d.pelUjian, d.pelTugas, d.manual.length, d.poinAbsensi, d.poinSistem, d.poinManual, d.total, d.sikap]));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Pelanggaran');
+  XLSX.writeFile(wb, `pelanggaran-${namaFileAman(plData.program+'-'+plData.kelas+'-'+plData.ta+'-'+plData.smt)}.xlsx`);
+}
+
+// ---------- PENGATURAN POIN (di menu Pengaturan Nilai) ----------
+function isiFormPoinPel(){
+  const c = cfgPel(), set = (id,v)=>{ const e = document.getElementById(id); if(e) e.value = v; };
+  set('pn-pl-alpa', c.alpa); set('pn-pl-terlambat', c.terlambat); set('pn-pl-ujian', c.ujian); set('pn-pl-tugas', c.tugas); set('pn-pl-akhir', c.akhir);
+  set('pn-pl-maks', c.maks_sistem); set('pn-pl-batas', c.batas_ujian); set('pn-pl-ringan', c.manual.ringan); set('pn-pl-sedang', c.manual.sedang); set('pn-pl-berat', c.manual.berat);
+  set('pn-pl-a', c.ambang.A); set('pn-pl-b', c.ambang.B); set('pn-pl-c', c.ambang.C);
+}
+function bacaFormPoinPel(){
+  const n = (id, nama)=>{ const v = angkaAtauNull(document.getElementById(id).value); if(v==null || Number.isNaN(v) || v<0 || v>1000) throw new Error(`${nama} harus angka 0 atau lebih (maks. 1000).`); return v; };
+  const r = { alpa:n('pn-pl-alpa','Poin alpa'), terlambat:n('pn-pl-terlambat','Poin terlambat'), ujian:n('pn-pl-ujian','Poin pelanggaran ujian'), tugas:n('pn-pl-tugas','Poin pelanggaran tugas'),
+    akhir:n('pn-pl-akhir','Poin tambahan diakhiri otomatis'), maks_sistem:n('pn-pl-maks','Batas poin ujian/tugas'), batas_ujian:n('pn-pl-batas','Batas pelanggaran ujian diakhiri'),
+    manual:{ ringan:n('pn-pl-ringan','Poin Ringan'), sedang:n('pn-pl-sedang','Poin Sedang'), berat:n('pn-pl-berat','Poin Berat') },
+    ambang:{ A:n('pn-pl-a','Ambang A'), B:n('pn-pl-b','Ambang B'), C:n('pn-pl-c','Ambang C') } };
+  if(!(r.ambang.A < r.ambang.B && r.ambang.B < r.ambang.C)) throw new Error('Ambang predikat harus makin besar: batas A < batas B < batas C.');
+  return r;
+}
+
+// ---------- SIKAP OTOMATIS di Input Nilai Tambahan ----------
+let inSikapAuto = [];   // indeks baris -> { auto, poin } hasil hitung otomatis
+async function isiSikapOtomatis(c){
+  inSikapAuto = [];
+  const info = document.getElementById('in-sk-banner'); if(info) info.innerHTML = '<span class="muted">Menghitung sikap otomatis dari pelanggaran...</span>';
+  let h; try{ h = await muatPelanggaranKelas(c.program, c.kelas, c.ta, c.smt); }catch(e){ if(info) info.innerHTML = `<span style="color:#b3261e;">Sikap otomatis gagal dihitung: ${esc2(e.message||e)}. Sikap diisi manual seperti biasa.</span>`; return; }
+  inRoster.forEach((s,i)=>{
+    const d = h.peta.get(s.nisn); if(!d) return;
+    const k = catatanMap.get(`${s.nisn}##${c.ta}##${c.smt}`) || {};
+    inSikapAuto[i] = { auto:d.sikap, poin:d.total };
+    const sel = document.getElementById('in-sk-'+i), al = document.getElementById('in-sk-al-'+i);
+    if(k.sikap_disesuaikan && k.sikap){ sel.value = k.sikap; if(al) al.value = k.sikap_alasan || ''; }
+    else sel.value = d.sikap;
+    cekSikapPenyesuaian(i);
+  });
+  if(info) info.innerHTML = htmlPeringatanPel(h.peringatan) + `<p class="muted" style="margin:6px 0;">Predikat Sikap terisi <b>otomatis</b> dari poin pelanggaran semester ini (lihat menu Catatan Pelanggaran). Mengubah predikat dari hasil otomatis wajib disertai alasan dan akan ditandai "disesuaikan".</p>`;
+}
+function cekSikapPenyesuaian(i){
+  const a = inSikapAuto[i], sel = document.getElementById('in-sk-'+i), al = document.getElementById('in-sk-al-'+i), inf = document.getElementById('in-sk-info-'+i);
+  if(!a || !sel) return;
+  const beda = !!sel.value && sel.value !== a.auto;
+  if(inf) inf.innerHTML = `Otomatis: <b>${a.auto}</b> &middot; ${a.poin} poin${beda ? ' &middot; <b style="color:#b36b00;">disesuaikan</b>' : ''}`;
+  if(al) al.classList.toggle('hidden', !beda);
+}
+
+// ---------- MENU SURAT PANGGILAN ORANG TUA ----------
+let spData = null, spSiswa = null;
+async function loadSuratPanggilan(){ await siapkanFilterPel('sp'); }
+async function tampilkanDaftarSurat(){
+  const c = ctxPel('sp'); if(!c) return;
+  if(!await siapkanDataNilai()) return;
+  const box = document.getElementById('sp-isi'); box.innerHTML = '<p class="muted">Memuat data pelanggaran...</p>';
+  document.getElementById('sp-form').innerHTML = '';
+  try{ const h = await muatPelanggaranKelas(c.program, c.kelas, c.ta, c.smt); spData = { ...c, ...h }; renderDaftarSurat(); }
+  catch(e){ box.innerHTML = `<p style="color:#b3261e;">Gagal memuat: ${esc2(e.message||e)}</p>`; }
+}
+function renderDaftarSurat(){
+  if(!spData) return;
+  const rows = urutPelanggaran(spData.peta, document.getElementById('sp-cari').value);
+  document.getElementById('sp-isi').innerHTML = htmlPeringatanPel(spData.peringatan) + (rows.length
+    ? `<div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>Alpa</th><th>Terlambat</th><th>Ujian/Tugas</th><th>Manual</th><th>Total Poin</th><th>Sikap</th><th></th></tr></thead><tbody>` +
+      rows.map((d,i)=>`<tr><td>${i+1}</td><td>${esc2(d.nama)}<br><span class="muted">${esc2(d.nisn)}</span></td><td>${d.alpa}</td><td>${d.terlambat}</td><td>${(d.pelUjian||0)+(d.pelTugas||0)}x</td><td>${d.manual.length}</td><td><b>${d.total}</b></td><td>${badgeSikap(d.sikap)}</td>
+        <td><button class="btn gold" onclick="bukaFormSurat('${esc2(d.nisn)}')">✉ Buat Surat</button></td></tr>`).join('') + '</tbody></table></div>'
+    : '<p class="muted">Tidak ada siswa pada pilihan ini.</p>');
+}
+function uraianPelanggaranSurat(d){
+  const b = [];
+  if(d.alpa>0) b.push(`tidak hadir tanpa keterangan (alpa) sebanyak ${d.alpa} hari`);
+  if(d.terlambat>0) b.push(`terlambat hadir sebanyak ${d.terlambat} kali`);
+  if(d.pelUjian>0) b.push(`melakukan ${d.pelUjian} kali pelanggaran tata tertib saat mengerjakan ujian (berpindah halaman/aplikasi atau menempel jawaban)`);
+  if(d.pelTugas>0) b.push(`melakukan ${d.pelTugas} kali pelanggaran tata tertib saat mengerjakan tugas daring`);
+  d.manual.forEach(x=>b.push(x.keterangan.replace(/[.\s]+$/,'')));
+  return b.length ? 'tercatat '+b.join('; ')+'.' : 'perlu dibicarakan bersama pihak lembaga terkait perkembangan belajar dan kedisiplinannya.';
+}
+function bukaFormSurat(nisn){
+  const d = spData && spData.peta.get(nisn); if(!d) return;
+  spSiswa = d;
+  const t = new Date(); t.setDate(t.getDate()+3);
+  const tgl = t.toISOString().slice(0,10);
+  document.getElementById('sp-form').innerHTML = `<div class="card"><h3 style="margin-top:0;">Surat Panggilan &mdash; ${esc2(d.nama)}</h3>
+    <p class="muted" style="margin:0 0 8px;">Tanggal surat otomatis mengikuti hari saat surat dicetak. Tanda tangan Wali Kelas dan Ketua/Kepala PKBM diambil dari menu Tanda Tangan.</p>
+    <div class="grid3">
+      <div class="field"><label>Nomor surat (boleh kosong)</label><input type="text" id="sp-no" placeholder="mis. 012/PKBM-NI/X/2026" /></div>
+      <div class="field"><label>Panggilan ke-</label><select id="sp-ke"><option value="">—</option><option value="I">I</option><option value="II">II</option><option value="III">III</option></select></div>
+      <div class="field"><label>Lampiran</label><input type="text" id="sp-lamp" value="-" /></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Hari/tanggal menghadap</label><input type="date" id="sp-tgl" value="${tgl}" /></div>
+      <div class="field"><label>Pukul</label><input type="text" id="sp-jam" value="09.00 WIB s.d. selesai" /></div>
+      <div class="field"><label>Tempat</label><input type="text" id="sp-tempat" value="Kantor ${esc2(SEKOLAH.nama_singkat ? 'PKBM '+SEKOLAH.nama_singkat : 'PKBM')}" /></div>
+    </div>
+    <div class="field"><label>Keperluan</label><input type="text" id="sp-perlu" value="Pembinaan dan konsultasi mengenai kedisiplinan serta perkembangan belajar ananda" /></div>
+    <div class="field"><label>Uraian (dari catatan pelanggaran, boleh diubah)</label><textarea id="sp-uraian" rows="4" style="width:100%;box-sizing:border-box;">${esc2(uraianPelanggaranSurat(d))}</textarea></div>
+    <button class="btn gold" onclick="cetakSuratPanggilan()">🖨 Cetak Surat / Simpan PDF</button></div>`;
+  document.getElementById('sp-form').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function fmtTglPanjang(iso){ if(!iso) return '.......................'; const [y,m,d] = iso.split('-').map(Number); return new Date(y, m-1, d).toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' }); }
+async function cetakSuratPanggilan(){
+  const d = spSiswa, c = spData; if(!d || !c) return;
+  const v = id => document.getElementById(id).value.trim();
+  const [ttdKepala, ttdWali] = await Promise.all([ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', c.kelas)]);
+  const win = window.open('', '_blank'); if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  const ke = v('sp-ke');
+  const html = `${kopSekolahHTML()}
+    <table class="surat-meta"><tr><td style="width:90px;">Nomor</td><td>: ${esc2(v('sp-no')) || '......................................'}</td><td style="text-align:right;">${tglTtd()}</td></tr>
+      <tr><td>Lampiran</td><td colspan="2">: ${esc2(v('sp-lamp')) || '-'}</td></tr>
+      <tr><td>Perihal</td><td colspan="2">: <b>Panggilan Orang Tua/Wali Siswa${ke?' (Panggilan ke-'+esc2(ke)+')':''}</b></td></tr></table>
+    <p style="margin:18px 0 0;">Kepada Yth.<br>Bapak/Ibu Orang Tua/Wali dari <b>${esc2(d.nama)}</b><br>NISN ${esc2(d.nisn)} &mdash; Kelas ${esc2(c.kelas)} ${esc2(c.program)}<br>di Tempat</p>
+    <p style="margin-top:16px;">Dengan hormat,</p>
+    <p style="text-align:justify;">Berdasarkan catatan kami pada ${esc2(labelSmt(c.smt))} Tahun Ajaran ${esc2(c.ta)}, putra/putri Bapak/Ibu ${esc2(v('sp-uraian'))}</p>
+    <p style="text-align:justify;">Sehubungan dengan hal tersebut, kami mengundang Bapak/Ibu untuk hadir pada:</p>
+    <table class="surat-meta" style="margin-left:24px;"><tr><td style="width:120px;">Hari/Tanggal</td><td>: ${esc2(fmtTglPanjang(document.getElementById('sp-tgl').value))}</td></tr>
+      <tr><td>Pukul</td><td>: ${esc2(v('sp-jam'))}</td></tr><tr><td>Tempat</td><td>: ${esc2(v('sp-tempat'))}</td></tr><tr><td style="vertical-align:top;">Keperluan</td><td>: ${esc2(v('sp-perlu'))}</td></tr></table>
+    <p style="text-align:justify;margin-top:14px;">Mengingat pentingnya hal ini bagi kemajuan belajar ananda, kami mohon Bapak/Ibu berkenan hadir tepat waktu. Apabila berhalangan hadir, mohon menghubungi Wali Kelas terlebih dahulu.</p>
+    <p>Demikian surat panggilan ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.</p>
+    <div class="ttd"><div class="kolom">&nbsp;<br>${blokTtd('Wali Kelas', ttdWali, true)}</div><div class="kolom">&nbsp;<br>${blokTtd(SEKOLAH.jabatan_kepala||'Ketua PKBM', ttdKepala, true)}</div></div>`;
+  win.document.write(`<html><head><title>Surat Panggilan - ${esc2(d.nama)}</title><style>${CSS_TRANSKRIP}
+    body{font-size:14px;line-height:1.5;} .surat-meta{font-size:14px;border-collapse:collapse;width:100%;} .surat-meta td{padding:2px 0;vertical-align:top;} @media print{ @page{ margin:14mm; } }</style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>${html}</body></html>`);
+  win.document.close();
+}
+
+// ============================================================
+// KENAIKAN KELAS (v15.0; migrasi-v20-kenaikan-kelas.sql)
+// Saran dari nilai akhir Semester Genap (mapel belum tuntas), kehadiran, dan Sikap. Keputusan disimpan per siswa per
+// tahun ajaran; "Terapkan" mengubah kelas / status di tabel `students` lewat server (admin), dengan data lama
+// disimpan sehingga bisa dibatalkan. Keputusan juga tercetak di Rapor Semester Genap.
+// ============================================================
+const DEF_NAIK = { maks_belum_tuntas:3, min_hadir:75, sikap_d_menahan:true };
+let naikCfg = { ...DEF_NAIK };
+const KELAS_BERIKUT = { VII:'VIII', VIII:'IX', X:'XI', XI:'XII' };
+const KELAS_AKHIR = ['IX','XII'];
+const NAMA_KEP = { naik:'Naik kelas', tinggal:'Tidak naik', lulus:'Lulus', pindah:'Pindah', keluar:'Keluar' };
+let knData = null;   // { program, kelas, ta, akhir, baris:[{ nisn, nama, kelasAsli, m, saran, row, diterapkan }], tabelAda }
+const kenaikanCache = new Map();   // ta -> Promise<{ map: nisn -> baris kenaikan_kelas, error }>
+function kosongkanCacheKenaikan(){ kenaikanCache.clear(); }
+function muatKeputusanKenaikan(ta){
+  if(!kenaikanCache.has(ta)) kenaikanCache.set(ta, (async()=>{
+    try{
+      const r = await ambilSemuaBaris(()=>supa.from('kenaikan_kelas').select('*').eq('tahun_ajaran', ta).order('id'));
+      return r.error ? { map:new Map(), error:r.error } : { map:new Map((r.data||[]).map(x=>[x.siswa_nisn, x])), error:null };
+    }catch(e){ return { map:new Map(), error:e }; }
+  })());
+  return kenaikanCache.get(ta);
+}
+// Teks keputusan untuk Rapor Semester Genap (null = tidak dicetak)
+function teksKeputusanRapor(row){
+  if(!row) return null;
+  if(row.keputusan==='naik') return `Naik ke kelas ${row.kelas_tujuan || KELAS_BERIKUT[row.kelas_asal] || ''}`.trim();
+  if(row.keputusan==='lulus') return 'LULUS';
+  if(row.keputusan==='tinggal') return KELAS_AKHIR.includes(row.kelas_asal) ? `Belum lulus (mengulang kelas ${row.kelas_asal})` : `Tidak naik (tetap di kelas ${row.kelas_asal})`;
+  return null;
+}
+function kelasBaruTeks(kelasAsli, kelasRomawi){
+  const m = String(kelasAsli||'').trim().match(/^(\d{1,2})(.*)$/);
+  if(m) return (parseInt(m[1],10)+1)+m[2];
+  return KELAS_BERIKUT[kelasRomawi] || '';
+}
+async function muatPengKenaikan(){
+  naikCfg = { ...DEF_NAIK };
+  try{
+    const { data } = await supa.from('pengaturan_nilai').select('kenaikan').eq('id','umum').maybeSingle();
+    if(data && data.kenaikan) naikCfg = { ...DEF_NAIK, ...data.kenaikan };
+  }catch(e){ /* kolom belum ada: pakai bawaan */ }
+  document.getElementById('kn-maks').value = naikCfg.maks_belum_tuntas;
+  document.getElementById('kn-hadir').value = naikCfg.min_hadir;
+  document.getElementById('kn-sikapd').checked = !!naikCfg.sikap_d_menahan;
+}
+async function simpanKriteriaKenaikan(){
+  const maks = angkaAtauNull(document.getElementById('kn-maks').value), hadir = angkaAtauNull(document.getElementById('kn-hadir').value);
+  if(maks==null || Number.isNaN(maks) || maks<0 || maks>50) return alert('Maksimal mapel belum tuntas harus angka 0-50.');
+  if(hadir==null || Number.isNaN(hadir) || hadir<0 || hadir>100) return alert('Minimal kehadiran harus angka 0-100 (0 = tidak dipakai).');
+  const kenaikan = { maks_belum_tuntas:maks, min_hadir:hadir, sikap_d_menahan:document.getElementById('kn-sikapd').checked };
+  let { data, error } = await supa.from('pengaturan_nilai').update({ kenaikan }).eq('id','umum').select();
+  if(!error && !(data && data.length)) ({ error } = await supa.from('pengaturan_nilai').upsert({ id:'umum', kenaikan }));
+  if(error) return alert('Gagal menyimpan kriteria: '+error.message+(/kenaikan/i.test(error.message)?' — jalankan migrasi-v20-kenaikan-kelas.sql di Supabase SQL Editor dulu.':''));
+  naikCfg = { ...DEF_NAIK, ...kenaikan };
+  alert('Kriteria saran tersimpan. Klik Tampilkan untuk menghitung ulang saran.');
+}
+async function loadKenaikan(){
+  if(!await siapkanFilterPel('kn')) return;
+  const sel = document.getElementById('kn-ta'), opsi = [...sel.options].map(o=>o.value);
+  const [y] = taBerjalan().split('/').map(Number), sebelumnya = `${y-1}/${y}`;
+  if(!sel.dataset.diatur){ sel.value = (semesterBerjalan()==='Ganjil' && opsi.includes(sebelumnya)) ? sebelumnya : taBerjalan(); sel.dataset.diatur = '1'; }
+  await muatPengKenaikan();
+}
+function hitungMetrikKenaikan(nisn, ta){
+  const rows = susunNilaiSiswa(nisn, ta, 'Genap');
+  const nas = rows.map(r=>r.na).filter(x=>x!=null);
+  return { n:rows.length, rata: nas.length ? rataRata(nas) : null, belum: rows.filter(r=>r.na==null || r.tuntas===false).length,
+    hadir: hadirNilaiMap.has(`${nisn}##${ta}##Genap`) ? hadirNilaiMap.get(`${nisn}##${ta}##Genap`) : null,
+    sikap: (catatanMap.get(`${nisn}##${ta}##Genap`)||{}).sikap || null };
+}
+function saranKenaikan(m, akhir){
+  if(!m.n) return { aksi:null, alasan:['Belum ada nilai Semester Genap'] };
+  const c = naikCfg, alasan = [];
+  if(m.belum > c.maks_belum_tuntas) alasan.push(`${m.belum} mapel belum tuntas (maks. ${c.maks_belum_tuntas})`);
+  if(m.hadir!=null && c.min_hadir>0 && m.hadir < c.min_hadir) alasan.push(`kehadiran ${fmtN(m.hadir)}% (min. ${c.min_hadir}%)`);
+  if(c.sikap_d_menahan && m.sikap==='D') alasan.push('sikap D');
+  return { aksi: alasan.length ? 'tinggal' : (akhir ? 'lulus' : 'naik'), alasan };
+}
+async function tampilkanKenaikan(){
+  const program = document.getElementById('kn-program').value, kelas = document.getElementById('kn-kelas').value, ta = document.getElementById('kn-ta').value;
+  if(!program || !kelas || !ta) return alert('Pilih Jenjang, Kelas, dan Tahun Ajaran dulu.');
+  if(!await siapkanDataNilai()) return;
+  const box = document.getElementById('kn-isi'); box.innerHTML = '<p class="muted">Menghitung saran kenaikan...</p>';
+  kosongkanCacheKenaikan();
+  const { map, error } = await muatKeputusanKenaikan(ta);
+  const akhir = KELAS_AKHIR.includes(kelas), peta = new Map();
+  daftarSiswaNilai.filter(s=>!s.nonaktif && s.kelasRomawi===kelas && s.programLabel===program).forEach(s=>peta.set(s.nisn, { nisn:s.nisn, nama:s.nama, kelasAsli:s.kelasAsli }));
+  map.forEach(r=>{ if(r.kelas_asal===kelas && r.program===program){
+    const b = peta.get(r.siswa_nisn) || { nisn:r.siswa_nisn, nama:r.siswa_nama||r.siswa_nisn, kelasAsli:r.kelas_asal_asli||null };
+    peta.set(r.siswa_nisn, b); } });
+  const baris = [...peta.values()].sort((a,b)=>String(a.nama).localeCompare(String(b.nama),'id')).map(b=>{
+    const row = map.get(b.nisn) || null, m = hitungMetrikKenaikan(b.nisn, ta);
+    return { ...b, m, saran:saranKenaikan(m, akhir), row, diterapkan: !!(row && row.status==='diterapkan') };
+  });
+  knData = { program, kelas, ta, akhir, baris, tabelAda:!error };
+  renderKenaikan();
+}
+function opsiKeputusan(akhir){ return akhir ? [['lulus','Lulus'],['tinggal','Tidak Lulus'],['pindah','Pindah'],['keluar','Keluar']] : [['naik','Naik'],['tinggal','Tidak Naik'],['pindah','Pindah'],['keluar','Keluar']]; }
+function keputusanDipilih(i){ const b = knData.baris[i]; return b.diterapkan ? b.row.keputusan : document.getElementById('kn-k-'+i).value; }
+function teksTujuan(b, k, kelas){
+  if(k==='naik') return 'Kelas '+kelasBaruTeks(b.kelasAsli, kelas);
+  if(k==='lulus') return 'Lulus'; if(k==='pindah') return 'Pindah sekolah'; if(k==='keluar') return 'Keluar';
+  if(k==='tinggal') return 'Tetap di kelas '+(b.kelasAsli||kelas); return '-';
+}
+function renderKenaikan(){
+  if(!knData) return;
+  const { kelas, akhir, baris, tabelAda } = knData, box = document.getElementById('kn-isi');
+  if(!baris.length){ box.innerHTML = '<p class="muted">Tidak ada siswa aktif pada kelas ini.</p>'; return; }
+  const admin = ADALAH_ADMIN || ADALAH_SUPER;
+  const tanpaNilai = baris.filter(b=>!b.m.n).length;
+  box.innerHTML = (tabelAda ? '' : '<div style="background:#FFF8E6;border:1px solid #E5C97A;border-radius:3px;padding:8px 12px;margin:8px 0;font-size:13px;">Tabel keputusan belum ada: jalankan <b>migrasi-v20-kenaikan-kelas.sql</b> di Supabase SQL Editor dulu. Saran tetap tampil, tetapi keputusan belum bisa disimpan.</div>') +
+    (tanpaNilai ? `<p class="muted" style="margin:6px 0;">${tanpaNilai} siswa belum punya nilai Semester Genap; tidak ada saran otomatis untuk mereka, tentukan manual.</p>` : '') +
+    `<div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>Rata-rata Genap</th><th>Mapel belum tuntas</th><th>Hadir</th><th>Sikap</th><th>Saran</th><th>Keputusan</th><th>Alasan (bila beda dari saran)</th><th>Hasil</th></tr></thead><tbody>` +
+    baris.map((b,i)=>{
+      const m = b.m, sr = b.saran, k0 = b.row ? b.row.keputusan : (sr.aksi||'');
+      const saranTxt = sr.aksi ? `<b>${esc2(NAMA_KEP[sr.aksi] && akhir && sr.aksi==='tinggal' ? 'Tidak lulus' : NAMA_KEP[sr.aksi])}</b>${sr.alasan.length?`<br><span class="muted" style="font-size:11px;">${sr.alasan.map(esc2).join('; ')}</span>`:''}` : `<span class="muted">${sr.alasan.map(esc2).join('; ')}</span>`;
+      const kontrol = b.diterapkan
+        ? `<b>${esc2(NAMA_KEP[b.row.keputusan])}</b> <span class="badge siap">Diterapkan</span>`
+        : `<select id="kn-k-${i}" onchange="ubahKeputusanKenaikan(${i})"><option value="">—</option>${opsiKeputusan(akhir).map(([v,t])=>`<option value="${v}"${k0===v?' selected':''}>${t}</option>`).join('')}</select>${b.row?'<br><span class="muted" style="font-size:11px;">tersimpan</span>':''}`;
+      return `<tr><td>${i+1}</td><td>${esc2(b.nama)}<br><span class="muted">${esc2(b.nisn)}</span></td><td>${m.rata!=null?fmtN(m.rata):'<span class="muted">-</span>'}</td>
+        <td${m.n && m.belum>naikCfg.maks_belum_tuntas?' style="color:#b3261e;font-weight:600;"':''}>${m.n?m.belum:'-'}</td><td>${m.hadir!=null?fmtN(m.hadir)+'%':'-'}</td><td>${m.sikap||'-'}</td><td>${saranTxt}</td><td>${kontrol}</td>
+        <td>${b.diterapkan ? esc2(b.row.alasan||'') : `<input type="text" id="kn-al-${i}" class="hidden" placeholder="Alasan wajib" value="${esc2(b.row&&b.row.alasan||'')}" />`}</td>
+        <td id="kn-tj-${i}">${esc2(teksTujuan(b, k0, kelas))}</td></tr>`;
+    }).join('') + '</tbody></table></div>' +
+    `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn outline" onclick="terapkanSaranSemua()">Isi semua dengan saran</button>
+      <button class="btn gold" onclick="simpanKeputusanKenaikan()">💾 Simpan Keputusan</button>
+      <button class="btn outline" onclick="cetakDaftarKenaikan()">🖨 Cetak Daftar</button>
+      ${admin ? '<button class="btn gold" onclick="terapkanKenaikan()">✅ Terapkan ke Data Siswa</button><button class="btn outline" onclick="batalkanKenaikan()">↩ Batalkan yang Sudah Diterapkan</button>' : '<span class="muted">Menerapkan kenaikan ke data siswa hanya untuk admin.</span>'}
+    </div>
+    <p class="muted" style="margin-top:8px;font-size:12.5px;">Simpan dulu keputusan, cetak semua rapor Semester Genap, <b>baru</b> terapkan ke data siswa: setelah diterapkan, siswa pindah ke kelas barunya dan daftar kelas lama menjadi kosong di menu per kelas. Unduh Cadangan Data sebelum menerapkan.</p>`;
+  baris.forEach((b,i)=>{ if(!b.diterapkan) ubahKeputusanKenaikan(i); });
+}
+function ubahKeputusanKenaikan(i){
+  const b = knData.baris[i], k = document.getElementById('kn-k-'+i).value, al = document.getElementById('kn-al-'+i);
+  document.getElementById('kn-tj-'+i).textContent = teksTujuan(b, k, knData.kelas);
+  const beda = !!k && !!b.saran.aksi && k!==b.saran.aksi;
+  if(al) al.classList.toggle('hidden', !beda);
+}
+function terapkanSaranSemua(){
+  if(!knData) return;
+  knData.baris.forEach((b,i)=>{ if(!b.diterapkan && b.saran.aksi){ document.getElementById('kn-k-'+i).value = b.saran.aksi; ubahKeputusanKenaikan(i); } });
+}
+async function simpanKeputusanKenaikan(){
+  if(!knData) return false;
+  if(!knData.tabelAda){ alert('Jalankan migrasi-v20-kenaikan-kelas.sql di Supabase SQL Editor dulu.'); return false; }
+  const { program, kelas, ta } = knData, upsert = [], hapus = [];
+  for(let i=0;i<knData.baris.length;i++){
+    const b = knData.baris[i]; if(b.diterapkan) continue;
+    const k = document.getElementById('kn-k-'+i).value, alasan = (document.getElementById('kn-al-'+i).value||'').trim();
+    if(!k){ if(b.row) hapus.push(b.row.id); continue; }
+    if(b.saran.aksi && k!==b.saran.aksi && !alasan){ alert(`Alasan wajib diisi untuk ${b.nama}: keputusan berbeda dari saran (${NAMA_KEP[b.saran.aksi]}).`); return false; }
+    upsert.push({ siswa_nisn:b.nisn, siswa_nama:b.nama, tahun_ajaran:ta, program, kelas_asal:kelas, kelas_asal_asli:b.kelasAsli||null, keputusan:k, saran:b.saran.aksi||null,
+      alasan: (b.saran.aksi && k!==b.saran.aksi) ? alasan : null, kelas_tujuan: k==='naik' ? (KELAS_BERIKUT[kelas]||null) : null, status:'direncanakan', updated_at:new Date().toISOString() });
+  }
+  if(upsert.length){ const { error } = await supa.from('kenaikan_kelas').upsert(upsert, { onConflict:'siswa_nisn,tahun_ajaran' }); if(error){ alert('Gagal menyimpan: '+error.message); return false; } }
+  if(hapus.length){ const { error } = await supa.from('kenaikan_kelas').delete().in('id', hapus); if(error){ alert('Gagal menghapus: '+error.message); return false; } }
+  await tampilkanKenaikan();
+  return true;
+}
+const NAMA_AKSI_SERVER = { naik:'naik kelas', lulus:'lulus', pindah:'pindah', keluar:'keluar' };
+async function terapkanKenaikan(){
+  if(!(ADALAH_ADMIN || ADALAH_SUPER)) return alert('Hanya admin yang dapat menerapkan kenaikan kelas.');
+  if(!knData) return;
+  if(!await simpanKeputusanKenaikan()) return;
+  const target = knData.baris.filter(b=>b.row && b.row.status==='direncanakan');
+  if(!target.length) return alert('Tidak ada keputusan yang menunggu diterapkan. Pilih keputusan lalu simpan dulu.');
+  const hit = k => target.filter(b=>b.row.keputusan===k).length;
+  const ringkas = ['naik','tinggal','lulus','pindah','keluar'].filter(k=>hit(k)).map(k=>`${NAMA_KEP[k]}: ${hit(k)}`).join(', ');
+  const jawab = prompt(`Menerapkan keputusan kenaikan Kelas ${knData.kelas} (${knData.ta}) untuk ${target.length} siswa.\n${ringkas}\n\nKelas / status siswa di database (juga dipakai aplikasi absensi) akan berubah.\nPastikan rapor Semester Genap sudah tercetak dan Cadangan Data sudah diunduh.\n\nKetik TERAPKAN untuk melanjutkan.`);
+  if(jawab!=='TERAPKAN') return;
+  const server = target.filter(b=>b.row.keputusan!=='tinggal'), gagal = [];
+  let email = null; try{ email = (await supa.auth.getUser()).data.user?.email || null; }catch(e){}
+  const sekarang = new Date().toISOString();
+  try{
+    for(let i=0;i<server.length;i+=100){
+      const bagian = server.slice(i,i+100);
+      const res = await panggilKelolaSiswa({ action:'kenaikan', rows:bagian.map(b=>({ nisn:b.nisn, aksi:b.row.keputusan })) });
+      for(const h of (res.hasil||[])){
+        const b = bagian.find(x=>x.nisn===h.nisn);
+        if(!h.ok){ gagal.push(`${b?b.nama:h.nisn}: ${h.error}`); continue; }
+        const { error } = await supa.from('kenaikan_kelas').update({ status:'diterapkan', lama_kelas:h.lama.kelas, lama_jenjang:h.lama.jenjang, lama_program:h.lama.program, lama_status:h.lama.status,
+          baru_kelas:h.baru.kelas, baru_status:h.baru.status, diterapkan_pada:sekarang, diterapkan_oleh:email, updated_at:sekarang }).eq('siswa_nisn', h.nisn).eq('tahun_ajaran', knData.ta);
+        if(error) gagal.push(`${b?b.nama:h.nisn}: kelas sudah berubah tetapi riwayat gagal dicatat (${error.message})`);
+      }
+    }
+    const tinggal = target.filter(b=>b.row.keputusan==='tinggal').map(b=>b.nisn);
+    if(tinggal.length){ const { error } = await supa.from('kenaikan_kelas').update({ status:'diterapkan', diterapkan_pada:sekarang, diterapkan_oleh:email, updated_at:sekarang }).in('siswa_nisn', tinggal).eq('tahun_ajaran', knData.ta); if(error) gagal.push('Gagal menandai siswa tidak naik: '+error.message); }
+  }catch(e){ gagal.push(e.message||String(e)); }
+  alert(`Selesai. ${target.length-gagal.length} dari ${target.length} siswa diterapkan.${gagal.length?'\n\nBermasalah:\n'+gagal.join('\n'):''}`);
+  kosongkanCacheKenaikan(); await siapkanDataNilai(); await tampilkanKenaikan();
+}
+async function batalkanKenaikan(){
+  if(!(ADALAH_ADMIN || ADALAH_SUPER)) return alert('Hanya admin yang dapat membatalkan.');
+  if(!knData) return;
+  const target = knData.baris.filter(b=>b.row && b.row.status==='diterapkan');
+  if(!target.length) return alert('Belum ada keputusan yang diterapkan pada kelas ini.');
+  if(!confirm(`Batalkan penerapan untuk ${target.length} siswa Kelas ${knData.kelas}?\n\nKelas/status siswa dikembalikan seperti sebelum diterapkan (hanya bila data siswa belum diubah lagi setelahnya). Keputusan tetap tersimpan sebagai rencana.`)) return;
+  const server = target.filter(b=>b.row.lama_status), gagal = [], sekarang = new Date().toISOString();
+  try{
+    for(let i=0;i<server.length;i+=100){
+      const bagian = server.slice(i,i+100);
+      const res = await panggilKelolaSiswa({ action:'batalkan_kenaikan', rows:bagian.map(b=>({ nisn:b.nisn, kelas:b.row.lama_kelas, jenjang:b.row.lama_jenjang, program:b.row.lama_program, status:b.row.lama_status, baru_kelas:b.row.baru_kelas, baru_status:b.row.baru_status })) });
+      for(const h of (res.hasil||[])){
+        const b = bagian.find(x=>x.nisn===h.nisn);
+        if(!h.ok){ gagal.push(`${b?b.nama:h.nisn}: ${h.error}`); continue; }
+        const { error } = await supa.from('kenaikan_kelas').update({ status:'direncanakan', lama_kelas:null, lama_jenjang:null, lama_program:null, lama_status:null, baru_kelas:null, baru_status:null, diterapkan_pada:null, diterapkan_oleh:null, updated_at:sekarang }).eq('siswa_nisn', h.nisn).eq('tahun_ajaran', knData.ta);
+        if(error) gagal.push(`${b?b.nama:h.nisn}: data siswa dikembalikan tetapi riwayat gagal diperbarui (${error.message})`);
+      }
+    }
+    const tinggal = target.filter(b=>!b.row.lama_status).map(b=>b.nisn);
+    if(tinggal.length) await supa.from('kenaikan_kelas').update({ status:'direncanakan', diterapkan_pada:null, diterapkan_oleh:null, updated_at:sekarang }).in('siswa_nisn', tinggal).eq('tahun_ajaran', knData.ta);
+  }catch(e){ gagal.push(e.message||String(e)); }
+  alert(`Selesai. ${target.length-gagal.length} dari ${target.length} siswa dibatalkan.${gagal.length?'\n\nBermasalah:\n'+gagal.join('\n'):''}`);
+  kosongkanCacheKenaikan(); await siapkanDataNilai(); await tampilkanKenaikan();
+}
+async function cetakDaftarKenaikan(){
+  if(!knData) return;
+  const { kelas, ta, program, baris, akhir } = knData;
+  const [ttdKepala, ttdWali] = await Promise.all([ambilTtd('kepala_pkbm',''), ambilTtd('wali_kelas', kelas)]);
+  const rows = baris.map((b,i)=>{ const k = keputusanDipilih(i); return { b, k }; });
+  const win = window.open('', '_blank'); if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
+  win.document.write(`<html><head><title>Daftar Kenaikan Kelas ${esc2(kelas)}</title><style>${CSS_TRANSKRIP} body{max-width:900px;} @media print{ @page{ margin:12mm; } }</style></head><body>
+    <button onclick="window.print()" style="position:fixed;top:10px;right:10px;">Cetak / Simpan PDF</button>
+    ${kopSekolahHTML()}<h1>DAFTAR KEPUTUSAN ${akhir?'KELULUSAN':'KENAIKAN KELAS'}</h1>
+    <div class="sub">${esc2(program)} &bull; Kelas ${esc2(kelas)} &bull; Tahun Pelajaran ${esc2(ta)}</div>
+    <table class="nilai"><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Rata-rata Genap</th><th>Mapel Belum Tuntas</th><th>Kehadiran</th><th>Sikap</th><th>Keputusan</th></tr></thead><tbody>
+    ${rows.map(({b,k},i)=>`<tr><td>${i+1}</td><td>${esc2(b.nama)}</td><td>${esc2(b.nisn)}</td><td>${b.m.rata!=null?fmtN(b.m.rata):'-'}</td><td>${b.m.n?b.m.belum:'-'}</td><td>${b.m.hadir!=null?fmtN(b.m.hadir)+'%':'-'}</td><td>${esc2(b.m.sikap||'-')}</td><td><b>${esc2(k ? (k==='tinggal' && akhir ? 'Tidak lulus' : NAMA_KEP[k]) + (k==='naik' ? ' ke kelas '+(KELAS_BERIKUT[kelas]||'') : '') : '-')}</b></td></tr>`).join('')}
+    </tbody></table>
+    <div class="ttd"><div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali, true)}</div><div class="kolom">&nbsp;<br>${blokTtd(esc2(SEKOLAH.jabatan_kepala||'Kepala'), ttdKepala, true)}</div></div></body></html>`);
+  win.document.close();
 }
 </script>
 </body>

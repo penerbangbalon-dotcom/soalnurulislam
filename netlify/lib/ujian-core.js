@@ -363,7 +363,7 @@ async function daftarRemedialSiswa(nisn) {
       uts: g.uts.length ? g.uts.sort((a, b) => b.t - a.t)[0].sk : null,
       uas: g.uas.length ? g.uas.sort((a, b) => b.t - a.t)[0].sk : null,
     };
-    for (const komp of ['uh', 'uts', 'uas']) {
+    for (const komp of ['uts', 'uas']) {   // remedial hanya UTS dan UAS
       const asli = nilaiAsli[komp];
       if (asli == null || asli >= kkm) continue;                      // belum ada nilai / sudah tuntas
       const manual = manualRem.get(kunci + '##rem_' + komp);

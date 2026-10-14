@@ -4,6 +4,10 @@
 // dibuat oleh fungsi database tambah_siswa_massal (lihat migrasi-v13-tambah-siswa.sql).
 //
 // Aksi: "ubah" { nisn, data:{ nama, kelas, jk, tanggal_lahir, tempat_lahir, nipd, hp, alamat } } (satu siswa)
+// Aksi: "kenaikan" { rows: [{ nisn, aksi: 'naik'|'lulus'|'pindah'|'keluar' }] } (maks 100/permintaan): menaikkan kelas (7->8, 8->9, 10->11, 11->12, rombel tetap)
+//   atau mengubah status siswa AKTIF menjadi LULUS / PINDAH / KELUAR. Mengembalikan data lama per siswa (untuk pembatalan).
+// Aksi: "batalkan_kenaikan" { rows: [{ nisn, kelas, jenjang, program, status, baru_kelas, baru_status }] }: mengembalikan data lama,
+//   hanya bila data siswa sekarang masih sama dengan hasil kenaikan (tidak menimpa perubahan lain).
 // Aksi: "tambah" { rows: [{ nama, nisn, jk, kelas, tanggal_lahir, tempat_lahir, nipd, hp, alamat }] } (maks 100 baris/permintaan)
 
 const { adaKonfigurasi, wajibAdmin, sb } = require('../lib/ujian-core');
@@ -98,6 +102,81 @@ async function ubahSiswa(body) {
   return resp(200, { ok: true, siswa: hasil[0] });
 }
 
+// ---------- KENAIKAN KELAS (v15.0) ----------
+const STATUS_AKSI = { lulus: 'LULUS', pindah: 'PINDAH', keluar: 'KELUAR' };
+// "10 IPS 1" -> "11 IPS 1". Hanya kelas 7, 8, 10, 11 yang bisa naik; kelas 9 dan 12 adalah kelas akhir (Lulus).
+function kelasBerikutnya(kelasLama) {
+  const k = normalKelas(kelasLama);
+  const m = k.kelas.match(/^(\d{1,2})(?:\s+(.*))?$/);
+  if (!m) throw new Error('Kelas SD/umum tidak bisa dinaikkan dari menu ini');
+  const angka = parseInt(m[1], 10);
+  if (angka === 9 || angka === 12) throw new Error(`Kelas ${angka} adalah kelas akhir: pilih Lulus atau Tidak Lulus`);
+  if (![7, 8, 10, 11].includes(angka)) throw new Error(`Kelas ${angka} tidak bisa dinaikkan dari menu ini`);
+  return normalKelas(`${angka + 1}${m[2] ? ' ' + m[2] : ''}`);
+}
+function ramahErrorStatus(e) {
+  return /enum|check constraint|invalid input value/i.test(e.message || '')
+    ? 'Database menolak nilai status ini. Jalankan migrasi-v20-kenaikan-kelas.sql di Supabase SQL Editor (menambah status LULUS/PINDAH/KELUAR).'
+    : e.message;
+}
+async function ambilSiswaMap(nisns) {
+  const hasil = await sb(`students?nisn=in.(${nisns.map(encodeURIComponent).join(',')})&select=nisn,kelas,jenjang,program,status`);
+  return new Map((hasil || []).map((x) => [x.nisn, x]));
+}
+async function kenaikanKelas(body) {
+  const rows = Array.isArray(body.rows) ? body.rows : [];
+  if (!rows.length) return resp(400, { error: 'Tidak ada data.' });
+  if (rows.length > MAKS_BARIS) return resp(400, { error: `Maksimal ${MAKS_BARIS} siswa per permintaan.` });
+  const nisns = rows.map((r) => rapikan(r && r.nisn)).filter((n) => /^\d{5,20}$/.test(n));
+  const ada = nisns.length ? await ambilSiswaMap(nisns) : new Map();
+  const hasil = [];
+  for (const r of rows) {
+    const nisn = rapikan(r && r.nisn), aksi = rapikan(r && r.aksi);
+    const lapor = (o) => hasil.push({ nisn, ...o });
+    const cur = ada.get(nisn);
+    if (!cur) { lapor({ ok: false, error: 'Siswa tidak ditemukan' }); continue; }
+    if (cur.status !== 'AKTIF') { lapor({ ok: false, error: `Status siswa bukan AKTIF (${cur.status})` }); continue; }
+    const lama = { kelas: cur.kelas, jenjang: cur.jenjang, program: cur.program, status: cur.status };
+    try {
+      let data;
+      if (aksi === 'naik') { const k = kelasBerikutnya(cur.kelas); data = { kelas: k.kelas, jenjang: k.jenjang, program: k.program }; }
+      else if (STATUS_AKSI[aksi]) {
+        if (aksi === 'lulus') {
+          const angka = parseInt((normalKelas(cur.kelas).kelas.match(/^\d+/) || [0])[0], 10);
+          if (angka !== 9 && angka !== 12) throw new Error('Lulus hanya untuk kelas akhir (9 atau 12)');
+        }
+        data = { status: STATUS_AKSI[aksi] };
+      } else throw new Error('Aksi tidak dikenali');
+      const upd = await sb(`students?nisn=eq.${encodeURIComponent(nisn)}&status=eq.AKTIF`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(data) });
+      if (!upd || !upd.length) throw new Error('Tidak ada baris yang berubah');
+      lapor({ ok: true, lama, baru: { kelas: upd[0].kelas, jenjang: upd[0].jenjang, program: upd[0].program, status: upd[0].status } });
+    } catch (e) { lapor({ ok: false, error: ramahErrorStatus(e) }); }
+  }
+  return resp(200, { ok: true, hasil });
+}
+async function batalkanKenaikan(body) {
+  const rows = Array.isArray(body.rows) ? body.rows : [];
+  if (!rows.length) return resp(400, { error: 'Tidak ada data.' });
+  if (rows.length > MAKS_BARIS) return resp(400, { error: `Maksimal ${MAKS_BARIS} siswa per permintaan.` });
+  const nisns = rows.map((r) => rapikan(r && r.nisn)).filter((n) => /^\d{5,20}$/.test(n));
+  const ada = nisns.length ? await ambilSiswaMap(nisns) : new Map();
+  const hasil = [];
+  for (const r of rows) {
+    const nisn = rapikan(r && r.nisn), cur = ada.get(nisn);
+    const lapor = (o) => hasil.push({ nisn, ...o });
+    if (!cur) { lapor({ ok: false, error: 'Siswa tidak ditemukan' }); continue; }
+    if (cur.kelas !== r.baru_kelas || cur.status !== r.baru_status) { lapor({ ok: false, error: 'Data siswa sudah berubah setelah kenaikan; tidak dibatalkan otomatis' }); continue; }
+    if (rapikan(r.status) !== 'AKTIF') { lapor({ ok: false, error: 'Data lama tidak valid' }); continue; }
+    try {
+      const k = normalKelas(r.kelas);
+      const upd = await sb(`students?nisn=eq.${encodeURIComponent(nisn)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ kelas: rapikan(r.kelas), jenjang: k.jenjang, program: k.program, status: 'AKTIF' }) });
+      if (!upd || !upd.length) throw new Error('Tidak ada baris yang berubah');
+      lapor({ ok: true });
+    } catch (e) { lapor({ ok: false, error: ramahErrorStatus(e) }); }
+  }
+  return resp(200, { ok: true, hasil });
+}
+
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
   if (!adaKonfigurasi()) return resp(500, { error: 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum diset di Vercel Environment Variables.' });
@@ -110,6 +189,8 @@ exports.handler = async function (event) {
 
   try {
     if (body.action === 'ubah') return await ubahSiswa(body);
+    if (body.action === 'kenaikan') return await kenaikanKelas(body);
+    if (body.action === 'batalkan_kenaikan') return await batalkanKenaikan(body);
     if (body.action !== 'tambah') return resp(400, { error: 'Aksi tidak dikenali' });
     const rows = Array.isArray(body.rows) ? body.rows : [];
     if (!rows.length) return resp(400, { error: 'Tidak ada data siswa.' });
@@ -145,4 +226,4 @@ exports.handler = async function (event) {
   }
 };
 
-exports._uji = { normalKelas, normalJk, normalTanggal, siapkanBaris, siapkanUbah };
+exports._uji = { kelasBerikutnya, normalKelas, normalJk, normalTanggal, siapkanBaris, siapkanUbah };
