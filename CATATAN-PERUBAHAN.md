@@ -290,3 +290,8 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 - Jenjang/program diisi otomatis dari kelas: 1-6 = SD/UMUM (ditulis "Kelas N"), 7-9 = SMP/PAKET_B, 10-12 = SMA/PAKET_C. Angka Romawi dikonversi ke angka.
 - NISN yang sudah terdaftar dilewati (tidak menimpa). Nama, NISN (angka), kelas, dan tanggal lahir wajib.
 - Server: `netlify/functions/kelola-siswa.js` + `api/kelola-siswa.js`; maksimal 100 siswa/permintaan (upload dipecah otomatis per 50).
+
+## Bonus "tidak pernah alpa" (Sikap otomatis)
+- Pengaturan Nilai > Poin Pelanggaran: tambah "Bonus tidak pernah alpa (pengurang poin)" (bawaan 3) dan opsi "Sikap A wajib tanpa alpa" (bawaan aktif).
+- Siswa dengan alpa 0 mendapat pengurang poin (total tidak kurang dari 0); siswa yang pernah alpa maksimal B bila opsi A-wajib aktif.
+- Tidak perlu migrasi SQL baru; pengaturan disimpan di kolom JSON pelanggaran yang sudah ada.

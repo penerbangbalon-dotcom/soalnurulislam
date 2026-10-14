@@ -1028,6 +1028,12 @@
           <div class="field"><label>Sikap B bila poin &le;</label><input type="number" id="pn-pl-b" min="0" /></div>
           <div class="field"><label>Sikap C bila poin &le; (selebihnya D)</label><input type="number" id="pn-pl-c" min="0" /></div>
         </div>
+        <div class="grid3">
+          <div class="field"><label>Bonus tidak pernah alpa (pengurang poin)</label><input type="number" id="pn-pl-bonus" min="0" /></div>
+          <div class="field"><label style="display:flex;align-items:center;gap:6px;color:var(--ink);"><input type="checkbox" id="pn-pl-awajib" style="width:auto;"> Sikap A wajib tanpa alpa</label>
+            <p class="muted" style="margin:4px 0 0;font-size:12px;">Bila dicentang, siswa yang pernah alpa maksimal mendapat B walau poinnya kecil.</p></div>
+          <div></div>
+        </div>
         <h3 style="margin-top:14px;">Syarat Mendapat Rapor</h3>
         <p class="muted" style="margin:0 0 8px;">Dipakai di menu <b>Syarat Rapor</b>, tab Syarat Rapor di halaman siswa, dan peringatan saat mencetak rapor.</p>
         <div class="grid3">
@@ -9268,13 +9274,20 @@ function escapeHtml(str){
 // + catatan manual guru. Total poin menentukan predikat Sikap A/B/C/D lewat ambang di Pengaturan Nilai.
 // ============================================================
 const DEF_PEL = { alpa:3, terlambat:1, ujian:1, tugas:1, akhir:5, maks_sistem:10, batas_ujian:3,
-  manual:{ ringan:2, sedang:5, berat:10 }, ambang:{ A:5, B:15, C:30 } };
+  manual:{ ringan:2, sedang:5, berat:10 }, ambang:{ A:5, B:15, C:30 },
+  bonus_tanpa_alpa:3, a_wajib_tanpa_alpa:true };
 function gabungPel(raw){
   const r = raw || {};
   return { ...DEF_PEL, ...r, manual:{ ...DEF_PEL.manual, ...(r.manual||{}) }, ambang:{ ...DEF_PEL.ambang, ...(r.ambang||{}) } };
 }
 function cfgPel(){ return pengNilai.pel || gabungPel(null); }
-function predikatDariPoin(p){ const a = cfgPel().ambang; return p<=a.A ? 'A' : p<=a.B ? 'B' : p<=a.C ? 'C' : 'D'; }
+function predikatDariPoin(p, alpa){
+  const c = cfgPel(), a = c.ambang;
+  let h = p<=a.A ? 'A' : p<=a.B ? 'B' : p<=a.C ? 'C' : 'D';
+  // Sikap A hanya untuk siswa yang tidak pernah alpa (bila opsi dicentang)
+  if(h==='A' && c.a_wajib_tanpa_alpa && (alpa||0)>0) h = 'B';
+  return h;
+}
 const NAMA_KAT_PEL = { ringan:'Ringan', sedang:'Sedang', berat:'Berat' };
 const pelCache = new Map();   // program##kelas##ta##smt -> Promise<Map nisn -> data pelanggaran>
 function kosongkanCachePel(){ pelCache.clear(); }
@@ -9342,8 +9355,9 @@ async function bangunPelanggaranKelas(program, kelas, ta, smt){
     d.poinSistem = Math.min(cfg.maks_sistem, sesi*cfg.ujian + ses2*cfg.tugas + akhir*cfg.akhir);
     d.poinManual = d.manual.reduce((a,x)=>a+(Number(x.poin)||0),0);
     d.pelUjian = sesi; d.pelTugas = ses2;
-    d.total = d.poinAbsensi + d.poinSistem + d.poinManual;
-    d.sikap = predikatDariPoin(d.total);
+    d.bonus = (d.alpa===0) ? (Number(cfg.bonus_tanpa_alpa)||0) : 0;   // bonus tidak pernah alpa (mengurangi poin)
+    d.total = Math.max(0, d.poinAbsensi + d.poinSistem + d.poinManual - d.bonus);
+    d.sikap = predikatDariPoin(d.total, d.alpa);
   });
   return { peta, peringatan, manualTersedia };
 }
@@ -9394,7 +9408,7 @@ function renderTabelPelanggaran(){
   const cfg = cfgPel();
   if(!rows.length){ box.innerHTML = htmlPeringatanPel(plData.peringatan) + '<p class="muted">Tidak ada siswa pada pilihan ini.</p>'; return; }
   box.innerHTML = htmlPeringatanPel(plData.peringatan) +
-    `<p class="muted" style="margin:6px 0;">Poin: alpa ${cfg.alpa}/hari, terlambat ${cfg.terlambat}/kali, pelanggaran ujian ${cfg.ujian} dan tugas ${cfg.tugas} per kejadian (+${cfg.akhir} bila diakhiri otomatis; maks. ${cfg.maks_sistem} dari sumber ini), catatan manual ${cfg.manual.ringan}/${cfg.manual.sedang}/${cfg.manual.berat}. Sikap: A sampai ${cfg.ambang.A} poin, B sampai ${cfg.ambang.B}, C sampai ${cfg.ambang.C}, selebihnya D. Ubah di Pengaturan Nilai.</p>
+    `<p class="muted" style="margin:6px 0;">Poin: alpa ${cfg.alpa}/hari, terlambat ${cfg.terlambat}/kali, pelanggaran ujian ${cfg.ujian} dan tugas ${cfg.tugas} per kejadian (+${cfg.akhir} bila diakhiri otomatis; maks. ${cfg.maks_sistem} dari sumber ini), catatan manual ${cfg.manual.ringan}/${cfg.manual.sedang}/${cfg.manual.berat}. ${cfg.bonus_tanpa_alpa?`Siswa yang tidak pernah alpa mendapat pengurang ${cfg.bonus_tanpa_alpa} poin. `:''}${cfg.a_wajib_tanpa_alpa?'Sikap A hanya untuk siswa tanpa alpa. ':''}Sikap: A sampai ${cfg.ambang.A} poin, B sampai ${cfg.ambang.B}, C sampai ${cfg.ambang.C}, selebihnya D. Ubah di Pengaturan Nilai.</p>
     <div class="card" style="overflow-x:auto;"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>Alpa</th><th>Terlambat</th><th>Ujian</th><th>Tugas</th><th>Catatan Manual</th><th>Total Poin</th><th>Sikap Otomatis</th><th></th></tr></thead><tbody>` +
     rows.map((d,i)=>`<tr${d.total>0?'':' style="color:#777;"'}><td>${i+1}</td><td>${esc2(d.nama)}<br><span class="muted">${esc2(d.nisn)}</span></td>
       <td>${d.adaAbsensi?d.alpa:'<span class="muted">-</span>'}</td><td>${d.adaAbsensi?d.terlambat:'<span class="muted">-</span>'}</td><td>${d.pelUjian||0}x</td><td>${d.pelTugas||0}x</td><td>${d.manual.length}</td>
@@ -9407,7 +9421,7 @@ function bukaRincianPel(nisn){
   const li = a => a.length ? `<ul style="margin:4px 0 0;padding-left:18px;">${a.join('')}</ul>` : '<span class="muted">Tidak ada.</span>';
   const hari = new Date().toISOString().slice(0,10);
   el.innerHTML = `<div class="card"><h3 style="margin-top:0;">${esc2(d.nama)} <span class="muted" style="font-weight:normal;">(${esc2(d.nisn)}) &bull; Kelas ${esc2(plData.kelas)} &bull; ${esc2(labelSmt(plData.smt))} ${esc2(plData.ta)}</span></h3>
-    <p style="margin:0 0 8px;">Total <b>${d.total} poin</b> (absensi ${d.poinAbsensi} + ujian/tugas ${d.poinSistem} + manual ${d.poinManual}) &rarr; Sikap otomatis ${badgeSikap(d.sikap)}</p>
+    <p style="margin:0 0 8px;">Total <b>${d.total} poin</b> (absensi ${d.poinAbsensi} + ujian/tugas ${d.poinSistem} + manual ${d.poinManual}${d.bonus?` &minus; bonus tidak pernah alpa ${d.bonus}`:''}) &rarr; Sikap otomatis ${badgeSikap(d.sikap)}</p>
     <p style="margin:6px 0 2px;"><b>Absensi:</b> ${d.adaAbsensi ? `alpa ${d.alpa} hari, terlambat ${d.terlambat} kali` : '<span class="muted">belum ada data absensi pada periode ini</span>'}</p>
     <p style="margin:6px 0 2px;"><b>Pelanggaran saat ujian:</b></p>${li(d.ujian.map(x=>`<li>${esc2(x.jenis)} ${esc2(x.mapel)} &mdash; ${x.jumlah}x pindah tab/aplikasi atau paste${x.akhir?' (ujian diakhiri otomatis)':''}</li>`))}
     <p style="margin:6px 0 2px;"><b>Pelanggaran saat tugas:</b></p>${li(d.tugas.map(x=>`<li>${esc2(x.mapel)} &ndash; ${esc2(x.judul)} &mdash; ${x.jumlah}x${x.akhir?' (dikumpulkan otomatis)':''}</li>`))}
@@ -9454,13 +9468,15 @@ function isiFormPoinPel(){
   set('pn-pl-alpa', c.alpa); set('pn-pl-terlambat', c.terlambat); set('pn-pl-ujian', c.ujian); set('pn-pl-tugas', c.tugas); set('pn-pl-akhir', c.akhir);
   set('pn-pl-maks', c.maks_sistem); set('pn-pl-batas', c.batas_ujian); set('pn-pl-ringan', c.manual.ringan); set('pn-pl-sedang', c.manual.sedang); set('pn-pl-berat', c.manual.berat);
   set('pn-pl-a', c.ambang.A); set('pn-pl-b', c.ambang.B); set('pn-pl-c', c.ambang.C);
+  set('pn-pl-bonus', c.bonus_tanpa_alpa); const aw = document.getElementById('pn-pl-awajib'); if(aw) aw.checked = !!c.a_wajib_tanpa_alpa;
 }
 function bacaFormPoinPel(){
   const n = (id, nama)=>{ const v = angkaAtauNull(document.getElementById(id).value); if(v==null || Number.isNaN(v) || v<0 || v>1000) throw new Error(`${nama} harus angka 0 atau lebih (maks. 1000).`); return v; };
   const r = { alpa:n('pn-pl-alpa','Poin alpa'), terlambat:n('pn-pl-terlambat','Poin terlambat'), ujian:n('pn-pl-ujian','Poin pelanggaran ujian'), tugas:n('pn-pl-tugas','Poin pelanggaran tugas'),
     akhir:n('pn-pl-akhir','Poin tambahan diakhiri otomatis'), maks_sistem:n('pn-pl-maks','Batas poin ujian/tugas'), batas_ujian:n('pn-pl-batas','Batas pelanggaran ujian diakhiri'),
     manual:{ ringan:n('pn-pl-ringan','Poin Ringan'), sedang:n('pn-pl-sedang','Poin Sedang'), berat:n('pn-pl-berat','Poin Berat') },
-    ambang:{ A:n('pn-pl-a','Ambang A'), B:n('pn-pl-b','Ambang B'), C:n('pn-pl-c','Ambang C') } };
+    ambang:{ A:n('pn-pl-a','Ambang A'), B:n('pn-pl-b','Ambang B'), C:n('pn-pl-c','Ambang C') },
+    bonus_tanpa_alpa:n('pn-pl-bonus','Bonus tidak pernah alpa'), a_wajib_tanpa_alpa:!!document.getElementById('pn-pl-awajib').checked };
   if(!(r.ambang.A < r.ambang.B && r.ambang.B < r.ambang.C)) throw new Error('Ambang predikat harus makin besar: batas A < batas B < batas C.');
   return r;
 }
