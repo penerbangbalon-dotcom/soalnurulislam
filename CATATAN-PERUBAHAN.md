@@ -1,5 +1,11 @@
 # Perubahan terbaru
 
+## v15.8 — Kaitkan soal ke CP/TP secara massal
+File berubah: `index.html`. Tanpa migrasi SQL baru (memakai kolom `bank_soal.cp_id` / `tp_id` dari migrasi-v17); unggah file lalu deploy ulang.
+- **Kaitkan dari soal terpilih** (Bank Soal): centang soal, klik **🔗 Kaitkan ke CP/TP**, pilih CP dan TP, simpan sekali untuk semuanya. Bisa untuk soal yang dicentang atau **semua hasil filter** (termasuk halaman lain). Filter "(Soal tanpa CP)" tetap dipakai untuk menyaring soal yang belum berkait. Kosongkan CP untuk melepas kaitan.
+- **Kaitkan per topik** (tombol **🔗 Kaitkan per Topik**): pilih mapel; muncul daftar topik beserta jumlah soal, mis. "Pecahan (24 soal)". CP/TP ditebak otomatis dari kemiripan kata (tanpa AI, tidak memakai kuota), bisa diganti per topik, lalu **Simpan Semua**. Bawaan hanya menyentuh soal yang belum berkait CP. Soal tanpa topik dikaitkan lewat cara pertama.
+- Tebakan hanya saran: topik yang tidak ada kecocokannya diberi "Lewati" dan tidak diubah.
+
 ## v15.7 — Cadangan Data mencakup tabel baru
 File berubah: `netlify/functions/cadangan-data.js`. Tanpa migrasi SQL; unggah file lalu deploy ulang.
 - Menu **Cadangan Data** kini ikut mencadangkan dan memulihkan `catatan_pelanggaran`, `kenaikan_kelas`, dan `rapor_mapel_sembunyi` (sebelumnya tidak ikut, sehingga keputusan kenaikan kelas, catatan pelanggaran, dan pilihan mapel rapor tidak ada di file cadangan). Cadangan lama tetap bisa dipulihkan; tabel baru hanya terisi bila ada di file.

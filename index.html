@@ -285,6 +285,7 @@
         <button class="btn outline" onclick="unduhTemplateSoal()">Unduh Template</button>
         <button class="btn outline" onclick="eksporBankSoal()" title="Unduh soal sesuai filter saat ini sebagai file Excel (bisa diimpor ulang)">Ekspor Bank Soal</button>
         <button class="btn outline" onclick="cekDuplikatBank()" title="Cari soal dengan isi yang persis sama">Cek Soal Ganda</button>
+        <button class="btn outline" onclick="bukaKaitTopik()" title="Kaitkan banyak soal ke CP/TP sekaligus berdasarkan kolom topik">🔗 Kaitkan per Topik</button>
         <input type="file" id="file-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSoal(this)">
         <button class="btn gold" onclick="openGenerateAI()">✦ Generate dengan AI</button>
       </div>
@@ -300,6 +301,7 @@
         <button class="btn" style="padding:5px 12px;" onclick="bukaMasukkanKePaket()" title="Tambahkan soal yang dicentang ke paket ujian yang sudah ada di Daftar Paket Ujian">+ Masukkan ke Paket Ujian</button>
         <select id="bank-massal-tingkat"><option value="sangat_mudah">Sangat Mudah</option><option value="mudah">Mudah</option><option value="sedang" selected>Sedang</option><option value="sulit">Sulit</option></select>
         <button class="btn outline" style="padding:5px 12px;" onclick="ubahTingkatTerpilih()">Ubah tingkat kesulitan</button>
+        <button class="btn outline" style="padding:5px 12px;" onclick="bukaKaitMassal()" title="Kaitkan soal terpilih ke satu CP dan TP sekaligus">🔗 Kaitkan ke CP/TP</button>
         <button class="btn danger" style="padding:5px 12px;" onclick="hapusBankTerpilih()">Hapus terpilih</button>
         <button class="btn outline" style="padding:5px 12px;" onclick="cekSemuaBank(false)">Batal pilih</button>
       </div>
@@ -1651,6 +1653,42 @@
     <div class="toolbar" style="margin:0;justify-content:flex-end;">
       <button class="btn outline" onclick="closeModal('modal-ke-paket')">Batal</button>
       <button class="btn" id="kp-simpan" onclick="simpanMasukkanKePaket()">Masukkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Kaitkan massal soal terpilih ke CP/TP -->
+<div class="modal-bg hidden" id="modal-kait-massal">
+  <div class="modal" style="max-width:600px;">
+    <h2>Kaitkan Soal ke CP &amp; TP</h2>
+    <p class="muted" id="km-info"></p>
+    <div id="km-cakupan" style="margin-bottom:8px;"></div>
+    <div class="field"><label>Capaian Pembelajaran (CP)</label><select id="km-cp" onchange="isiTpKaitMassal()"></select></div>
+    <div class="field"><label>Tujuan Pembelajaran (TP)</label><select id="km-tp"></select></div>
+    <p class="muted" id="km-catatan" style="font-size:12.5px;"></p>
+    <div class="toolbar" style="margin:0;justify-content:flex-end;">
+      <button class="btn outline" onclick="closeModal('modal-kait-massal')">Batal</button>
+      <button class="btn" id="km-simpan" onclick="simpanKaitMassal()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Kaitkan per topik ke CP/TP -->
+<div class="modal-bg hidden" id="modal-kait-topik">
+  <div class="modal" style="max-width:980px;">
+    <h2>Kaitkan Soal per Topik ke CP &amp; TP</h2>
+    <div class="toolbar" style="margin:0 0 8px;">
+      <select id="kt-mapel" onchange="muatKaitTopik()"></select>
+      <label class="checkline" style="border:0;padding:0;"><input type="checkbox" id="kt-hanya-kosong" checked onchange="muatKaitTopik()"><span>Hanya soal yang belum berkait CP</span></label>
+    </div>
+    <p class="muted" id="kt-info" style="font-size:12.5px;"></p>
+    <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);">
+      <table><thead><tr><th>Topik</th><th>Capaian Pembelajaran (CP)</th><th>Tujuan Pembelajaran (TP)</th></tr></thead>
+      <tbody id="kt-body"></tbody></table>
+    </div>
+    <div class="toolbar" style="margin:12px 0 0;justify-content:flex-end;">
+      <button class="btn outline" onclick="closeModal('modal-kait-topik')">Batal</button>
+      <button class="btn" id="kt-simpan" onclick="simpanKaitTopik()">Simpan Semua</button>
     </div>
   </div>
 </div>
@@ -3743,6 +3781,169 @@ function ringkasTp(t){
   let x = String(t.deskripsi||'').trim().replace(/[.;]+$/,'');
   x = x.replace(/^(?:peserta didik|siswa|warga belajar)\s+(?:dapat|mampu|dapat\/mampu)\s+/i, '');
   return x.charAt(0).toLowerCase()+x.slice(1);
+}
+
+// ---------- Kaitkan soal ke CP/TP secara massal (v15.8) ----------
+// Cara 1: dari soal yang dicentang / semua hasil filter di Bank Soal. Cara 2: per topik dengan tebakan TP (tanpa AI).
+let kmMapelId = null, kmIdCek = [], kmIdSemua = [];
+async function pastikanCacheCpTp(){ if(!cpList.length && !tpList.length) await muatCacheCpTp(); }
+function opsiCpHtml(cps, kosongLabel){
+  return `<option value="">${kosongLabel}</option>` + cps.map(c=>`<option value="${c.id}">${escapeHtml(c.kode||'CP')}${c.elemen?' — '+escapeHtml(c.elemen):''}: ${escapeHtml(potong(c.deskripsi,60))}</option>`).join('');
+}
+function opsiTpHtml(cid){
+  const tps = cid ? tpUntukCp(cid).sort(urutKode) : [];
+  return '<option value="">— Seluruh CP (tanpa TP tertentu) —</option>' + tps.map(t=>`<option value="${t.id}">${escapeHtml(t.kode||'TP')} ${escapeHtml(potong(t.deskripsi,70))}</option>`).join('');
+}
+async function bukaKaitMassal(){
+  await pastikanCacheCpTp();
+  if(!cpTpTersedia) return alert('Fitur CP & TP belum aktif. Jalankan migrasi-v17-cp-tp.sql di Supabase terlebih dahulu.');
+  kmIdCek = idBankDipilih(); if(!kmIdCek.length) return;
+  const mapelDari = ids => [...new Set(bankSoalTampil.filter(x=>ids.includes(x.id)).map(x=>x.mapel_id))];
+  const mapelCek = mapelDari(kmIdCek);
+  if(mapelCek.length!==1) return alert('Soal yang dipilih berasal dari lebih dari satu mata pelajaran. Pilih satu mata pelajaran lewat filter di atas, lalu pilih soalnya.');
+  kmMapelId = mapelCek[0];
+  const cps = cpUntukMapel(kmMapelId).sort(urutKode);
+  if(!cps.length) return alert('Mata pelajaran ini belum punya CP. Isi dulu di menu CP & TP per Mapel.');
+  kmIdSemua = bankSoalTampil.map(x=>x.id);
+  const semuaSatuMapel = new Set(bankSoalTampil.map(x=>x.mapel_id)).size===1;
+  const mp = currentMapelList.find(m=>m.id===kmMapelId);
+  cpEl('km-info').innerHTML = `Mata pelajaran: <b>${escapeHtml(mp?mp.nama:'-')}</b>. Soal yang sudah berkait CP/TP lain akan diganti.`;
+  cpEl('km-cakupan').innerHTML =
+    `<label class="checkline" style="border:0;padding:3px 0;"><input type="radio" name="km-cakupan" value="cek" checked><span>Soal yang dicentang (<b>${kmIdCek.length}</b>)</span></label>` +
+    `<label class="checkline" style="border:0;padding:3px 0;${semuaSatuMapel?'':'opacity:.55;'}"><input type="radio" name="km-cakupan" value="semua" ${semuaSatuMapel?'':'disabled'}><span>Semua soal hasil filter (<b>${kmIdSemua.length}</b>, termasuk halaman lain)${semuaSatuMapel?'':' — pilih satu mata pelajaran di filter dulu'}</span></label>`;
+  cpEl('km-cp').innerHTML = opsiCpHtml(cps, '— Lepas kaitan CP (kosongkan) —');
+  cpEl('km-cp').value = cps.length===1 ? cps[0].id : '';
+  isiTpKaitMassal();
+  cpEl('km-catatan').textContent = 'Tips: pakai filter "(Soal tanpa CP)" lalu pilih semua, supaya hanya soal yang belum berkait yang diubah.';
+  cpEl('modal-kait-massal').classList.remove('hidden');
+}
+function isiTpKaitMassal(){ cpEl('km-tp').innerHTML = opsiTpHtml(cpEl('km-cp').value); }
+async function simpanKaitMassal(){
+  const cakupan = (document.querySelector('input[name="km-cakupan"]:checked')||{}).value;
+  const ids = cakupan==='semua' ? kmIdSemua : kmIdCek;
+  if(!ids.length) return;
+  const cpId = cpEl('km-cp').value || null, tpId = cpId ? (cpEl('km-tp').value || null) : null;
+  const c = cpId ? cpDari(cpId) : null, t = tpId ? tpDari(tpId) : null;
+  const pesan = cpId
+    ? `Kaitkan ${ids.length} soal ke ${c.kode||'CP'}${t?' · TP '+(t.kode||''):' (seluruh CP)'}?`
+    : `Lepas kaitan CP/TP dari ${ids.length} soal?`;
+  if(!confirm(pesan)) return;
+  const btn = cpEl('km-simpan'); btn.disabled = true;
+  for(let i=0;i<ids.length;i+=100){
+    const { error } = await supa.from('bank_soal').update({ cp_id: cpId, tp_id: tpId }).in('id', ids.slice(i,i+100));
+    if(error){ btn.disabled = false; return alert('Gagal menyimpan: '+error.message); }
+  }
+  btn.disabled = false;
+  closeModal('modal-kait-massal');
+  await muatHitungSoalCp(); await loadBankSoal();
+  alert(`${ids.length} soal berhasil diperbarui.`);
+}
+
+// ---- Per topik ----
+let ktGrup = [];
+const KT_STOP = new Set(['dan','yang','di','ke','dari','untuk','dengan','pada','dalam','atau','secara','serta','peserta','didik','siswa','warga','belajar','mampu','dapat','bab','materi','soal','tentang','the','of','kelas','semester']);
+const KT_KATA_KERJA = new Set(['menjelaskan','menentukan','mengidentifikasi','menganalisis','menerapkan','memahami','menggunakan','menyelesaikan','membedakan','menyebutkan','mendeskripsikan','menghitung','membuat','menyajikan','mengevaluasi']);
+function ktToken(teks){
+  return normCari(teks).split(/[^a-z0-9]+/).filter(w=>w.length>=3 && !KT_STOP.has(w) && !KT_KATA_KERJA.has(w)).map(w=>{
+    let x = w;
+    x = x.replace(/(nya|kan|lah|an|i)$/,m=>x.length-m.length>=4?'':m);
+    x = x.replace(/^(meng|meny|mem|men|me|peng|peny|pem|pen|pe|ber|ter|di|ke|se)/,m=>x.length-m.length>=4?'':m);
+    return x;
+  });
+}
+function ktCocok(tokTopik, teks){
+  const tok = ktToken(teks); if(!tokTopik.length || !tok.length) return 0;
+  let hit = 0;
+  tokTopik.forEach(a=>{ if(tok.some(b=>a===b || (a.length>=4 && b.length>=4 && (a.includes(b)||b.includes(a))))) hit++; });
+  return hit/tokTopik.length;
+}
+// Tebakan berdasarkan kemiripan kata saja: TP dulu, lalu CP bila tidak ada TP yang cukup cocok.
+function ktTebak(topik, cps){
+  const tokTopik = ktToken(topik); if(!tokTopik.length) return null;
+  let best = null;
+  cps.forEach(c=>{
+    tpUntukCp(c.id).forEach(t=>{
+      const sk = ktCocok(tokTopik, t.deskripsi) + 0.25*ktCocok(tokTopik, c.elemen||'');
+      if(sk>=0.5 && (!best || sk>best.skor)) best = { cp:c.id, tp:t.id, skor:sk };
+    });
+  });
+  if(best) return best;
+  cps.forEach(c=>{
+    const sk = Math.max(ktCocok(tokTopik, c.elemen||''), ktCocok(tokTopik, c.deskripsi));
+    if(sk>=0.5 && (!best || sk>best.skor)) best = { cp:c.id, tp:null, skor:sk };
+  });
+  return best;
+}
+async function bukaKaitTopik(){
+  await pastikanCacheCpTp();
+  if(!cpTpTersedia) return alert('Fitur CP & TP belum aktif. Jalankan migrasi-v17-cp-tp.sql di Supabase terlebih dahulu.');
+  const daftar = currentMapelList.filter(m=>cpUntukMapel(m.id).length);
+  if(!daftar.length) return alert('Belum ada mata pelajaran yang punya CP. Isi dulu di menu CP & TP per Mapel.');
+  const sel = cpEl('kt-mapel'), awal = cpEl('filter-mapel').value;
+  sel.innerHTML = daftar.map(m=>`<option value="${m.id}">${escapeHtml(m.nama)}${m.program?' — '+escapeHtml(m.program):''}${m.kelas?' '+escapeHtml(m.kelas):''}</option>`).join('');
+  sel.value = daftar.some(m=>m.id===awal) ? awal : daftar[0].id;
+  cpEl('modal-kait-topik').classList.remove('hidden');
+  await muatKaitTopik();
+}
+async function muatKaitTopik(){
+  const mid = cpEl('kt-mapel').value, hanyaKosong = cpEl('kt-hanya-kosong').checked;
+  const body = cpEl('kt-body'), info = cpEl('kt-info');
+  body.innerHTML = ''; info.textContent = 'Memuat soal…'; cpEl('kt-simpan').disabled = true;
+  const { data, error } = await ambilSemuaBaris(()=>supa.from('bank_soal').select('id, topik, cp_id, tp_id').eq('mapel_id', mid).order('id'));
+  if(error){ info.textContent = 'Gagal memuat: '+error.message; return; }
+  const cps = cpUntukMapel(mid).sort(urutKode);
+  const peta = new Map(); let tanpaTopik = 0, dilewati = 0;
+  (data||[]).forEach(x=>{
+    if(hanyaKosong && x.cp_id){ dilewati++; return; }
+    const label = String(x.topik||'').trim();
+    if(!label){ tanpaTopik++; return; }
+    const k = normCari(label);
+    if(!peta.has(k)) peta.set(k, { label, ids:[], cp:new Set(), tp:new Set() });
+    const g = peta.get(k); g.ids.push(x.id); g.cp.add(x.cp_id||''); g.tp.add(x.tp_id||'');
+  });
+  ktGrup = [...peta.values()].sort((a,b)=>b.ids.length-a.ids.length || a.label.localeCompare(b.label));
+  ktGrup.forEach(g=>{
+    if(g.cp.size===1 && [...g.cp][0]){ g.pilihCp = [...g.cp][0]; g.pilihTp = g.tp.size===1 ? ([...g.tp][0]||'') : ''; g.tebakan = false; return; }
+    const t = ktTebak(g.label, cps);
+    g.pilihCp = t ? t.cp : ''; g.pilihTp = t && t.tp ? t.tp : ''; g.tebakan = !!t;
+  });
+  body.innerHTML = ktGrup.map((g,i)=>`<tr>
+    <td style="min-width:180px;"><b>${escapeHtml(g.label)}</b> <span class="muted">(${g.ids.length} soal)</span>${g.tebakan?'<br><span class="badge" style="background:#fff4d6;color:#7a5a00;">tebakan otomatis, periksa</span>':''}</td>
+    <td><select class="kt-cp" data-i="${i}" onchange="isiTpKaitTopik(${i})">${opsiCpHtml(cps,'— Lewati (jangan diubah) —')}</select></td>
+    <td><select class="kt-tp" data-i="${i}">${opsiTpHtml(g.pilihCp)}</select></td></tr>`).join('');
+  document.querySelectorAll('#kt-body .kt-cp').forEach(sel=>{ sel.value = ktGrup[sel.dataset.i].pilihCp; });
+  document.querySelectorAll('#kt-body .kt-tp').forEach(sel=>{ sel.value = ktGrup[sel.dataset.i].pilihTp; });
+  const total = ktGrup.reduce((n,g)=>n+g.ids.length,0);
+  info.innerHTML = ktGrup.length
+    ? `<b>${ktGrup.length}</b> topik (${total} soal). Tebakan dibuat dari kemiripan kata, tanpa AI, jadi tidak memakai kuota. Periksa dan ganti pilihan yang kurang pas, lalu simpan sekaligus.${tanpaTopik?` ${tanpaTopik} soal tanpa topik tidak ditampilkan di sini; kaitkan lewat soal terpilih di Bank Soal.`:''}${dilewati?` ${dilewati} soal yang sudah berkait CP dilewati.`:''}`
+    : `Tidak ada soal bertopik untuk dikaitkan.${tanpaTopik?` ${tanpaTopik} soal tanpa topik: kaitkan lewat soal terpilih di Bank Soal.`:''}${dilewati?` ${dilewati} soal sudah berkait CP.`:''}`;
+  cpEl('kt-simpan').disabled = !ktGrup.length;
+}
+function isiTpKaitTopik(i){
+  const cp = document.querySelector(`#kt-body .kt-cp[data-i="${i}"]`), tp = document.querySelector(`#kt-body .kt-tp[data-i="${i}"]`);
+  tp.innerHTML = opsiTpHtml(cp.value); tp.value = '';
+}
+async function simpanKaitTopik(){
+  const kerja = [];
+  ktGrup.forEach((g,i)=>{
+    const cp = document.querySelector(`#kt-body .kt-cp[data-i="${i}"]`).value;
+    if(!cp) return;
+    kerja.push({ ids:g.ids, cp_id:cp, tp_id: document.querySelector(`#kt-body .kt-tp[data-i="${i}"]`).value || null });
+  });
+  if(!kerja.length) return alert('Belum ada topik yang dipilih CP-nya.');
+  const nSoal = kerja.reduce((n,k)=>n+k.ids.length,0);
+  if(!confirm(`Simpan kaitan untuk ${kerja.length} topik (${nSoal} soal)?`)) return;
+  const btn = cpEl('kt-simpan'); btn.disabled = true;
+  for(const k of kerja){
+    for(let i=0;i<k.ids.length;i+=100){
+      const { error } = await supa.from('bank_soal').update({ cp_id:k.cp_id, tp_id:k.tp_id }).in('id', k.ids.slice(i,i+100));
+      if(error){ btn.disabled = false; return alert('Gagal menyimpan: '+error.message+'\nSebagian topik mungkin sudah tersimpan; buka lagi untuk memeriksa.'); }
+    }
+  }
+  btn.disabled = false;
+  closeModal('modal-kait-topik');
+  await muatHitungSoalCp(); await loadBankSoal();
+  alert(`${nSoal} soal pada ${kerja.length} topik berhasil dikaitkan.`);
 }
 
 // Impor Bank Soal: kolom opsional cp_kode / tp_kode (kode dari menu CP & TP) mengaitkan soal ke CP/TP
