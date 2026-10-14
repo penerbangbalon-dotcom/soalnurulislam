@@ -1290,13 +1290,14 @@
               <input type="checkbox" id="mp-tidak-diujikan"> Mapel ini tidak diujikan (UTS/UAS)
             </label>
           </div>
+          <div class="field"><label>Jurusan (untuk rapor)</label><select id="mp-jurusan"><option value="">Semua jurusan / umum</option><option value="IPA">Khusus IPA</option><option value="IPS">Khusus IPS</option></select></div>
         </div>
         <div class="toolbar" style="justify-content:flex-end;">
           <button class="btn outline hidden" id="mp-batal-btn" onclick="batalEditMapel()">Batal Edit</button>
           <button class="btn" id="mp-simpan-btn" onclick="simpanMapel()">Tambah</button>
         </div>
         <table>
-          <thead><tr><th>Nama</th><th>Jenjang</th><th>Kelas</th><th>Diujikan?</th><th></th></tr></thead>
+          <thead><tr><th>Nama</th><th>Jenjang</th><th>Kelas</th><th>Jurusan</th><th>Diujikan?</th><th></th></tr></thead>
           <tbody id="mapel-body"></tbody>
         </table>
       </div>
@@ -2489,6 +2490,7 @@ async function loadMapelList(){
   const tbody = document.getElementById('mapel-body');
   tbody.innerHTML = currentMapelList.map(m=>`<tr>
       <td>${escapeHtml(m.nama)}</td><td>${m.program}</td><td>${m.kelas || '<span class="muted">belum diisi</span>'}</td>
+      <td>${m.jurusan ? escapeHtml(m.jurusan) : '<span class="muted">Semua</span>'}</td>
       <td>${m.tidak_diujikan ? '<span class="muted">Tidak diujikan</span>' : 'Ya'}</td>
       <td style="white-space:nowrap;">
         <button class="btn outline" style="padding:4px 10px;" onclick="bukaCpTpMapel('${m.id}')" title="Kelola Capaian & Tujuan Pembelajaran mapel ini">CP &amp; TP${cpUntukMapel(m.id).length?` (${cpUntukMapel(m.id).length})`:''}</button>
@@ -2505,10 +2507,15 @@ async function simpanMapel(){
   const tidak_diujikan = document.getElementById('mp-tidak-diujikan').checked;
   if(!nama) return alert('Nama mapel wajib diisi');
   if(!kelas) return alert('Kelas wajib dipilih');
-  const payload = { nama, program, kelas, tidak_diujikan };
-  const { error } = editingMapelId
-    ? await supa.from('mata_pelajaran').update(payload).eq('id', editingMapelId)
-    : await supa.from('mata_pelajaran').insert(payload);
+  const jurusan = (document.getElementById('mp-jurusan').value || null);
+  const simpan = pl => editingMapelId
+    ? supa.from('mata_pelajaran').update(pl).eq('id', editingMapelId)
+    : supa.from('mata_pelajaran').insert(pl);
+  let { error } = await simpan({ nama, program, kelas, tidak_diujikan, jurusan });
+  if(error && /jurusan/i.test(error.message||'')){   // migrasi-v21 belum dijalankan
+    if(jurusan) return alert('Kolom jurusan belum ada di database. Jalankan migrasi-v21-mapel-jurusan.sql di Supabase SQL Editor dulu.');
+    ({ error } = await simpan({ nama, program, kelas, tidak_diujikan }));
+  }
   if(error) return alert(error.message);
   batalEditMapel();
   loadMapelList();
@@ -2520,6 +2527,7 @@ function editMapel(id){
   document.getElementById('mp-nama').value = m.nama;
   document.getElementById('mp-program').value = m.program;
   document.getElementById('mp-tidak-diujikan').checked = !!m.tidak_diujikan;
+  document.getElementById('mp-jurusan').value = m.jurusan || '';
   isiOpsiKelasMapel(m.kelas);
   isiOpsiPresetMapel();
   document.getElementById('mp-preset').value = '';
@@ -2532,6 +2540,7 @@ function batalEditMapel(){
   document.getElementById('mp-nama').value = '';
   document.getElementById('mp-program').value = 'Paket B';
   document.getElementById('mp-tidak-diujikan').checked = false;
+  document.getElementById('mp-jurusan').value = '';
   isiOpsiKelasMapel();
   isiOpsiPresetMapel();
   document.getElementById('mp-simpan-btn').textContent = 'Tambah';
@@ -7662,7 +7671,7 @@ async function capaianKompetensiRapor(nama, nisn, ta, smt, rows){
   const butirTeks = x => x.cp_id ? ringkasTp(x) : String(x.deskripsi||'').trim().replace(/[.;]+$/,'');   // TP diringkas; CP apa adanya
   const daftar = a => a.map(butirTeks).join('; ');
   return rows.map(r=>{
-    if(r.na==null) return '-';
+    if(r.na==null) return `${nm} belum mengikuti ujian atau penilaian pada muatan pelajaran ini, sehingga nilai dan capaian kompetensi belum dapat ditentukan.`;
     const m = currentMapelList.find(x=>x.nama===r.mapel && x.program===r.program && x.kelas===r.kelas);
     const cps = (cpTpTersedia && m) ? cpUntukMapel(m.id).sort(urutKode) : [];
     const kkm = r.kkm!=null ? Number(r.kkm) : 70;
@@ -7686,10 +7695,24 @@ async function capaianKompetensiRapor(nama, nisn, ta, smt, rows){
 // Isi satu lembar rapor (HTML) untuk satu siswa; null bila siswa belum punya nilai pada semester itu.
 async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
   const rows = susunNilaiSiswa(nisn, ta, smt);
-  if(!rows.length) return null;
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
   const nama = s ? s.nama : nisn;
-  const kelas = rows[0].kelas, program = rows[0].program;
+  // Siswa aktif yang belum punya nilai sama sekali tetap dibuatkan rapor (semua mapel "Belum ada nilai"),
+  // memakai kelas dan jenjang siswa saat ini.
+  let kelas, program;
+  if(rows.length){ kelas = rows[0].kelas; program = rows[0].program; }
+  else if(s && !s.nonaktif && s.kelasRomawi && s.programLabel){ kelas = s.kelasRomawi; program = s.programLabel; }
+  else return null;
+  // Tampilkan semua mapel jenjang & kelas siswa, sesuai jurusannya (IPA/IPS). Mapel tanpa nilai ditandai "Belum ada nilai".
+  {
+    const norm = x => String(x||'').trim().toLowerCase();
+    const jurSiswa = s ? jurusanSiswaBU(s) : null;
+    const ada = new Set(rows.filter(r=>r.program===program && r.kelas===kelas).map(r=>norm(r.mapel)));
+    currentMapelList.filter(m=>m.program===program && m.kelas===kelas && !m.tidak_diujikan && !ada.has(norm(m.nama)) && (!m.jurusan || m.jurusan===jurSiswa)).forEach(m=>{
+      rows.push({ ta, smt, kelas, program, mapel:m.nama, na:null, kkm:ambilKKM(program, kelas, m.nama), tuntas:null });
+    });
+    rows.sort((a,c)=>a.mapel.localeCompare(c.mapel,'id'));
+  }
   const [hadirRek, ttdWali, nipd, capaian, ekskul] = await Promise.all([
     ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilWali(kelas), nipdSiswa(nisn), capaianKompetensiRapor(nama, nisn, ta, smt, rows),
     ambilEkskulKelas(program, kelas, ta, smt).then(r=>(r.data||[]).filter(e=>e.siswa_nisn===nisn), ()=>[]) ]);
@@ -7717,7 +7740,7 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
     <table class="rp-nilai">
       <colgroup><col style="width:30px"><col style="width:175px"><col style="width:52px"><col></colgroup>
       <thead><tr><th>No</th><th>Muatan Pelajaran</th><th>Nilai Akhir</th><th>Capaian Kompetensi</th></tr></thead>
-      <tbody>${rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${cel(r.na)}</td><td class="cap">${esc2(capaian[i])}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc2(r.mapel)}</td><td class="c">${r.na==null ? '<span style="font-size:9.5px;font-style:italic;">Belum ada nilai</span>' : cel(r.na)}</td><td class="cap">${esc2(capaian[i])}</td></tr>`).join('')}</tbody>
     </table>
     ${ekskul.length ? `<table class="rp-nilai rp-ekskul">
       <colgroup><col style="width:30px"><col style="width:175px"><col style="width:70px"><col></colgroup>
@@ -7772,10 +7795,13 @@ async function cetakRaporSemester(){
   if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
   if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
   const rowsCek = susunNilaiSiswa(nisn, ta, smt);
-  if(rowsCek.length && !await izinCetakRaporSiswa(nisn, rowsCek[0].program, rowsCek[0].kelas, ta, smt)) return;   // peringatan bila belum memenuhi syarat rapor
+  const sCek = daftarSiswaNilai.find(x=>x.nisn===nisn);
+  const progCek = rowsCek.length ? rowsCek[0].program : (sCek && !sCek.nonaktif ? sCek.programLabel : null);
+  const kelCek = rowsCek.length ? rowsCek[0].kelas : (sCek && !sCek.nonaktif ? sCek.kelasRomawi : null);
+  if(progCek && kelCek && !await izinCetakRaporSiswa(nisn, progCek, kelCek, ta, smt)) return;   // peringatan bila belum memenuhi syarat rapor
   const ttdKepala = await ambilTtd('kepala_pkbm','');
   const isi = await htmlRaporSiswa(nisn, ta, smt, ttdKepala, pembuatTtdWali());
-  if(!isi) return alert('Belum ada nilai final untuk siswa ini pada semester tersebut.');
+  if(!isi) return alert('Rapor tidak dapat dibuat: siswa ini tidak aktif dan belum punya nilai pada semester tersebut.');
   const win = window.open('', '_blank');
   if(!win) return alert('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.');
   const s = daftarSiswaNilai.find(x=>x.nisn===nisn);
@@ -7787,10 +7813,11 @@ async function cetakRaporSemesterSemua(){
   const kelas = document.getElementById('rn-kelas').value;
   if(!ta || !smt) return alert('Pilih Tahun Ajaran dan Semester dulu (rapor dicetak per semester).');
   if(!dataNilaiSiap) return alert('Data nilai belum termuat. Klik "Muat Ulang Data".');
-  let daftar = daftarPickerSiswa('rn').filter(s=>susunNilaiSiswa(s.nisn, ta, smt).length);
-  if(!daftar.length) return alert('Belum ada nilai final untuk siswa Kelas '+kelas+' pada semester tersebut.');
+  let daftar = daftarPickerSiswa('rn').filter(s=>susunNilaiSiswa(s.nisn, ta, smt).length || (!s.nonaktif && s.kelasRomawi && s.programLabel));
+  if(!daftar.length) return alert('Tidak ada siswa aktif pada Kelas '+kelas+'.');
   // Siswa yang belum memenuhi syarat rapor (ujian/tugas/kehadiran): pilih cetak hanya yang memenuhi, semua, atau batal.
-  const p0 = susunNilaiSiswa(daftar[0].nisn, ta, smt)[0];
+  const r0 = susunNilaiSiswa(daftar[0].nisn, ta, smt)[0];
+  const p0 = r0 || { program:daftar[0].programLabel, kelas:daftar[0].kelasRomawi };
   const disaring = await saringSiswaCetakSyarat(daftar, p0.program, p0.kelas, ta, smt);
   if(!disaring) return;
   if(!disaring.length) return alert('Tidak ada siswa yang memenuhi syarat rapor pada kelas ini.');

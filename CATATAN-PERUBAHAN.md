@@ -295,3 +295,16 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 - Pengaturan Nilai > Poin Pelanggaran: tambah "Bonus tidak pernah alpa (pengurang poin)" (bawaan 3) dan opsi "Sikap A wajib tanpa alpa" (bawaan aktif).
 - Siswa dengan alpa 0 mendapat pengurang poin (total tidak kurang dari 0); siswa yang pernah alpa maksimal B bila opsi A-wajib aktif.
 - Tidak perlu migrasi SQL baru; pengaturan disimpan di kolom JSON pelanggaran yang sudah ada.
+
+## Rapor: penanda mapel yang belum ada nilai
+- Mapel tanpa komponen nilai (belum ujian/tugas/praktik) kini tampil "Belum ada nilai" di kolom Nilai Akhir, dengan kalimat penjelas di Capaian Kompetensi (sebelumnya "-").
+- Angka 0 tetap hanya muncul bila ada komponen yang benar-benar bernilai 0 (mis. tugas wajib lewat tenggat tidak dikerjakan).
+
+## Rapor: semua mapel jenjang & kelas selalu tampil
+- Lembar rapor menampilkan seluruh mapel pada jenjang dan kelas siswa (kecuali mapel bertanda "Tidak diujikan" di menu Mata Pelajaran). Mapel yang belum punya nilai ditulis "Belum ada nilai".
+- Siswa yang belum punya data nilai sama sekali pada semester itu tetap tidak dibuatkan rapor (perilaku lama).
+
+## Rapor: sesuai jurusan & siswa tanpa nilai tetap dicetak
+- Migrasi baru: migrasi-v21-mapel-jurusan.sql (kolom jurusan pada mata_pelajaran). Menu Mata Pelajaran punya isian Jurusan (Semua/IPA/IPS).
+- Mapel "kosong" di rapor hanya yang umum (jurusan kosong) atau sesuai jurusan siswa (dibaca dari nama kelas, mis. "11 IPA", "11 IPS 1"). Mapel yang sudah punya nilai tetap tampil.
+- Siswa aktif tanpa nilai sama sekali pada semester itu tetap dibuatkan rapor (kelas dan jenjang siswa saat ini).
