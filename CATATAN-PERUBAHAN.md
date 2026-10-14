@@ -1,5 +1,35 @@
 # Perubahan terbaru
 
+## v15.7 — Cadangan Data mencakup tabel baru
+File berubah: `netlify/functions/cadangan-data.js`. Tanpa migrasi SQL; unggah file lalu deploy ulang.
+- Menu **Cadangan Data** kini ikut mencadangkan dan memulihkan `catatan_pelanggaran`, `kenaikan_kelas`, dan `rapor_mapel_sembunyi` (sebelumnya tidak ikut, sehingga keputusan kenaikan kelas, catatan pelanggaran, dan pilihan mapel rapor tidak ada di file cadangan). Cadangan lama tetap bisa dipulihkan; tabel baru hanya terisi bila ada di file.
+- Urutan migrasi SQL lengkap kini ada di `DEPLOY-VERCEL.md` (bagian 7).
+
+## v15.1–v15.6 — Rapor sesuai jurusan, Rekap semua mapel, tombol "Di Rapor Cetak"
+**Jalankan `migrasi-v21-mapel-jurusan.sql` lalu `migrasi-v22-rapor-mapel-sembunyi.sql`** di Supabase SQL Editor (sekali; aman diulang). File berubah: `index.html`.
+
+### Rapor: penanda mapel yang belum ada nilai
+- Mapel tanpa komponen nilai (belum ujian/tugas/praktik) kini tampil "Belum ada nilai" di kolom Nilai Akhir, dengan kalimat penjelas di Capaian Kompetensi (sebelumnya "-").
+- Angka 0 tetap hanya muncul bila ada komponen yang benar-benar bernilai 0 (mis. tugas wajib lewat tenggat tidak dikerjakan).
+
+### Rapor: semua mapel jenjang & kelas selalu tampil
+- Lembar rapor menampilkan seluruh mapel pada jenjang dan kelas siswa (kecuali mapel bertanda "Tidak diujikan" di menu Mata Pelajaran). Mapel yang belum punya nilai ditulis "Belum ada nilai".
+- Siswa yang belum punya data nilai sama sekali pada semester itu tetap tidak dibuatkan rapor (perilaku lama).
+
+### Rapor: sesuai jurusan & siswa tanpa nilai tetap dicetak
+- Migrasi baru: migrasi-v21-mapel-jurusan.sql (kolom jurusan pada mata_pelajaran). Menu Mata Pelajaran punya isian Jurusan (Semua/IPA/IPS).
+- Mapel "kosong" di rapor hanya yang umum (jurusan kosong) atau sesuai jurusan siswa (dibaca dari nama kelas, mis. "11 IPA", "11 IPS 1"). Mapel yang sudah punya nilai tetap tampil.
+- Siswa aktif tanpa nilai sama sekali pada semester itu tetap dibuatkan rapor (kelas dan jenjang siswa saat ini).
+
+### Rekap Nilai Siswa: tombol Tampil / Tidak tampil di rapor cetak
+- Kolom baru "Di Rapor Cetak" (setelah Status). Tombol per mapel per siswa per semester; mapel "Tidak tampil" tidak ikut dicetak di rapor (rata-rata di rapor dihitung dari mapel yang tampil). Rekap, Leger, dan Transkrip tidak berubah.
+- Migrasi baru: migrasi-v22-rapor-mapel-sembunyi.sql (tabel rapor_mapel_sembunyi). Sebelum dijalankan, semua mapel tetap tampil dan tombol memberi peringatan.
+
+### Rekap Nilai Siswa menampilkan SEMUA mapel (v15_6)
+- Bila Tahun Ajaran & Semester dipilih, Rekap menampilkan semua mapel jenjang/kelas siswa; yang belum bernilai diberi keterangan "belum ada nilai" (+ "di luar jurusan" bila jurusan mapel berbeda).
+- Tombol "Di Rapor Cetak": bawaan Tampil; mapel belum bernilai & di luar jurusan bawaannya Tidak tampil. Klik untuk mengubah; pilihan manual disimpan (tabel rapor_mapel_sembunyi, kolom sembunyi).
+- migrasi-v22 diperbarui (kolom sembunyi). Jalankan migrasi-v22 sebelum memakai tombol.
+
 ## v15.0 — Kenaikan Kelas (naik / tidak naik / lulus / pindah / keluar)
 **Jalankan `migrasi-v20-kenaikan-kelas.sql`** di Supabase SQL Editor (sekali; aman diulang), lalu unggah semua file dan deploy ulang. File berubah: `index.html`, `netlify/functions/kelola-siswa.js`; file baru: `migrasi-v20-kenaikan-kelas.sql`. Jumlah fungsi Vercel tetap (aksi baru ada di `kelola-siswa`). Sertakan juga perubahan v14.9 di bawah (migrasi-v19 bila belum dijalankan).
 - **Menu Kenaikan Kelas** (Laporan Nilai): pilih Jenjang, Kelas, Tahun Ajaran. Saran per siswa dari nilai akhir Semester Genap (jumlah mapel di bawah KKM atau tanpa nilai), persentase kehadiran, dan Sikap. Kriteria bawaan: maks. 3 mapel belum tuntas, kehadiran minimal 75%, Sikap D menahan; bisa diubah di menu itu.
@@ -295,25 +325,3 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 - Pengaturan Nilai > Poin Pelanggaran: tambah "Bonus tidak pernah alpa (pengurang poin)" (bawaan 3) dan opsi "Sikap A wajib tanpa alpa" (bawaan aktif).
 - Siswa dengan alpa 0 mendapat pengurang poin (total tidak kurang dari 0); siswa yang pernah alpa maksimal B bila opsi A-wajib aktif.
 - Tidak perlu migrasi SQL baru; pengaturan disimpan di kolom JSON pelanggaran yang sudah ada.
-
-## Rapor: penanda mapel yang belum ada nilai
-- Mapel tanpa komponen nilai (belum ujian/tugas/praktik) kini tampil "Belum ada nilai" di kolom Nilai Akhir, dengan kalimat penjelas di Capaian Kompetensi (sebelumnya "-").
-- Angka 0 tetap hanya muncul bila ada komponen yang benar-benar bernilai 0 (mis. tugas wajib lewat tenggat tidak dikerjakan).
-
-## Rapor: semua mapel jenjang & kelas selalu tampil
-- Lembar rapor menampilkan seluruh mapel pada jenjang dan kelas siswa (kecuali mapel bertanda "Tidak diujikan" di menu Mata Pelajaran). Mapel yang belum punya nilai ditulis "Belum ada nilai".
-- Siswa yang belum punya data nilai sama sekali pada semester itu tetap tidak dibuatkan rapor (perilaku lama).
-
-## Rapor: sesuai jurusan & siswa tanpa nilai tetap dicetak
-- Migrasi baru: migrasi-v21-mapel-jurusan.sql (kolom jurusan pada mata_pelajaran). Menu Mata Pelajaran punya isian Jurusan (Semua/IPA/IPS).
-- Mapel "kosong" di rapor hanya yang umum (jurusan kosong) atau sesuai jurusan siswa (dibaca dari nama kelas, mis. "11 IPA", "11 IPS 1"). Mapel yang sudah punya nilai tetap tampil.
-- Siswa aktif tanpa nilai sama sekali pada semester itu tetap dibuatkan rapor (kelas dan jenjang siswa saat ini).
-
-## Rekap Nilai Siswa: tombol Tampil / Tidak tampil di rapor cetak
-- Kolom baru "Di Rapor Cetak" (setelah Status). Tombol per mapel per siswa per semester; mapel "Tidak tampil" tidak ikut dicetak di rapor (rata-rata di rapor dihitung dari mapel yang tampil). Rekap, Leger, dan Transkrip tidak berubah.
-- Migrasi baru: migrasi-v22-rapor-mapel-sembunyi.sql (tabel rapor_mapel_sembunyi). Sebelum dijalankan, semua mapel tetap tampil dan tombol memberi peringatan.
-
-## Rekap Nilai Siswa menampilkan SEMUA mapel (v15_6)
-- Bila Tahun Ajaran & Semester dipilih, Rekap menampilkan semua mapel jenjang/kelas siswa; yang belum bernilai diberi keterangan "belum ada nilai" (+ "di luar jurusan" bila jurusan mapel berbeda).
-- Tombol "Di Rapor Cetak": bawaan Tampil; mapel belum bernilai & di luar jurusan bawaannya Tidak tampil. Klik untuk mengubah; pilihan manual disimpan (tabel rapor_mapel_sembunyi, kolom sembunyi).
-- migrasi-v22 diperbarui (kolom sembunyi). Jalankan migrasi-v22 sebelum memakai tombol.

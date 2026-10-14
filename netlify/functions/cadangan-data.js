@@ -25,6 +25,7 @@ const TABEL = [
   { t: 'sesi_ujian', pk: 'id', u: 200 }, { t: 'detail_jawaban', pk: 'id' },
   { t: 'nilai_komponen', pk: 'id' }, { t: 'nilai_manual_komponen', pk: 'id' },
   { t: 'catatan_siswa_semester', pk: 'id' }, { t: 'ekstrakurikuler_siswa', pk: 'id' },
+  { t: 'catatan_pelanggaran', pk: 'id' }, { t: 'kenaikan_kelas', pk: 'id' }, { t: 'rapor_mapel_sembunyi', pk: 'id' },
   { t: 'tugas', pk: 'id', u: 100 }, { t: 'tugas_jawaban', pk: 'id', u: 40 }, { t: 'piagam_log', pk: 'id' },
   // paling akhir: isi aslinya menimpa baris yang dibuat otomatis oleh trigger saat sesi dipulihkan
   { t: 'arsip_nilai', pk: 'sesi_id' },

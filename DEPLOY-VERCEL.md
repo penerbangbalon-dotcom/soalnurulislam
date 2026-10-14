@@ -71,3 +71,26 @@ Jangan pernah memasukkan `SUPABASE_SERVICE_ROLE_KEY` ke `index.html`, `ujian.htm
 - `SUPER_ADMIN_EMAILS` = email Super Admin, pisahkan koma (mis. `kepala@contoh.com`). Tanpa ini, akun admin tertua otomatis jadi Super Admin saat login pertama.
 - Jalankan `migrasi-v12-superadmin.sql` di Supabase SQL Editor.
 - Setelah menambah/mengubah variabel di Vercel, lakukan Redeploy agar berlaku.
+
+## 7. Urutan migrasi SQL (Supabase -> SQL Editor)
+Instalasi baru: jalankan berurutan. Instalasi lama: jalankan hanya yang belum pernah dijalankan (semuanya aman diulang).
+1. `supabase-schema.sql`
+2. `migrasi-lengkap.sql`
+3. `migrasi-v7.sql`
+4. `migrasi-v8-absensi-nilai.sql` (butuh fungsi `rekap_kehadiran()` dari aplikasi absensi)
+5. `migrasi-arsip-nilai.sql`
+6. `migrasi-v10-pengecualian.sql`
+7. `migrasi-v11-keamanan.sql`
+8. `migrasi-v12-superadmin.sql`
+9. `migrasi-v13-tambah-siswa.sql`
+10. `migrasi-v14-remedial.sql`
+11. `migrasi-v15-paket-remedial.sql`
+12. `migrasi-v16-tugas-syarat-rapor.sql`
+13. `migrasi-v17-cp-tp.sql`
+14. `migrasi-v18-ekskul-nip.sql`
+15. `migrasi-v19-pelanggaran.sql`
+16. `migrasi-v20-kenaikan-kelas.sql` (bila `students.status` bertipe teks dengan CHECK, pastikan LULUS, PINDAH, KELUAR diizinkan)
+17. `migrasi-v21-mapel-jurusan.sql`
+18. `migrasi-v22-rapor-mapel-sembunyi.sql`
+
+Catatan: jumlah fungsi di folder `api/` saat ini 11 (batas paket gratis Vercel 12). Tambahkan aksi baru ke fungsi yang ada, jangan membuat file baru di `api/`.
