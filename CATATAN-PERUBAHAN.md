@@ -308,3 +308,7 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 - Migrasi baru: migrasi-v21-mapel-jurusan.sql (kolom jurusan pada mata_pelajaran). Menu Mata Pelajaran punya isian Jurusan (Semua/IPA/IPS).
 - Mapel "kosong" di rapor hanya yang umum (jurusan kosong) atau sesuai jurusan siswa (dibaca dari nama kelas, mis. "11 IPA", "11 IPS 1"). Mapel yang sudah punya nilai tetap tampil.
 - Siswa aktif tanpa nilai sama sekali pada semester itu tetap dibuatkan rapor (kelas dan jenjang siswa saat ini).
+
+## Rekap Nilai Siswa: tombol Tampil / Tidak tampil di rapor cetak
+- Kolom baru "Di Rapor Cetak" (setelah Status). Tombol per mapel per siswa per semester; mapel "Tidak tampil" tidak ikut dicetak di rapor (rata-rata di rapor dihitung dari mapel yang tampil). Rekap, Leger, dan Transkrip tidak berubah.
+- Migrasi baru: migrasi-v22-rapor-mapel-sembunyi.sql (tabel rapor_mapel_sembunyi). Sebelum dijalankan, semua mapel tetap tampil dan tombol memberi peringatan.

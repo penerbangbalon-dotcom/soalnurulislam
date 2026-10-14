@@ -803,7 +803,7 @@
         </div>
         <div class="card" style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Mata Pelajaran</th><th>Semester / T.A.</th><th>Kelas</th><th>Ulangan Harian</th><th>UTS</th><th>UAS</th><th>Tugas</th><th>Praktik</th><th>Nilai Akhir</th><th>KKM</th><th>Status</th></tr></thead>
+            <thead><tr><th>Mata Pelajaran</th><th>Semester / T.A.</th><th>Kelas</th><th>Ulangan Harian</th><th>UTS</th><th>UAS</th><th>Tugas</th><th>Praktik</th><th>Nilai Akhir</th><th>KKM</th><th>Status</th><th>Di Rapor Cetak</th></tr></thead>
             <tbody id="rn-body"></tbody>
           </table>
         </div>
@@ -7289,6 +7289,32 @@ function bangunNilaiTugasOnline(tugasRows, jawabRows, aktif){
 let catatanMap = new Map();     // nisn##ta##smt -> baris catatan_siswa_semester
 let catatanBaris = [];
 
+// ---------- Tampil / tidak tampil mapel pada rapor cetak ----------
+let raporSembunyi = new Set(), rnAksiRef = [];
+const kunciSembunyi = (nisn, r) => [nisn, r.ta, r.smt, r.program, r.kelas, String(r.mapel).trim().toLowerCase()].join('##');
+function tombolRaporMapel(nisn, r){
+  rnAksiRef.push({ nisn, ta:r.ta, smt:r.smt, program:r.program, kelas:r.kelas, mapel:r.mapel });
+  const h = raporSembunyi.has(kunciSembunyi(nisn, r));
+  return `<td style="white-space:nowrap;"><button class="btn outline" style="padding:3px 10px;font-size:12px;${h?'color:#b3261e;border-color:#b3261e;':''}" onclick="toggleRaporMapel(${rnAksiRef.length-1})" title="${h?'Mapel ini TIDAK dicetak di rapor. Klik untuk menampilkan.':'Mapel ini dicetak di rapor. Klik untuk menyembunyikan.'}">${h?'Tidak tampil':'Tampil'}</button></td>`;
+}
+async function toggleRaporMapel(i){
+  const a = rnAksiRef[i]; if(!a) return;
+  const k = kunciSembunyi(a.nisn, a);
+  const sembunyikan = !raporSembunyi.has(k);
+  let error;
+  if(sembunyikan){
+    ({ error } = await supa.from('rapor_mapel_sembunyi').upsert(
+      { siswa_nisn:a.nisn, program:a.program, kelas:a.kelas, tahun_ajaran:a.ta, semester:a.smt, mapel_nama:a.mapel },
+      { onConflict:'siswa_nisn,program,kelas,tahun_ajaran,semester,mapel_nama' }));
+  } else {
+    ({ error } = await supa.from('rapor_mapel_sembunyi').delete()
+      .eq('siswa_nisn',a.nisn).eq('program',a.program).eq('kelas',a.kelas).eq('tahun_ajaran',a.ta).eq('semester',a.smt).eq('mapel_nama',a.mapel));
+  }
+  if(error) return alert(/rapor_mapel_sembunyi/i.test(error.message||'') ? 'Tabel belum ada di database. Jalankan migrasi-v22-rapor-mapel-sembunyi.sql di Supabase SQL Editor dulu.' : error.message);
+  if(sembunyikan) raporSembunyi.add(k); else raporSembunyi.delete(k);
+  renderRekapNilai();
+}
+
 async function siapkanDataNilai(){
   kosongkanCachePel();   // poin pelanggaran dihitung ulang setelah data/pengaturan dimuat
   const [arsip, manual, cat, peng, tgs, tjw] = await Promise.all([
@@ -7357,6 +7383,11 @@ async function siapkanDataNilai(){
     const n = normSmtTa(r);
     return { ...r, smt:n.smt, ta:n.ta, komp:komponenNilai(r.jenis_ujian), skor:Number(r.total_skor) };
   }).filter(r=>r.komp);
+  raporSembunyi = new Set();
+  try{
+    const h = await ambilSemuaBaris(()=>supa.from('rapor_mapel_sembunyi').select('*').order('id'));
+    if(!h.error) (h.data||[]).forEach(x=>raporSembunyi.add([x.siswa_nisn, x.tahun_ajaran, x.semester, x.program, x.kelas, String(x.mapel_nama).trim().toLowerCase()].join('##')));
+  }catch(e){}   // tabel belum ada (migrasi-v22 belum dijalankan): semua mapel tampil
   let aktif = [];
   try{ aktif = await ambilSemuaSiswaAbsensi(); }
   catch(e){ alert('Gagal memuat data siswa dari database absensi: '+e.message); }
@@ -7534,13 +7565,14 @@ function renderRekapNilaiSemua(){
   document.getElementById('rn-rata').textContent = rataSiswa.length ? fmtN(rataRata(rataSiswa)) : '-';
   document.getElementById('rn-max').textContent = rataSiswa.length ? fmtN(Math.max(...rataSiswa)) : '-';
   document.getElementById('rn-min').textContent = rataSiswa.length ? fmtN(Math.min(...rataSiswa)) : '-';
+  rnAksiRef.length = 0;
   document.getElementById('rn-body').innerHTML = daftar.map((x,i)=>{
     const belum = x.rows.filter(r=>r.tuntas===false).length;
-    return `<tr style="background:#F0EDE2;"><td colspan="11"><b>${i+1}. ${esc2(x.s.nama)}</b> <span class="muted">(${esc2(x.s.nisn)})</span>${belum?` &bull; <span style="color:#b3261e;">${belum} mapel belum tuntas KKM</span>`:''}</td></tr>` +
+    return `<tr style="background:#F0EDE2;"><td colspan="12"><b>${i+1}. ${esc2(x.s.nama)}</b> <span class="muted">(${esc2(x.s.nisn)})</span>${belum?` &bull; <span style="color:#b3261e;">${belum} mapel belum tuntas KKM</span>`:''}</td></tr>` +
       x.rows.map(r=>`<tr${r.tuntas===false?' style="background:#FBEEEC;"':''}>
         <td>${esc2(r.mapel)}</td><td>${esc2(labelSmt(r.smt))}<br><span class="muted">${esc2(r.ta)}</span></td><td>${esc2(r.kelas)}</td>
         <td>${cel(r.uh)}${tandaRem(r,'uh')}</td><td>${cel(r.uts)}${tandaRem(r,'uts')}</td><td>${cel(r.uas)}${tandaRem(r,'uas')}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
-        <td><b>${r.na==null?'-':fmtN(r.na)}</b></td><td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td></tr>`).join('');
+        <td><b>${r.na==null?'-':fmtN(r.na)}</b></td><td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td>${tombolRaporMapel(x.s.nisn, r)}</tr>`).join('');
   }).join('');
   document.getElementById('rn-catatan').innerHTML = '<span class="muted">Ringkasan di atas = rata-rata dari rata-rata Nilai Akhir tiap siswa. Pilih satu siswa untuk melihat sikap &amp; kehadiran.</span>';
 }
@@ -7567,6 +7599,7 @@ function renderRekapNilai(){
   document.getElementById('rn-max').textContent = nas.length ? fmtN(Math.max(...nas)) : '-';
   document.getElementById('rn-min').innerHTML = nas.length ? fmtN(Math.min(...nas)) + (belum ? ` &bull; <span style="color:#b3261e;">${belum} mapel belum tuntas KKM</span>` : ' &bull; semua tuntas KKM') : '-';
   const cel = v => v==null ? '<span class="muted">-</span>' : fmtN(v);
+  rnAksiRef.length = 0;
   document.getElementById('rn-body').innerHTML = rows.map(r=>{
     const uhTxt = r.uhList.length
       ? r.uhList.map(fmtN).join(', ') + (r.uhList.length>1 ? ` <span class="muted">(rata-rata ${fmtN(r.uh)})</span>` : '')
@@ -7577,7 +7610,7 @@ function renderRekapNilai(){
       <td>${esc2(r.kelas)}</td>
       <td>${uhTxt}${tandaRem(r,'uh')}</td><td>${cel(r.uts)}${tandaRem(r,'uts')}</td><td>${cel(r.uas)}${tandaRem(r,'uas')}</td><td>${cel(r.tugas)}</td><td>${cel(r.praktik)}</td>
       <td><b>${r.na==null?'-':fmtN(r.na)}</b>${r.na==null?'':`<br><span class="muted">${esc2(predikatNilai(r.na))}</span>`}</td>
-      <td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td>
+      <td>${fmtN(r.kkm)}</td><td>${htmlTuntas(r.tuntas)}</td>${tombolRaporMapel(nisn, r)}
     </tr>`;
   }).join('');
   // Sikap & kehadiran untuk kombinasi TA/semester yang tampil
@@ -7713,6 +7746,8 @@ async function htmlRaporSiswa(nisn, ta, smt, ttdKepala, ambilWali){
     });
     rows.sort((a,c)=>a.mapel.localeCompare(c.mapel,'id'));
   }
+  // Mapel yang dipilih "Tidak tampil" di Rekap Nilai Siswa tidak dicetak di rapor
+  for(let i=rows.length-1;i>=0;i--) if(raporSembunyi.has(kunciSembunyi(nisn, rows[i]))) rows.splice(i,1);
   const [hadirRek, ttdWali, nipd, capaian, ekskul] = await Promise.all([
     ambilRekapKehadiran(nisn, program, kelas, ta, smt), ambilWali(kelas), nipdSiswa(nisn), capaianKompetensiRapor(nama, nisn, ta, smt, rows),
     ambilEkskulKelas(program, kelas, ta, smt).then(r=>(r.data||[]).filter(e=>e.siswa_nisn===nisn), ()=>[]) ]);
