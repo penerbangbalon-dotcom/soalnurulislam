@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="theme-color" content="#0A2A66" />
+<meta name="theme-color" content="#1F2430" />
+<script>try{var t=localStorage.getItem('tema_sekolah');if(t)document.documentElement.setAttribute('data-tema',t)}catch(e){}</script>
 <title>Ujian Online — PKBM Nurul Islam</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -93,6 +94,38 @@
   .overlay-kunci{background:rgba(12,37,89,.96);backdrop-filter:blur(4px);}
   .overlay-curang .kotak{border-radius:18px;}
   @media(max-width:520px){.card{padding:18px;}.wrap{padding:18px 12px 80px;}}
+
+/* ===== v15.11: warna sekolah (bawaan Kuning Emas) ===== */
+:root{--paper:#F6F7F9;--line:#E6E8EC;--ink:#1B1F27;--ink-soft:#667085;--green:#F5B301;--green-dark:#D99A00;--primary-soft:#FFF5D6;--primary-ink:#8A5A00;--on-primary:#2B1D00;--sidebar-bg:#1F2430;--side-active-bg:#F5B301;--side-active-ink:#2B1D00;--gold:#D9480F;}
+:root[data-tema=biru]{--green:#2563EB;--green-dark:#1D4ED8;--primary-soft:#E8F0FE;--primary-ink:#1D4ED8;--on-primary:#fff;--sidebar-bg:#0F2A5C;--side-active-bg:rgba(255,255,255,.16);--side-active-ink:#fff;--gold:#F59E0B;}
+:root[data-tema=hijau]{--green:#059669;--green-dark:#047857;--primary-soft:#E3F6EE;--primary-ink:#047857;--on-primary:#fff;--sidebar-bg:#0B3B30;--side-active-bg:rgba(255,255,255,.16);--side-active-ink:#fff;--gold:#F59E0B;}
+:root[data-tema=ungu]{--green:#7C3AED;--green-dark:#6D28D9;--primary-soft:#F1EAFE;--primary-ink:#6D28D9;--on-primary:#fff;--sidebar-bg:#2E1B5C;--side-active-bg:rgba(255,255,255,.16);--side-active-ink:#fff;--gold:#F59E0B;}
+:root[data-tema=teal]{--green:#0D9488;--green-dark:#0F766E;--primary-soft:#DFF5F2;--primary-ink:#0F766E;--on-primary:#fff;--sidebar-bg:#0B3A38;--side-active-bg:rgba(255,255,255,.16);--side-active-ink:#fff;--gold:#F59E0B;}
+:root[data-tema=mawar]{--green:#E11D48;--green-dark:#BE123C;--primary-soft:#FDE7EC;--primary-ink:#BE123C;--on-primary:#fff;--sidebar-bg:#4A1424;--side-active-bg:rgba(255,255,255,.16);--side-active-ink:#fff;--gold:#F59E0B;}
+a{color:var(--primary-ink);}
+.btn{color:var(--on-primary);}
+.btn.outline{color:var(--primary-ink);}
+.btn.outline:hover{background:var(--primary-soft);}
+.btn.gold{color:#fff;}
+.btn:focus-visible,.tab-btn:focus-visible{outline:3px solid color-mix(in srgb,var(--primary-ink) 45%,transparent);outline-offset:2px;}
+input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 25%,transparent);}
+.num-tag{background:var(--green);color:var(--on-primary);}
+.badge.manual{background:var(--primary-soft);color:var(--primary-ink);}
+.badge.siap{color:#1F5A25;}
+.fchip,.quick-chip{background:#F8F9FB;}
+.fchip:hover,.quick-chip:hover{background:var(--primary-soft);}
+.fchip.aktif{background:var(--green);border-color:var(--green);color:var(--on-primary);}
+.bar,.mon-bar{background:#EEF0F3;}
+.bar>span{background:var(--green);}
+.tab-btn:hover{background:var(--primary-soft);}
+.tab-btn.aktif,.tab-btn.aktif:hover{background:var(--green);color:var(--on-primary);}
+.top-bar{background:color-mix(in srgb,var(--paper) 90%,transparent);}
+.opsi-line:hover{background:var(--primary-soft);}
+.opsi-line:has(input:checked){border-color:var(--green);background:var(--primary-soft);}
+.st-info{background:var(--primary-soft);color:var(--primary-ink);}
+.banner-info{background:var(--primary-soft);border-color:color-mix(in srgb,var(--green) 40%,#fff);}
+.instruksi{background:#F8F9FB;}
+.overlay-kunci{background:color-mix(in srgb,var(--sidebar-bg) 96%,transparent);}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
@@ -1094,9 +1127,10 @@ function escapeHtml(str){
 // Identitas sekolah (nama & logo) dari pengaturan admin; bila gagal dimuat, tampilan bawaan tetap dipakai.
 (async function muatIdentitasSekolah(){
   try{
-    const r = await fetch(SUPABASE_URL+'/rest/v1/pengaturan_sekolah?id=eq.1&select=nama_aplikasi,logo_url', { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY } });
+    const r = await fetch(SUPABASE_URL+'/rest/v1/pengaturan_sekolah?id=eq.1&select=nama_aplikasi,logo_url,tema_warna', { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY } });
     if(!r.ok) return;
     const d = (await r.json())[0]; if(!d) return;
+    if(d.tema_warna && /^[a-z]+$/.test(d.tema_warna)){ document.documentElement.setAttribute('data-tema', d.tema_warna); try{ localStorage.setItem('tema_sekolah', d.tema_warna); }catch(e){} }
     if(d.nama_aplikasi){ document.getElementById('brand-nama').textContent = d.nama_aplikasi; document.title = 'Ujian Online — '+d.nama_aplikasi; }
     if(d.logo_url && /^data:image\/|^https?:\/\//.test(d.logo_url)) document.getElementById('brand-logo').src = d.logo_url;
   }catch(e){ /* abaikan */ }

@@ -1,5 +1,11 @@
 # Perubahan terbaru
 
+## v15.11 — Warna kuning emas + pilihan warna untuk seluruh sekolah
+File berubah: `index.html` dan `ujian.html`. Kolom `tema_warna` di tabel `pengaturan_sekolah` sudah ditambahkan (lihat `migrasi-v23-tema-warna.sql`); unggah kedua file lalu deploy ulang.
+- **Warna bawaan kuning emas**: tombol berwarna kuning dengan tulisan cokelat tua agar terbaca; menu samping gelap dengan menu aktif berwarna kuning.
+- **Menu baru "Warna Aplikasi"** (khusus Super Admin, di grup Pengaturan): pilih Kuning Emas, Biru, Hijau, Ungu, Teal, atau Merah Muda. Pilihan terlihat langsung sebagai pratinjau, lalu **Simpan untuk semua** menerapkannya ke admin dan halaman siswa.
+- Cetakan (rapor, piagam, kartu ujian, rekap) tidak berubah.
+
 ## v15.10 — Tampilan lebih modern
 File berubah: `index.html` dan `ujian.html` (hanya tampilan/CSS). Tanpa migrasi SQL; unggah kedua file lalu deploy ulang.
 - **Gaya baru**: huruf Plus Jakarta Sans (lebih ramah, tanpa huruf serif), sudut membulat, bayangan lembut, tombol dan isian lebih nyaman, bingkai fokus saat mengetik.
