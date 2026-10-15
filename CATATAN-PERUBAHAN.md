@@ -1,5 +1,15 @@
 # Perubahan terbaru
 
+## v15.10 — Tampilan lebih modern
+File berubah: `index.html` dan `ujian.html` (hanya tampilan/CSS). Tanpa migrasi SQL; unggah kedua file lalu deploy ulang.
+- **Gaya baru**: huruf Plus Jakarta Sans (lebih ramah, tanpa huruf serif), sudut membulat, bayangan lembut, tombol dan isian lebih nyaman, bingkai fokus saat mengetik.
+- **Menu samping**: item berbentuk kapsul membulat, submenu dengan garis penuntun, warna biru tetap.
+- **Tabel & kartu**: header tabel lebih ringan, garis antar baris tipis, kartu dengan bayangan halus.
+- **Halaman login & jendela popup**: lebih lega, latar lembut.
+- **Halaman siswa**: pilihan jawaban berupa baris yang bisa diklik dan menyorot pilihan yang dicentang; timer berbentuk kapsul.
+- **Ponsel**: jarak dan kolom menyesuaikan layar kecil (kolom 2/3 menjadi 1).
+- Cetakan (rapor, piagam, kartu ujian, rekap) tidak berubah.
+
 ## v15.9 — Peringkat di Piagam & Rekap Nilai dibedakan dari peringkat Rapor
 File berubah: `index.html`. Tanpa migrasi SQL; unggah file lalu deploy ulang.
 - **Label jelas**: di Piagam dan cetak Rekap Nilai (Laporan Siswa), peringkat kini tertulis "Peringkat Ujian UTS ke-5 dari 36 siswa" (mengikuti jenis ujian). Rapor tetap "Peringkat di Kelas" (berdasarkan rata-rata Nilai Akhir semua mapel), jadi kedua peringkat tidak lagi terkesan bertentangan.
