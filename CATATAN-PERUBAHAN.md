@@ -1,5 +1,12 @@
 # Perubahan terbaru
 
+## v15.14 — Mapel tidak diujikan lebih mudah dilihat dan diatur
+File berubah: `index.html` saja (tanpa migrasi SQL).
+- **Menu Mata Pelajaran**: filter *Semua / Diujikan saja / Tidak diujikan saja*, kotak cari, ringkasan jumlah, baris mapel tidak diujikan tampil redup dengan lencana, dan tombol satu klik **Tidak diujikan / Ujikan kembali** di tiap baris.
+- **Laporan Siswa**: kotak baru di bawah tabel berisi daftar mapel tidak diujikan untuk kelas & program siswa yang dipilih, tombol **Ujikan kembali**, dan pilihan untuk menandai mapel lain sebagai tidak diujikan.
+- **Dashboard**: kartu **Mapel tidak diujikan** yang langsung membuka daftarnya.
+- Tombol lama "Tandai Tidak Diujikan" di tabel laporan tidak pernah muncul lagi di versi sebelumnya; fungsinya kini ada di kotak baru di atas.
+
 ## v15.13 — Dashboard lebih lengkap
 File berubah: `index.html` saja (tanpa migrasi SQL).
 - **10 kartu ringkasan** (sedang ujian, perlu dinilai, ujian hari ini, rata-rata nilai, sudah dinilai, paket dibuka, paket draft, bank soal, mata pelajaran, siswa aktif) plus **pengingat** di bagian atas bila ada yang perlu ditindaklanjuti.
