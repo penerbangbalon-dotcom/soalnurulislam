@@ -240,6 +240,15 @@ tr:hover td{background:var(--primary-soft);}
 .tema-opsi:hover{border-color:var(--green);}
 .tema-opsi.aktif{border-color:var(--primary-ink);background:var(--primary-soft);}
 .tema-opsi i{width:34px;height:34px;border-radius:50%;display:block;box-shadow:inset 0 0 0 3px rgba(255,255,255,.55),0 1px 3px rgba(0,0,0,.25);}
+
+/* ===== v15.12: dashboard ===== */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin:16px 0;}
+.dash-kartu{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);cursor:pointer;text-align:left;font:inherit;color:inherit;transition:transform .12s,border-color .12s;}
+.dash-kartu:hover{transform:translateY(-2px);border-color:var(--green);}
+.dash-kartu small{display:block;color:var(--ink-soft);font-weight:600;font-size:12.5px;margin-bottom:8px;}
+.dash-kartu b{font-size:30px;font-weight:700;letter-spacing:-.02em;}
+.dash-kartu.sorot{background:var(--primary-soft);border-color:var(--green);}
+.dash-aksi{display:flex;flex-wrap:wrap;gap:8px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -273,6 +282,7 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </div>
     <div class="logout" onclick="logout()" role="button" tabindex="0">&#x21AA; Keluar</div>
+    <div class="item" data-tab="dashboard" onclick="showTab('dashboard')" style="margin-top:6px;">Dashboard</div>
     <div class="group open has-active" data-group="soal">
       <div class="ghead" onclick="toggleGroup('soal')"><span>Bank Soal</span><span class="chev">&#9656;</span></div>
       <div class="subs">
@@ -340,6 +350,27 @@ tr:hover td{background:var(--primary-soft);}
   </nav>
 
   <main>
+    <!-- ===== TAB: DASHBOARD ===== -->
+    <section id="tab-dashboard" class="hidden">
+      <h2>Dashboard</h2>
+      <p class="muted" id="dash-sub"></p>
+      <div class="dash-grid" id="dash-kartu"></div>
+      <div class="card">
+        <h3>Pintasan</h3>
+        <div class="dash-aksi">
+          <button type="button" class="btn" onclick="showTab('daftar')">Buat / Kelola Paket Ujian</button>
+          <button type="button" class="btn outline" onclick="showTab('monitor')">Monitoring Ujian</button>
+          <button type="button" class="btn outline" onclick="showTab('pending')">Nilai Jawaban Essay</button>
+          <button type="button" class="btn outline" onclick="showTab('bank')">Bank Soal</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Aktivitas ujian terbaru</h3>
+        <div class="table-wrap"><table><thead><tr><th>Siswa</th><th>Paket ujian</th><th>Status</th><th>Skor</th><th>Waktu</th></tr></thead>
+        <tbody id="dash-riwayat"><tr><td colspan="5" class="muted">Memuat...</td></tr></tbody></table></div>
+      </div>
+    </section>
+
     <!-- ===== TAB: BANK SOAL ===== -->
     <section id="tab-bank">
       <h2>Bank Soal</h2>
@@ -1913,7 +1944,10 @@ CP-2: Pada akhir fase D, peserta didik mampu ...
 // ============================================================
 const SUPABASE_URL = 'https://oeweivdvovpcgolaxzuc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ld2VpdmR2b3ZwY2dvbGF4enVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NjY3MDgsImV4cCI6MjEwNTM0MjcwOH0.bJyrKD7pnCcVizWbsBD5e0LrFl_8LdwU_5JRmyqkfV0';
-const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Sesi login disimpan di sessionStorage: ditutup saat tab/browser ditutup, jadi aplikasi yang dibuka baru selalu meminta login.
+// Sisa sesi lama (localStorage) dibersihkan supaya tidak ada login yang tertinggal di browser.
+try{ Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){}
+const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ storage: window.sessionStorage } });
 
 let currentMapelList = [];
 
@@ -2056,10 +2090,73 @@ async function tentukanPeranSaya(){
   document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden', !ADALAH_ADMIN));
   document.querySelectorAll('.super-only').forEach(el=>el.classList.toggle('hidden', !ADALAH_SUPER));
 }
+// ---------- Keamanan sesi: keluar otomatis bila tidak ada aktivitas ----------
+const BATAS_TIDAK_AKTIF_MS = 3*60*60*1000; // 3 jam (ubah angka 3 untuk mengganti lamanya)
+function catatAktivitas(paksa){
+  const n = Date.now(), t = Number(sessionStorage.getItem('aktivitas_terakhir')||0);
+  if(paksa || n-t > 15000){ try{ sessionStorage.setItem('aktivitas_terakhir', String(n)); }catch(e){} }
+}
+function sesiTidakAktif(){
+  const t = Number(sessionStorage.getItem('aktivitas_terakhir')||0);
+  return t>0 && Date.now()-t > BATAS_TIDAK_AKTIF_MS;
+}
+function tampilPesanLogin(){
+  const p = sessionStorage.getItem('pesan_login'); if(!p) return;
+  sessionStorage.removeItem('pesan_login');
+  const el = document.getElementById('login-error'); if(el) el.textContent = p;
+}
+function mulaiPantauTidakAktif(){
+  ['click','keydown','mousemove','touchstart','scroll'].forEach(ev=>window.addEventListener(ev, ()=>catatAktivitas(false), { passive:true }));
+  setInterval(()=>{
+    if(document.getElementById('app').classList.contains('hidden')) return;
+    if(sesiTidakAktif()){ sessionStorage.setItem('pesan_login','Anda keluar otomatis karena sudah lama tidak aktif. Silakan masuk lagi.'); logout(); }
+  }, 60000);
+}
+
+// ---------- DASHBOARD ----------
+async function loadDashboard(){
+  const kartu = document.getElementById('dash-kartu'), riwayat = document.getElementById('dash-riwayat');
+  document.getElementById('dash-sub').textContent = 'Ringkasan ujian di ' + (SEKOLAH.nama_lembaga || SEKOLAH.nama_aplikasi || 'sekolah') + '.';
+  const hitung = async (tabel, saring)=>{
+    let q = supa.from(tabel).select('*',{ count:'exact', head:true });
+    if(saring) q = saring(q);
+    const { count, error } = await q; return error ? null : count;
+  };
+  const [siswa, soal, paket, jalan, nilai, selesai] = await Promise.all([
+    hitung('students'), hitung('bank_soal'),
+    hitung('paket_ujian', q=>q.eq('status','siap').or('diarsipkan.is.null,diarsipkan.eq.false')),
+    hitung('sesi_ujian', q=>q.eq('status','berlangsung')),
+    hitung('sesi_ujian', q=>q.eq('status','selesai')),
+    hitung('sesi_ujian', q=>q.eq('status','dinilai'))
+  ]);
+  const daftar = [
+    ['Sedang ujian sekarang', jalan, 'monitor', jalan>0],
+    ['Perlu dinilai', nilai, 'pending', nilai>0],
+    ['Ujian sudah dinilai', selesai, 'hasil', false],
+    ['Paket ujian dibuka', paket, 'daftar', false],
+    ['Bank soal', soal, 'bank', false],
+    ['Siswa terdaftar', siswa, 'siswa', false]
+  ];
+  kartu.innerHTML = daftar.map(([nama,n,tab,sorot])=>`<button type="button" class="dash-kartu ${sorot?'sorot':''}" onclick="showTab('${tab}')"><small>${nama}</small><b>${n==null?'-':Number(n).toLocaleString('id-ID')}</b></button>`).join('');
+  const { data, error } = await supa.from('sesi_ujian').select('id, siswa_nama, status, total_skor, waktu_mulai, waktu_selesai, paket_ujian(judul)').order('id',{ ascending:false }).limit(8);
+  if(error){ riwayat.innerHTML = `<tr><td colspan="5">${escapeHtml(error.message)}</td></tr>`; return; }
+  const NAMA_STATUS = { berlangsung:'Sedang ujian', selesai:'Menunggu penilaian', dinilai:'Sudah dinilai' };
+  riwayat.innerHTML = (data||[]).length ? data.map(x=>{
+    const w = x.waktu_selesai || x.waktu_mulai;
+    return `<tr><td>${escapeHtml(x.siswa_nama||'-')}</td><td>${escapeHtml(x.paket_ujian?.judul||'-')}</td><td>${escapeHtml(NAMA_STATUS[x.status]||x.status||'-')}</td><td>${x.total_skor==null?'-':escapeHtml(String(x.total_skor))}</td><td>${w?new Date(w).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="muted">Belum ada ujian yang dikerjakan.</td></tr>';
+}
+
 async function boot(){
   await loadSekolah();
   const { data:{ session } } = await supa.auth.getSession();
-  if(!session){ return; }
+  if(session && sesiTidakAktif()){
+    try{ await supa.auth.signOut(); }catch(e){}
+    sessionStorage.setItem('pesan_login','Anda keluar otomatis karena sudah lama tidak aktif. Silakan masuk lagi.');
+    tampilPesanLogin(); return;
+  }
+  if(!session){ tampilPesanLogin(); return; }
+  catatAktivitas(true);
   await tentukanPeranSaya();
   if(MODE_LOGIN==='super' && !ADALAH_SUPER){
     try{ await supa.auth.signOut(); }catch(e){}
@@ -2076,6 +2173,8 @@ async function boot(){
   await loadBankSoal();
   await loadDaftarPaket();
   refreshBadgePending();
+  showTab('dashboard');
+  mulaiPantauTidakAktif();
 }
 boot();
 
@@ -2365,7 +2464,7 @@ function showTab(tab){
   if((tab==='user' || tab==='cadangan') && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['bank','cptp','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
+  ['dashboard','bank','cptp','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -2373,6 +2472,7 @@ function showTab(tab){
     g.classList.toggle('has-active', aktif);
     if(aktif) g.classList.add('open');
   });
+  if(tab==='dashboard') loadDashboard();
   if(tab==='cptp') loadCpTp();
   if(tab==='tugas') loadTugasGuru();
   if(tab==='nilaitugas') loadPenilaianTugas();

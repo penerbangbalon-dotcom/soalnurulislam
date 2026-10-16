@@ -1,5 +1,12 @@
 # Perubahan terbaru
 
+## v15.12 — Dashboard + keamanan login
+File berubah: `index.html` saja (tanpa migrasi SQL).
+- **Dashboard** (menu paling atas, halaman pertama setelah login): kartu ringkasan (sedang ujian, perlu dinilai, sudah dinilai, paket dibuka, bank soal, siswa), pintasan, dan 8 aktivitas ujian terbaru. Kartu bisa diklik.
+- **Login diminta lagi saat aplikasi dibuka baru**: sesi hanya hidup selama tab/browser terbuka. Muat ulang halaman di tab yang sama tidak keluar.
+- **Keluar otomatis** setelah 3 jam tanpa aktivitas (angka ada di `BATAS_TIDAK_AKTIF_MS`), disertai pesan di halaman login.
+- Setelah pemasangan, semua pengguna perlu login sekali lagi (sesi lama dihapus).
+
 ## v15.11 — Warna kuning emas + pilihan warna untuk seluruh sekolah
 File berubah: `index.html` dan `ujian.html`. Kolom `tema_warna` di tabel `pengaturan_sekolah` sudah ditambahkan (lihat `migrasi-v23-tema-warna.sql`); unggah kedua file lalu deploy ulang.
 - **Warna bawaan kuning emas**: tombol berwarna kuning dengan tulisan cokelat tua agar terbaca; menu samping gelap dengan menu aktif berwarna kuning.
