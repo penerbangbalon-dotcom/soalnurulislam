@@ -249,6 +249,21 @@ tr:hover td{background:var(--primary-soft);}
 .dash-kartu b{font-size:30px;font-weight:700;letter-spacing:-.02em;}
 .dash-kartu.sorot{background:var(--primary-soft);border-color:var(--green);}
 .dash-aksi{display:flex;flex-wrap:wrap;gap:8px;}
+
+/* ===== v15.13: dashboard lengkap ===== */
+.dash-dua{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px;}
+.dash-dua .card{margin-bottom:0;}
+.dash-info{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:var(--primary-soft);border:1px solid color-mix(in srgb,var(--green) 40%,#fff);margin:12px 0;font-weight:600;}
+.dash-bar{display:grid;grid-template-columns:96px 1fr 56px;align-items:center;gap:10px;margin:9px 0;font-size:13px;}
+.dash-bar-track{height:10px;background:#EEF0F3;border-radius:999px;overflow:hidden;}
+.dash-bar-track i{display:block;height:100%;background:var(--green);border-radius:999px;}
+.dash-bar b{text-align:right;}
+.dash-daftar{list-style:none;margin:0;padding:0;}
+.dash-daftar li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #EEF0F3;font-size:13.5px;}
+.dash-daftar li:last-child{border-bottom:none;}
+.dash-daftar small,.dash-kosong{color:var(--ink-soft);font-size:13px;}
+.dash-grup h4{margin:16px 0 8px;font-size:13px;font-weight:700;color:var(--ink-soft);}
+.dash-aksi .btn{padding:7px 12px;font-size:13px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -352,17 +367,30 @@ tr:hover td{background:var(--primary-soft);}
   <main>
     <!-- ===== TAB: DASHBOARD ===== -->
     <section id="tab-dashboard" class="hidden">
-      <h2>Dashboard</h2>
-      <p class="muted" id="dash-sub"></p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+        <div><h2 style="margin-bottom:4px;">Dashboard</h2><p class="muted" id="dash-sub" style="margin:0;"></p></div>
+        <button type="button" class="btn outline" onclick="loadDashboard()">&#x21BB; Segarkan</button>
+      </div>
+      <div id="dash-perhatian"></div>
       <div class="dash-grid" id="dash-kartu"></div>
+      <div class="dash-dua">
+        <div class="card"><h3>Sedang ujian sekarang</h3><div id="dash-jalan" class="dash-kosong">Memuat...</div></div>
+        <div class="card"><h3>Menunggu penilaian</h3><div id="dash-pending" class="dash-kosong">Memuat...</div></div>
+      </div>
+      <div class="dash-dua">
+        <div class="card"><h3>Ujian 7 hari terakhir</h3><div id="dash-hari"></div></div>
+        <div class="card"><h3>Sebaran nilai</h3><div id="dash-sebaran"></div></div>
+      </div>
+      <div class="dash-dua">
+        <div class="card"><h3>Paket ujian yang dibuka</h3><div id="dash-paket" class="dash-kosong">Memuat...</div></div>
+        <div class="card"><h3>Siswa per kelas</h3><div id="dash-kelas"></div></div>
+      </div>
       <div class="card">
-        <h3>Pintasan</h3>
-        <div class="dash-aksi">
-          <button type="button" class="btn" onclick="showTab('daftar')">Buat / Kelola Paket Ujian</button>
-          <button type="button" class="btn outline" onclick="showTab('monitor')">Monitoring Ujian</button>
-          <button type="button" class="btn outline" onclick="showTab('pending')">Nilai Jawaban Essay</button>
-          <button type="button" class="btn outline" onclick="showTab('bank')">Bank Soal</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0;">Pintasan</h3>
+          <input type="text" id="dash-cari" placeholder="Cari menu..." oninput="saringPintasan()" style="max-width:240px;" />
         </div>
+        <div id="dash-pintasan"></div>
       </div>
       <div class="card">
         <h3>Aktivitas ujian terbaru</h3>
@@ -2114,37 +2142,117 @@ function mulaiPantauTidakAktif(){
 }
 
 // ---------- DASHBOARD ----------
+function dashBar(label, n, maks, teks){
+  const w = maks>0 ? Math.max(n>0?3:0, Math.round(n/maks*100)) : 0;
+  return `<div class="dash-bar"><span>${escapeHtml(label)}</span><div class="dash-bar-track"><i style="width:${w}%"></i></div><b>${escapeHtml(teks==null?String(n):teks)}</b></div>`;
+}
+function bangunPintasan(){
+  const grup = [];
+  document.querySelectorAll('nav.sidebar .group').forEach(g=>{
+    if(g.classList.contains('hidden')) return;
+    const nama = ((g.querySelector('.ghead span')||{}).textContent||'').trim();
+    const item = [...g.querySelectorAll('.subs .item[data-tab]')].filter(i=>!i.classList.contains('hidden')).map(i=>({
+      tab:i.dataset.tab,
+      label:([...i.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim() || i.textContent.trim())
+    }));
+    if(item.length) grup.push({ nama, item });
+  });
+  document.getElementById('dash-pintasan').innerHTML = grup.map(g=>`<div class="dash-grup" data-grup="${escapeHtml(g.nama.toLowerCase())}"><h4>${escapeHtml(g.nama)}</h4><div class="dash-aksi">${g.item.map(i=>`<button type="button" class="btn outline" data-label="${escapeHtml(i.label.toLowerCase())}" onclick="showTab('${i.tab}')">${escapeHtml(i.label)}</button>`).join('')}</div></div>`).join('');
+}
+function saringPintasan(){
+  const q = document.getElementById('dash-cari').value.trim().toLowerCase();
+  document.querySelectorAll('#dash-pintasan .dash-grup').forEach(g=>{
+    let ada = false;
+    g.querySelectorAll('button').forEach(b=>{
+      const cocok = !q || b.dataset.label.includes(q) || g.dataset.grup.includes(q);
+      b.classList.toggle('hidden', !cocok); if(cocok) ada = true;
+    });
+    g.classList.toggle('hidden', !ada);
+  });
+}
 async function loadDashboard(){
-  const kartu = document.getElementById('dash-kartu'), riwayat = document.getElementById('dash-riwayat');
-  document.getElementById('dash-sub').textContent = 'Ringkasan ujian di ' + (SEKOLAH.nama_lembaga || SEKOLAH.nama_aplikasi || 'sekolah') + '.';
-  const hitung = async (tabel, saring)=>{
-    let q = supa.from(tabel).select('*',{ count:'exact', head:true });
-    if(saring) q = saring(q);
-    const { count, error } = await q; return error ? null : count;
-  };
-  const [siswa, soal, paket, jalan, nilai, selesai] = await Promise.all([
-    hitung('students'), hitung('bank_soal'),
-    hitung('paket_ujian', q=>q.eq('status','siap').or('diarsipkan.is.null,diarsipkan.eq.false')),
-    hitung('sesi_ujian', q=>q.eq('status','berlangsung')),
-    hitung('sesi_ujian', q=>q.eq('status','selesai')),
-    hitung('sesi_ujian', q=>q.eq('status','dinilai'))
+  const $ = id=>document.getElementById(id);
+  $('dash-sub').textContent = 'Ringkasan ujian di ' + (SEKOLAH.nama_lembaga || SEKOLAH.nama_aplikasi || 'sekolah') + '.';
+  bangunPintasan(); saringPintasan();
+  const hitung = async (tabel)=>{ const { count, error } = await supa.from(tabel).select('*',{ count:'exact', head:true }); return error ? null : count; };
+  const [rp, rs, rw, nSoal, nMapel] = await Promise.all([
+    ambilSemuaBaris(()=>supa.from('paket_ujian').select('id, judul, jenis_ujian, kelas, program, status, durasi_menit, diarsipkan, mata_pelajaran(nama)').order('id')),
+    ambilSemuaBaris(()=>supa.from('sesi_ujian').select('id, paket_ujian_id, siswa_nama, status, total_skor, waktu_mulai, waktu_selesai').order('id')),
+    ambilSemuaBaris(()=>supa.from('students').select('kelas, program, status').order('id')),
+    hitung('bank_soal'), hitung('mata_pelajaran')
   ]);
+  const paket = rp.data||[], sesi = rs.data||[], siswa = rw.data||[];
+  const pmap = new Map(paket.map(p=>[p.id,p]));
+  const judul = id=>pmap.get(id)?.judul || '-';
+  const waktu = x=>x.waktu_selesai || x.waktu_mulai;
+  const fmt = (w,o)=>w ? new Date(w).toLocaleString('id-ID', o) : '-';
+  const aktif = paket.filter(p=>!p.diarsipkan);
+  const dibuka = aktif.filter(p=>p.status==='siap'), draft = aktif.filter(p=>p.status==='draft');
+  const jalan = sesi.filter(x=>x.status==='berlangsung'), tunggu = sesi.filter(x=>x.status==='selesai');
+  const dinilai = sesi.filter(x=>x.status==='dinilai' && x.total_skor!=null);
+  const awalHari = new Date(); awalHari.setHours(0,0,0,0);
+  const hariIni = sesi.filter(x=>waktu(x) && new Date(waktu(x))>=awalHari).length;
+  const rata = dinilai.length ? dinilai.reduce((a,x)=>a+Number(x.total_skor),0)/dinilai.length : null;
+  const aktifSiswa = siswa.filter(x=>!/lulus|keluar|pindah|nonaktif|mutasi|alumni/i.test(x.status||''));
+  const n = v=>v==null ? '-' : Number(v).toLocaleString('id-ID');
+
+  // perhatian
+  const info = [];
+  if(tunggu.length) info.push([`${tunggu.length} lembar jawaban menunggu dinilai`, 'pending', 'Nilai sekarang']);
+  if(jalan.length) info.push([`${jalan.length} siswa sedang mengerjakan ujian`, 'monitor', 'Pantau']);
+  if(draft.length) info.push([`${draft.length} paket ujian masih draft (belum dibuka untuk siswa)`, 'daftar', 'Kelola paket']);
+  $('dash-perhatian').innerHTML = info.map(([t,tab,tombol])=>`<div class="dash-info"><span>${escapeHtml(t)}</span><button type="button" class="btn" onclick="showTab('${tab}')">${tombol}</button></div>`).join('');
+
+  // kartu
   const daftar = [
-    ['Sedang ujian sekarang', jalan, 'monitor', jalan>0],
-    ['Perlu dinilai', nilai, 'pending', nilai>0],
-    ['Ujian sudah dinilai', selesai, 'hasil', false],
-    ['Paket ujian dibuka', paket, 'daftar', false],
-    ['Bank soal', soal, 'bank', false],
-    ['Siswa terdaftar', siswa, 'siswa', false]
+    ['Sedang ujian sekarang', n(jalan.length), 'monitor', jalan.length>0],
+    ['Perlu dinilai', n(tunggu.length), 'pending', tunggu.length>0],
+    ['Ujian hari ini', n(hariIni), 'terlaksana', false],
+    ['Rata-rata nilai', rata==null?'-':rata.toFixed(1).replace(/\.0$/,''), 'hasil', false],
+    ['Ujian sudah dinilai', n(dinilai.length), 'hasil', false],
+    ['Paket ujian dibuka', n(dibuka.length), 'daftar', false],
+    ['Paket masih draft', n(draft.length), 'daftar', false],
+    ['Bank soal', n(nSoal), 'bank', false],
+    ['Mata pelajaran', n(nMapel), 'mapel', false],
+    ['Siswa aktif', rw.error?'-':n(aktifSiswa.length), 'siswa', false]
   ];
-  kartu.innerHTML = daftar.map(([nama,n,tab,sorot])=>`<button type="button" class="dash-kartu ${sorot?'sorot':''}" onclick="showTab('${tab}')"><small>${nama}</small><b>${n==null?'-':Number(n).toLocaleString('id-ID')}</b></button>`).join('');
-  const { data, error } = await supa.from('sesi_ujian').select('id, siswa_nama, status, total_skor, waktu_mulai, waktu_selesai, paket_ujian(judul)').order('id',{ ascending:false }).limit(8);
-  if(error){ riwayat.innerHTML = `<tr><td colspan="5">${escapeHtml(error.message)}</td></tr>`; return; }
+  $('dash-kartu').innerHTML = daftar.map(([nama,v,tab,sorot])=>`<button type="button" class="dash-kartu ${sorot?'sorot':''}" onclick="showTab('${tab}')"><small>${nama}</small><b>${v}</b></button>`).join('');
+
+  // sedang ujian
+  $('dash-jalan').innerHTML = jalan.length ? `<ul class="dash-daftar">${jalan.slice(0,10).map(x=>`<li><span>${escapeHtml(x.siswa_nama||'-')}<br><small>${escapeHtml(judul(x.paket_ujian_id))}</small></span><small>mulai ${fmt(x.waktu_mulai,{hour:'2-digit',minute:'2-digit'})}</small></li>`).join('')}</ul>${jalan.length>10?`<p class="dash-kosong">dan ${jalan.length-10} siswa lainnya.</p>`:''}` : 'Tidak ada siswa yang sedang ujian.';
+
+  // menunggu penilaian per paket
+  const per = new Map(); tunggu.forEach(x=>per.set(x.paket_ujian_id,(per.get(x.paket_ujian_id)||0)+1));
+  const urut = [...per.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6);
+  $('dash-pending').innerHTML = urut.length ? `<ul class="dash-daftar">${urut.map(([id,c])=>`<li><span>${escapeHtml(judul(id))}</span><b>${c} siswa</b></li>`).join('')}</ul><p style="margin:10px 0 0;"><button type="button" class="btn outline" onclick="showTab('pending')">Buka halaman penilaian</button></p>` : 'Semua jawaban sudah dinilai.';
+
+  // 7 hari terakhir
+  const hari = [];
+  for(let i=6;i>=0;i--){ const d = new Date(awalHari); d.setDate(d.getDate()-i); hari.push({ d, n:0 }); }
+  sesi.forEach(x=>{ const w = waktu(x); if(!w) return; const t = new Date(w); t.setHours(0,0,0,0); const h = hari.find(y=>y.d.getTime()===t.getTime()); if(h) h.n++; });
+  const mh = Math.max(...hari.map(h=>h.n));
+  $('dash-hari').innerHTML = hari.map(h=>dashBar(h.d.toLocaleDateString('id-ID',{ weekday:'short', day:'numeric' }), h.n, mh)).join('');
+
+  // sebaran nilai
+  const rentang = [['Di bawah 60',0,60],['60 - 69',60,70],['70 - 79',70,80],['80 - 89',80,90],['90 ke atas',90,Infinity]].map(([l,a,b])=>({ l, n:dinilai.filter(x=>Number(x.total_skor)>=a && Number(x.total_skor)<b).length }));
+  const mr = Math.max(...rentang.map(r=>r.n));
+  $('dash-sebaran').innerHTML = dinilai.length ? rentang.map(r=>dashBar(r.l, r.n, mr)).join('') : '<p class="dash-kosong">Belum ada nilai.</p>';
+
+  // paket dibuka
+  const peserta = new Map(); sesi.forEach(x=>peserta.set(x.paket_ujian_id,(peserta.get(x.paket_ujian_id)||0)+1));
+  $('dash-paket').innerHTML = dibuka.length ? `<ul class="dash-daftar">${dibuka.slice(-8).reverse().map(p=>`<li><span>${escapeHtml(p.judul||'-')}<br><small>${escapeHtml([p.mata_pelajaran?.nama, p.kelas?('Kelas '+p.kelas):'', p.program].filter(Boolean).join(' · '))}</small></span><small>${peserta.get(p.id)||0} peserta${p.durasi_menit?` · ${p.durasi_menit} mnt`:''}</small></li>`).join('')}</ul>` : 'Belum ada paket ujian yang dibuka.';
+
+  // siswa per kelas
+  const kls = new Map(); aktifSiswa.forEach(x=>{ const k = [x.program, x.kelas].filter(Boolean).join(' ') || 'Tanpa kelas'; kls.set(k,(kls.get(k)||0)+1); });
+  const dk = [...kls.entries()].sort((a,b)=>a[0].localeCompare(b[0],'id',{ numeric:true })).slice(0,14);
+  const mk = Math.max(0,...dk.map(x=>x[1]));
+  $('dash-kelas').innerHTML = dk.length ? dk.map(([k,c])=>dashBar(k,c,mk)).join('') : '<p class="dash-kosong">Belum ada data siswa.</p>';
+
+  // aktivitas terbaru
   const NAMA_STATUS = { berlangsung:'Sedang ujian', selesai:'Menunggu penilaian', dinilai:'Sudah dinilai' };
-  riwayat.innerHTML = (data||[]).length ? data.map(x=>{
-    const w = x.waktu_selesai || x.waktu_mulai;
-    return `<tr><td>${escapeHtml(x.siswa_nama||'-')}</td><td>${escapeHtml(x.paket_ujian?.judul||'-')}</td><td>${escapeHtml(NAMA_STATUS[x.status]||x.status||'-')}</td><td>${x.total_skor==null?'-':escapeHtml(String(x.total_skor))}</td><td>${w?new Date(w).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}</td></tr>`;
-  }).join('') : '<tr><td colspan="5" class="muted">Belum ada ujian yang dikerjakan.</td></tr>';
+  const terbaru = sesi.slice(-10).reverse();
+  $('dash-riwayat').innerHTML = terbaru.length ? terbaru.map(x=>`<tr><td>${escapeHtml(x.siswa_nama||'-')}</td><td>${escapeHtml(judul(x.paket_ujian_id))}</td><td>${escapeHtml(NAMA_STATUS[x.status]||x.status||'-')}</td><td>${x.total_skor==null?'-':escapeHtml(String(x.total_skor))}</td><td>${fmt(waktu(x),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('') : '<tr><td colspan="5" class="muted">Belum ada ujian yang dikerjakan.</td></tr>';
+  if(rp.error || rs.error) $('dash-riwayat').innerHTML = `<tr><td colspan="5">${escapeHtml((rp.error||rs.error).message)}</td></tr>`;
 }
 
 async function boot(){

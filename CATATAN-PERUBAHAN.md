@@ -1,5 +1,12 @@
 # Perubahan terbaru
 
+## v15.13 — Dashboard lebih lengkap
+File berubah: `index.html` saja (tanpa migrasi SQL).
+- **10 kartu ringkasan** (sedang ujian, perlu dinilai, ujian hari ini, rata-rata nilai, sudah dinilai, paket dibuka, paket draft, bank soal, mata pelajaran, siswa aktif) plus **pengingat** di bagian atas bila ada yang perlu ditindaklanjuti.
+- **Panel baru**: siswa yang sedang ujian, jawaban menunggu penilaian per paket, grafik ujian 7 hari terakhir, sebaran nilai, paket ujian yang dibuka, dan jumlah siswa per kelas.
+- **Pintasan lengkap**: semua menu dikelompokkan seperti menu samping (mengikuti peran akun) dengan kotak pencarian menu.
+- Tombol **Segarkan** untuk memuat ulang data.
+
 ## v15.12 — Dashboard + keamanan login
 File berubah: `index.html` saja (tanpa migrasi SQL).
 - **Dashboard** (menu paling atas, halaman pertama setelah login): kartu ringkasan (sedang ujian, perlu dinilai, sudah dinilai, paket dibuka, bank soal, siswa), pintasan, dan 8 aktivitas ujian terbaru. Kartu bisa diklik.
