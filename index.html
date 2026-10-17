@@ -1485,15 +1485,17 @@ tr:hover td{background:var(--primary-soft);}
 
     <section id="tab-ttd" class="hidden">
       <h2>Tanda Tangan Digital</h2>
-      <p class="muted">Unggah foto/scan tanda tangan (JPG/PNG) sekali di sini, lalu Rapor dan Piagam akan otomatis
-        menampilkannya secara digital tanpa perlu ditandatangani manual satu-satu.</p>
+      <p class="muted">Simpan nama (dan NIP) sekali di sini. Foto/scan tanda tangan (JPG/PNG) <b>bersifat opsional</b>:
+        bila diunggah, Rapor dan Piagam menampilkannya secara digital; bila tidak, cetakan tetap memakai nama yang
+        tersimpan dengan ruang kosong untuk tanda tangan manual. Foto yang sudah tersimpan tidak perlu diunggah ulang
+        setiap kali mengubah nama/NIP/ukuran.</p>
 
       <div class="card">
         <h3 style="margin-top:0;">Kepala PKBM</h3>
         <div class="grid2">
           <div class="field"><label>Nama Kepala PKBM</label><input type="text" id="ttd-kepala-nama" placeholder="Nama lengkap & gelar" />
             <label style="margin-top:8px;">NIP (boleh dikosongkan)</label><input type="text" id="ttd-kepala-nip" placeholder="mis. 19800101 200501 1 001" /></div>
-          <div class="field"><label>Foto Tanda Tangan (JPG/PNG)</label>
+          <div class="field"><label>Foto Tanda Tangan (JPG/PNG) — opsional</label>
             <input type="file" accept="image/*" onchange="pilihTtd(this,'kepala')">
             <div id="ttd-kepala-prev"></div>
           </div>
@@ -1518,7 +1520,7 @@ tr:hover td{background:var(--primary-soft);}
           <div class="field"><label>Nama Wali Kelas</label><input type="text" id="ttd-wali-nama" placeholder="Nama lengkap & gelar" />
             <label style="margin-top:8px;">NIP (boleh dikosongkan)</label><input type="text" id="ttd-wali-nip" placeholder="mis. 19800101 200501 1 001" /></div>
         </div>
-        <div class="field"><label>Foto Tanda Tangan (JPG/PNG)</label>
+        <div class="field"><label>Foto Tanda Tangan (JPG/PNG) — opsional</label>
           <input type="file" accept="image/*" onchange="pilihTtd(this,'wali')">
           <div id="ttd-wali-prev"></div>
         </div>
@@ -6614,16 +6616,13 @@ async function simpanTtdKepala(){
   const nama = document.getElementById('ttd-kepala-nama').value.trim();
   const tinggi_px = parseInt(document.getElementById('ttd-kepala-ukuran').value, 10) || 90;
   if(!nama) return alert('Nama Kepala PKBM wajib diisi.');
-  if(!ttdSementara.kepala){
-    const existing = await ambilTtd('kepala_pkbm', '');
-    if(!existing || !existing.ttd_base64) return alert('Unggah foto tanda tangan (JPG/PNG) terlebih dahulu.');
-  }
   const payload = { jenis:'kepala_pkbm', kelas:'', nama, tinggi_px, updated_at:new Date().toISOString() };
   if(ttdSementara.kepala) payload.ttd_base64 = ttdSementara.kepala;
   const { error } = await upsertTtdDenganNip(payload, document.getElementById('ttd-kepala-nip').value);
   if(error) return alert('Gagal menyimpan: '+error.message);
+  const adaFotoKepala = !!payload.ttd_base64;
   ttdSementara.kepala = null;
-  alert('Tanda tangan Kepala PKBM tersimpan. Rapor & Piagam yang dicetak berikutnya akan otomatis memakainya.');
+  alert(adaFotoKepala ? 'Data Kepala PKBM tersimpan (beserta foto tanda tangan). Rapor & Piagam berikutnya akan otomatis memakainya.' : 'Data Kepala PKBM tersimpan (tanpa foto baru). Jika belum pernah ada foto, Rapor & Piagam menampilkan nama dengan ruang kosong untuk tanda tangan manual.');
 }
 
 async function simpanTtdWali(){
@@ -6632,17 +6631,13 @@ async function simpanTtdWali(){
   const tinggi_px = parseInt(document.getElementById('ttd-wali-ukuran').value, 10) || 90;
   if(!kelas) return alert('Pilih kelas terlebih dahulu.');
   if(!nama) return alert('Nama Wali Kelas wajib diisi.');
-  if(!ttdSementara.wali){
-    const existing = await ambilTtd('wali_kelas', kelas);
-    if(!existing || !existing.ttd_base64) return alert('Unggah foto tanda tangan (JPG/PNG) terlebih dahulu.');
-  }
   const payload = { jenis:'wali_kelas', kelas, nama, tinggi_px, updated_at:new Date().toISOString() };
   if(ttdSementara.wali) payload.ttd_base64 = ttdSementara.wali;
   const { error } = await upsertTtdDenganNip(payload, document.getElementById('ttd-wali-nip').value);
   if(error) return alert('Gagal menyimpan: '+error.message);
   ttdSementara.wali = null;
   document.getElementById('ttd-wali-prev').innerHTML = '';
-  alert(`Tanda tangan Wali Kelas ${kelas} tersimpan.`);
+  alert(`Data Wali Kelas ${kelas} tersimpan.` + (payload.ttd_base64 ? '' : ' (tanpa foto baru; bila belum ada foto, cetakan memakai nama dengan ruang tanda tangan manual).'));
   muatDaftarWaliTtd();
 }
 
