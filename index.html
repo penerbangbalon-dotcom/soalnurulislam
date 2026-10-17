@@ -1464,7 +1464,7 @@ tr:hover td{background:var(--primary-soft);}
     <!-- ===== TAB: ARSIP NILAI ===== -->
     <section id="tab-arsip" class="hidden">
       <h2>Arsip Nilai</h2>
-      <p class="muted">Salinan permanen setiap nilai ujian siswa. Nilai di sini <b>tidak ikut terhapus</b> walaupun paket ujian dihapus atau sesi siswa di-reset, dan tidak bisa diubah dari aplikasi.</p>
+      <p class="muted">Salinan permanen setiap nilai ujian siswa. Nilai di sini <b>tidak ikut terhapus</b> walaupun paket ujian dihapus atau sesi siswa di-reset, dan tidak bisa diubah dari aplikasi. Nilai yang sudah terhapus dari Hasil Ujian dapat dikembalikan dengan tombol <b>Pulihkan Nilai</b>.</p>
       <div class="toolbar">
         <input type="text" id="arsip-cari" placeholder="Cari nama / NISN / paket / mapel / kelas..." title="Contoh: x uts   kelas:XI   -remedial   &quot;ulangan harian&quot;" style="max-width:340px;" oninput="renderArsipNilai()" />
         <select id="arsip-filter" onchange="renderArsipNilai()">
@@ -1472,11 +1472,12 @@ tr:hover td{background:var(--primary-soft);}
           <option value="hilang">Hanya yang datanya sudah dihapus dari sistem</option>
         </select>
         <button class="btn outline" onclick="eksporArsipNilai()">Ekspor Excel</button>
+        <button class="btn" id="arsip-pulih-semua" onclick="pulihkanSemuaArsip()">Pulihkan Semua yang Dihapus</button>
       </div>
       <div id="arsip-ringkasan" class="muted" style="margin-bottom:10px;"></div>
       <div class="card">
         <table>
-          <thead><tr><th>Siswa</th><th>Paket / Mapel</th><th>Kelas</th><th>Semester / Tahun</th><th>Nilai</th><th>Selesai</th><th>Status data</th></tr></thead>
+          <thead><tr><th>Siswa</th><th>Paket / Mapel</th><th>Kelas</th><th>Semester / Tahun</th><th>Nilai</th><th>Selesai</th><th>Status data</th><th>Aksi</th></tr></thead>
           <tbody id="arsip-body"></tbody>
         </table>
         <p class="muted hidden" id="arsip-empty">Tidak ada data yang cocok.</p>
@@ -6701,6 +6702,62 @@ function arsipTersaring(){
       medan:{ kelas:x=>x.kelas, jenis:x=>x.jenis_ujian, mapel:x=>x.mapel_nama, program:x=>x.program, smt:x=>x.semester, ta:x=>x.tahun_ajaran, judul:x=>x.paket_judul, nama:x=>x.siswa_nama, nisn:x=>x.siswa_nisn } });
   });
 }
+// Pulihkan nilai dari arsip ke Hasil Ujian. Sesi dibuat ulang dengan ID aslinya, lalu trigger
+// database otomatis menghapus tanda "dihapus" di arsip. Rincian jawaban per soal tidak tersimpan
+// di arsip, jadi yang kembali adalah nilai/skor, status, dan waktu selesainya.
+async function pulihkanBarisArsip(rows){
+  const hasil = { ok:0, gagal:[] };
+  const paketIds = [...new Set(rows.map(r=>r.paket_id).filter(Boolean))];
+  const paketAda = new Set();
+  for(let i=0;i<paketIds.length;i+=100){
+    const { data } = await supa.from('paket_ujian').select('id').in('id', paketIds.slice(i,i+100));
+    (data||[]).forEach(d=>paketAda.add(d.id));
+  }
+  const sesiAda = new Set();
+  for(let i=0;i<paketIds.length;i+=50){
+    const { data } = await ambilSemuaBaris(()=>supa.from('sesi_ujian').select('id, paket_ujian_id, siswa_nisn').in('paket_ujian_id', paketIds.slice(i,i+50)).order('id'));
+    (data||[]).forEach(d=>{ sesiAda.add(d.id); sesiAda.add(d.paket_ujian_id+'|'+d.siswa_nisn); });
+  }
+  for(const r of rows){
+    const nama = r.siswa_nama || r.siswa_nisn || '?';
+    if(!r.paket_id || !paketAda.has(r.paket_id)){ hasil.gagal.push(`${nama}: paket ujian "${r.paket_judul||'-'}" sudah dihapus, jadi tidak ada tempat untuk mengembalikan nilai.`); continue; }
+    if(sesiAda.has(r.sesi_id) || sesiAda.has(r.paket_id+'|'+r.siswa_nisn)){ hasil.gagal.push(`${nama}: sudah punya hasil ujian di paket "${r.paket_judul||'-'}" (mungkin sudah dipulihkan atau mengerjakan ulang).`); continue; }
+    const baris = {
+      id: r.sesi_id, paket_ujian_id: r.paket_id, siswa_nisn: r.siswa_nisn, siswa_nama: r.siswa_nama || r.siswa_nisn,
+      status: (r.status==='selesai' || r.status==='dinilai') ? r.status : 'dinilai',
+      total_skor: r.total_skor, mode_ujian: r.mode_ujian==='manual' ? 'manual' : 'online',
+      waktu_mulai: r.waktu_selesai || undefined, waktu_selesai: r.waktu_selesai || null,
+    };
+    if(baris.waktu_mulai===undefined) delete baris.waktu_mulai;
+    const { error } = await supa.from('sesi_ujian').insert(baris);
+    if(error) hasil.gagal.push(`${nama}: ${error.message}`); else hasil.ok++;
+  }
+  return hasil;
+}
+function laporPemulihan(h){
+  let msg = `Berhasil dipulihkan: ${h.ok} nilai.`;
+  if(h.gagal.length) msg += `\n\nTidak dapat dipulihkan (${h.gagal.length}):\n- ` + h.gagal.slice(0,10).join('\n- ') + (h.gagal.length>10 ? `\n... dan ${h.gagal.length-10} lainnya` : '');
+  if(h.ok) msg += '\n\nCatatan: rincian jawaban per soal tidak tersimpan di arsip, jadi yang kembali adalah nilai total, status, dan waktu selesai.';
+  alert(msg);
+}
+async function pulihkanNilaiArsip(sesiId){
+  const r = arsipData.find(x=>x.sesi_id===sesiId); if(!r) return;
+  if(!confirm(`Pulihkan nilai ${r.siswa_nama||r.siswa_nisn} (${r.paket_judul||'-'}, nilai ${r.total_skor==null?'-':Number(r.total_skor).toFixed(1).replace(/\.0$/,'')}) ke Hasil Ujian?`)) return;
+  const h = await pulihkanBarisArsip([r]);
+  laporPemulihan(h);
+  await loadArsipNilai();
+}
+async function pulihkanSemuaArsip(){
+  const rows = arsipTersaring().filter(r=>r.sesi_dihapus_pada);
+  if(!rows.length) return alert('Tidak ada nilai terhapus pada daftar yang sedang ditampilkan.');
+  if(!confirm(`Pulihkan ${rows.length} nilai yang terhapus (sesuai filter/pencarian saat ini) ke Hasil Ujian?`)) return;
+  const btn = document.getElementById('arsip-pulih-semua'); btn.disabled = true;
+  try{
+    const h = await pulihkanBarisArsip(rows);
+    laporPemulihan(h);
+  } finally { btn.disabled = false; }
+  await loadArsipNilai();
+}
 function renderArsipNilai(){
   const rows = arsipTersaring();
   const hilang = arsipData.filter(r=>r.sesi_dihapus_pada).length;
@@ -6717,7 +6774,8 @@ function renderArsipNilai(){
     <td><b>${r.total_skor==null?'-':Number(r.total_skor).toFixed(1).replace(/\.0$/,'')}</b></td>
     <td>${tglArsip(r.waktu_selesai)}</td>
     <td>${r.sesi_dihapus_pada ? `<span class="badge draft" title="Dihapus pada ${tglArsip(r.sesi_dihapus_pada)}">Data dihapus &mdash; aman di arsip</span>` : '<span class="badge siap">Masih aktif</span>'}</td>
-  </tr>`).join('') + (rows.length>MAKS ? `<tr><td colspan="7" class="muted">Menampilkan ${MAKS} dari ${rows.length}. Gunakan pencarian atau Ekspor Excel untuk melihat semuanya.</td></tr>` : '');
+    <td>${r.sesi_dihapus_pada ? `<button class="btn" style="padding:4px 10px;" onclick="pulihkanNilaiArsip('${r.sesi_id}')">Pulihkan Nilai</button>` : ''}</td>
+  </tr>`).join('') + (rows.length>MAKS ? `<tr><td colspan="8" class="muted">Menampilkan ${MAKS} dari ${rows.length}. Gunakan pencarian atau Ekspor Excel untuk melihat semuanya.</td></tr>` : '');
 }
 function eksporArsipNilai(){
   const rows = arsipTersaring();
