@@ -268,6 +268,19 @@ tr:hover td{background:var(--primary-soft);}
 /* ===== v15.14: mapel tidak diujikan ===== */
 .baris-tdk td{background:#FAFAF8;color:var(--ink-soft);}
 .badge-tdk{display:inline-block;padding:2px 10px;border-radius:999px;background:#F3F4F6;color:#4B5563;font-size:12px;font-weight:600;}
+  /* ---- Perangkat Ajar (RPP & Modul Ajar) ---- */
+  .pa-tp-list{max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--surface);}
+  .pa-tp{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13.5px;cursor:pointer;}
+  .pa-prog{padding:5px 0;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .pa-grup{margin:20px 0 8px;padding:7px 12px;background:#E7ECF4;border-radius:8px;font-weight:700;font-size:13.5px;letter-spacing:.2px;color:#1b2a41;}
+  .pa-bagian{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:10px;background:var(--surface);}
+  .pa-bagian-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
+  .pa-md p{margin:5px 0;line-height:1.55;} .pa-md ul,.pa-md ol{margin:5px 0 5px 20px;padding:0;line-height:1.55;}
+  .pa-md h5{margin:10px 0 3px;font-size:13.5px;}
+  .pa-scroll{overflow-x:auto;margin:6px 0;} .pa-tabel{border-collapse:collapse;width:100%;font-size:13px;}
+  .pa-tabel th,.pa-tabel td{border:1px solid #b9c2d0;padding:5px 8px;text-align:left;vertical-align:top;} .pa-tabel th{background:#E7ECF4;}
+  .pa-ident{border-collapse:collapse;width:100%;font-size:13.5px;} .pa-ident th{width:210px;background:#F2F4F8;text-align:left;}
+  .pa-ident th,.pa-ident td{border:1px solid #b9c2d0;padding:5px 9px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -308,6 +321,13 @@ tr:hover td{background:var(--primary-soft);}
         <div class="item active" data-tab="bank" onclick="showTab('bank')">Bank Soal</div>
         <div class="item" data-tab="rekap" onclick="showTab('rekap')">Rekap Bank Soal</div>
         <div class="item" data-tab="cptp" onclick="showTab('cptp')">CP &amp; TP per Mapel</div>
+      </div>
+    </div>
+    <div class="group" data-group="ajar">
+      <div class="ghead" onclick="toggleGroup('ajar')"><span>Perangkat Ajar</span><span class="chev">&#9656;</span></div>
+      <div class="subs">
+        <div class="item" data-tab="rpp" onclick="showTab('rpp')">RPP</div>
+        <div class="item" data-tab="modul" onclick="showTab('modul')">Modul Ajar</div>
       </div>
     </div>
     <div class="group" data-group="paketg">
@@ -359,6 +379,7 @@ tr:hover td{background:var(--primary-soft);}
         <div class="item" data-tab="pengnilai" onclick="showTab('pengnilai')">Pengaturan Nilai</div>
         <div class="item" data-tab="mapel" onclick="showTab('mapel')">Mata Pelajaran</div>
         <div class="item" data-tab="ttd" onclick="showTab('ttd')">Tanda Tangan</div>
+        <div class="item admin-only hidden" data-tab="pengajar" onclick="showTab('pengajar')">Pengaturan RPP &amp; Modul Ajar</div>
         <div class="item admin-only hidden" data-tab="siswa" onclick="showTab('siswa')">Data Siswa</div>
         <div class="item admin-only hidden" data-tab="sekolah" onclick="showTab('sekolah')">Identitas Sekolah</div>
         <div class="item super-only hidden" data-tab="user" onclick="showTab('user')">Manajemen User</div>
@@ -1484,6 +1505,41 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </section>
 
+    <!-- ===== TAB: RPP & MODUL AJAR ===== -->
+    <section id="tab-rpp" class="hidden"></section>
+    <section id="tab-modul" class="hidden"></section>
+    <section id="tab-pengajar" class="hidden">
+      <h2>Pengaturan RPP &amp; Modul Ajar</h2>
+      <p class="muted">Atur format standar dan konteks yang dipakai AI saat membuat RPP dan Modul Ajar. Hanya admin yang dapat mengubah. Pengaturan ini menjadi nilai awal; guru tetap bisa memilih format lain untuk tiap dokumen.</p>
+      <div class="card">
+        <h3 style="margin-top:0;">Format dokumen</h3>
+        <div class="grid2">
+          <div class="field"><label>Format standar untuk RPP</label><select id="pa-set-format_rpp"></select></div>
+          <div class="field"><label>Format standar untuk Modul Ajar</label><select id="pa-set-format_modul"></select></div>
+        </div>
+        <p class="muted" style="margin:0 0 6px;">Ketentuan terkini tidak mewajibkan satu bentuk tunggal: Panduan Pembelajaran dan Asesmen (Edisi Revisi 2025) membolehkan perencanaan berupa RPP atau modul ajar yang fleksibel, sedangkan format lama tetap dapat dipakai bila diminta pengawas. Tiga format yang tersedia:</p>
+        <ul id="pa-set-format-info" style="margin:0 0 4px 18px;padding:0;"></ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Alokasi waktu</h3>
+        <div class="grid2">
+          <div class="field"><label>Menit per 1 JP — Paket B (SMP)</label><input type="number" id="pa-set-menit_jp_b" min="20" max="60" /></div>
+          <div class="field"><label>Menit per 1 JP — Paket C (SMA)</label><input type="number" id="pa-set-menit_jp_c" min="20" max="60" /></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Pengaturan untuk AI</h3>
+        <div class="field"><label>Model pembelajaran bawaan (opsional)</label><input type="text" id="pa-set-model_default" placeholder="Contoh: Problem Based Learning (PBL)" /></div>
+        <div class="field"><label>Karakteristik peserta didik PKBM</label><textarea id="pa-set-karakter_peserta" rows="3" placeholder="Dipakai AI agar kegiatan dan contoh sesuai kondisi peserta didik Anda"></textarea></div>
+        <div class="field"><label>Catatan tambahan untuk semua dokumen (opsional)</label><textarea id="pa-set-catatan_ai" rows="2" placeholder="Contoh: gunakan contoh dari lingkungan pedesaan; hindari tugas yang membutuhkan internet"></textarea></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Tanda tangan di dokumen</h3>
+        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="pa-set-tampil_ttd_kepala" /> Tampilkan kolom tanda tangan Kepala PKBM (diambil dari menu Tanda Tangan)</label>
+      </div>
+      <div class="toolbar"><button class="btn" onclick="paSimpanPengaturan()">Simpan Pengaturan</button><span class="muted" id="pa-set-status"></span></div>
+    </section>
+
     <section id="tab-ttd" class="hidden">
       <h2>Tanda Tangan Digital</h2>
       <p class="muted">Simpan nama (dan NIP) sekali di sini. Foto/scan tanda tangan (JPG/PNG) <b>bersifat opsional</b>:
@@ -2008,9 +2064,11 @@ async function login(){
   const password = document.getElementById('login-pass').value;
   const { error } = await supa.auth.signInWithPassword({ email, password });
   if(error){ document.getElementById('login-error').textContent = error.message; return; }
+  catatAktivitas(true);   // login baru = aktivitas baru; cegah catatan lama menyebabkan keluar otomatis
   await boot();
 }
 async function logout(){
+  try{ sessionStorage.removeItem('aktivitas_terakhir'); }catch(e){}   // jangan wariskan waktu lama ke login berikutnya
   const btn = document.querySelector('.logout');
   if(btn) btn.textContent = 'Keluar...';
   try{
@@ -2621,9 +2679,9 @@ async function hapusUser(userId, email){
 // ---------- NAV ----------
 function showTab(tab){
   if((tab==='user' || tab==='cadangan') && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
-  if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
+  if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa' || tab==='pengajar') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['dashboard','bank','cptp','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
+  ['dashboard','bank','cptp','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa','rpp','modul','pengajar'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -2659,6 +2717,8 @@ function showTab(tab){
   if(tab==='arsip') loadArsipNilai();
   if(tab==='paket' && document.getElementById('pk-mapel').value) loadSoalUntukPaket();
   if(tab==='ttd') loadTabTtd();
+  if(tab==='rpp' || tab==='modul') paBukaTab(tab);
+  if(tab==='pengajar') paBukaPengaturan();
   if(tab==='sekolah') isiFormSekolah();
   if(tab==='user') loadDaftarUser();
   if(tab==='siswa') loadSiswaTerbaru();
@@ -10011,6 +10071,499 @@ function soalHtmlAman(str){
 function srcGambarAman(g){ return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=]+$/.test(String(g||'')) ? g : ''; }
 // Untuk menyisipkan teks bebas (nama, email) ke atribut onclick dengan aman: hasilnya string JavaScript ber-kutip ganda yang di-escape HTML.
 function jsq(v){ return escapeHtml(JSON.stringify(String(v==null?'':v))); }
+// ===================== PERANGKAT AJAR: RPP & MODUL AJAR =====================
+// Satu mesin dipakai dua menu (jenis 'rpp' dan 'modul'). Isi dokumen disimpan sebagai bagian-bagian bertipe markdown ringan
+// supaya bisa diedit guru, ditampilkan di layar, dan diubah ke Word oleh server (/api/perangkat-docx).
+const PA_FORMAT = {
+  pm: { label:'Pembelajaran Mendalam (Panduan Pembelajaran & Asesmen, Edisi Revisi 2025)', alur:'Identifikasi \u2192 Desain Pembelajaran \u2192 Pengalaman Belajar (memahami, mengaplikasi, merefleksi) \u2192 Asesmen' },
+  merdeka: { label:'Modul Ajar Kurikulum Merdeka', alur:'Informasi Umum \u2192 Komponen Inti \u2192 Lampiran' },
+  satu_lembar: { label:'RPP 1 Lembar (SE Mendikbud No. 14 Tahun 2019)', alur:'Tujuan Pembelajaran \u2192 Langkah Kegiatan \u2192 Penilaian' },
+};
+const PA_NAMA = { rpp:'RPP', modul:'Modul Ajar' };
+const PA_DEFAULT = { format_rpp:'pm', format_modul:'merdeka', menit_jp_b:40, menit_jp_c:45, model_default:'', karakter_peserta:'', catatan_ai:'', tampil_ttd_kepala:true };
+const PA_MODEL = ['Problem Based Learning (PBL)','Project Based Learning (PjBL)','Discovery Learning','Inquiry Learning','Cooperative Learning (Jigsaw/STAD)','Direct Instruction (Pembelajaran Langsung)','Contextual Teaching and Learning (CTL)'];
+let PA_SET = { ...PA_DEFAULT };
+let PA_SET_TERSEDIA = true;
+let PA_EMAIL = '';
+const PA = { rpp:{ doc:null, sibuk:false, dibangun:false, daftar:[], status:{}, galat:{}, provider:new Set() },
+             modul:{ doc:null, sibuk:false, dibangun:false, daftar:[], status:{}, galat:{}, provider:new Set() } };
+const paTunggu = (ms)=>new Promise(r=>setTimeout(r, ms));
+const paEl = (id)=>document.getElementById(id);
+
+async function paMuatPengaturan(){
+  try{
+    const { data, error } = await supa.from('pengaturan_perangkat_ajar').select('*').eq('id',1).maybeSingle();
+    if(error) throw error;
+    PA_SET_TERSEDIA = true;
+    if(data) PA_SET = { ...PA_DEFAULT, ...Object.fromEntries(Object.entries(data).filter(([k,v])=>v!==null && k in PA_DEFAULT)) };
+  }catch(e){ PA_SET_TERSEDIA = false; PA_SET = { ...PA_DEFAULT }; }
+  try{ PA_EMAIL = (await supa.auth.getUser()).data.user?.email || ''; }catch(e){}
+}
+
+// ---------- markdown ringan -> HTML (cermin parser di server) ----------
+function paMdHtml(teks){
+  const lines = String(teks||'').replace(/\r/g,'').split('\n');
+  const inline = s=>escapeHtml(s).replace(/`/g,'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  let out = '', para = [], list = null, tbl = null;
+  const fPara = ()=>{ if(para.length){ out += `<p>${inline(para.join(' '))}</p>`; para = []; } };
+  const fList = ()=>{ if(list){ out += `<${list.t}>${list.items.map(i=>`<li>${inline(i)}</li>`).join('')}</${list.t}>`; list = null; } };
+  const fTbl = ()=>{ if(!tbl) return;
+    const [h,...r] = tbl.header ? tbl.rows : [null, ...tbl.rows];
+    out += `<div class="pa-scroll"><table class="pa-tabel">${h?`<thead><tr>${h.map(c=>`<th>${inline(c)}</th>`).join('')}</tr></thead>`:''}<tbody>${r.map(x=>`<tr>${x.map(c=>`<td>${inline(c).replace(/&lt;br\s*\/?&gt;/gi,'<br>')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    tbl = null; };
+  const fAll = ()=>{ fPara(); fList(); fTbl(); };
+  for(const raw of lines){
+    const l = raw.trim(); let m;
+    if(!l){ fAll(); continue; }
+    if(/^#{1,6}\s+/.test(l)){ fAll(); out += `<h5>${inline(l.replace(/^#{1,6}\s+/,''))}</h5>`; continue; }
+    if(l.startsWith('|')){ fPara(); fList(); if(!tbl) tbl = { rows:[], header:false };
+      if(/^\|?[\s:|-]+\|?$/.test(l) && /-{2,}/.test(l)){ tbl.header = true; continue; }
+      tbl.rows.push(l.replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim())); continue; }
+    fTbl();
+    if((m = l.match(/^[-*\u2022]\s+(.*)$/))){ fPara(); if(!list || list.t!=='ul'){ fList(); list = { t:'ul', items:[] }; } list.items.push(m[1]); continue; }
+    if((m = l.match(/^(\d+)[.)]\s+(.*)$/))){ fPara(); if(!list || list.t!=='ol'){ fList(); list = { t:'ol', items:[] }; } list.items.push(m[2]); continue; }
+    fList(); para.push(l);
+  }
+  fAll();
+  return out;
+}
+
+// ---------- membuka tab ----------
+async function paBukaTab(p){
+  await paMuatPengaturan();   // pengaturan dimuat dulu supaya format & model bawaan langsung terpakai
+  if(!PA[p].dibangun){ paEl('tab-'+p).innerHTML = paHtmlTab(p); PA[p].dibangun = true; }
+  paIsiInfo(p);
+  paIsiOpsiForm(p, true);
+  if(!paEl(p+'-pustaka').classList.contains('hidden')) await paMuatPustaka(p);
+}
+function paIsiInfo(p){
+  const f = PA_FORMAT[p==='rpp' ? PA_SET.format_rpp : PA_SET.format_modul] || PA_FORMAT.pm;
+  paEl(p+'-info').innerHTML = `Format standar saat ini: <b>${escapeHtml(f.label)}</b> (${escapeHtml(f.alur)}). Admin dapat mengubahnya di menu <b>Pengaturan \u2192 Pengaturan RPP &amp; Modul Ajar</b>; format juga bisa dipilih per dokumen.`
+    + (PA_SET_TERSEDIA ? '' : `<br><span style="color:#b3261e;">Tabel perangkat ajar belum ada. Jalankan <b>migrasi-v24-perangkat-ajar.sql</b> di Supabase SQL Editor agar dokumen dapat disimpan.</span>`);
+}
+function paHtmlTab(p){
+  const nama = PA_NAMA[p];
+  const judul = p==='rpp' ? 'RPP \u2014 Rencana Pelaksanaan Pembelajaran' : 'Modul Ajar';
+  const ket = p==='rpp'
+    ? 'Buat RPP per mata pelajaran dengan bantuan AI berdasarkan CP &amp; TP yang sudah Anda isi. Hasilnya bisa diedit, disimpan di pustaka, dan diunduh sebagai file Word.'
+    : 'Pustaka Modul Ajar untuk semua guru. Buat modul ajar lengkap (termasuk LKPD, bahan bacaan, rubrik, glosarium) dengan AI, lalu unduh sebagai file Word.';
+  return `
+    <h2>${judul}</h2>
+    <p class="muted">${ket}</p>
+    <p class="muted" id="${p}-info"></p>
+    <div class="toolbar">
+      <button class="btn" id="${p}-btn-pustaka" onclick="paTampil('${p}','pustaka')">Pustaka ${nama}</button>
+      <button class="btn outline" onclick="paBaru('${p}')">+ Buat ${nama} dengan AI</button>
+    </div>
+
+    <div id="${p}-pustaka">
+      <div class="toolbar">
+        <input type="text" id="${p}-cari" placeholder="Cari judul / mapel / penyusun..." style="max-width:300px;" oninput="paRenderPustaka('${p}')" />
+        <select id="${p}-filter-mapel" onchange="paRenderPustaka('${p}')"><option value="">Semua mata pelajaran</option></select>
+        <select id="${p}-filter-kelas" onchange="paRenderPustaka('${p}')"><option value="">Semua kelas</option></select>
+      </div>
+      <div id="${p}-ringkasan" class="muted" style="margin-bottom:8px;"></div>
+      <table>
+        <thead><tr><th>Judul / Topik</th><th>Mata Pelajaran</th><th>Kelas</th><th>Format</th><th>Penyusun</th><th>Diperbarui</th><th>Aksi</th></tr></thead>
+        <tbody id="${p}-body"><tr><td colspan="7" class="muted">Memuat...</td></tr></tbody>
+      </table>
+      <div id="${p}-kosong" class="muted hidden" style="padding:14px 0;">Belum ada ${nama} di pustaka. Klik <b>+ Buat ${nama} dengan AI</b> untuk memulai.</div>
+    </div>
+
+    <div id="${p}-buat" class="hidden">
+      <div class="toolbar"><button class="btn outline" onclick="paTampil('${p}','pustaka')">&larr; Kembali ke Pustaka</button></div>
+      <div class="card" id="${p}-formcard">
+        <h3 style="margin-top:0;">Data ${nama} yang akan dibuat</h3>
+        <div class="grid2">
+          <div class="field"><label>Mata pelajaran</label><select id="${p}-f-mapel" onchange="paPilihMapel('${p}')"></select></div>
+          <div class="field"><label>Jenjang / Kelas / Fase</label><input type="text" id="${p}-f-info" disabled /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Semester</label><select id="${p}-f-semester" onchange="paRenderTp('${p}')"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+          <div class="field"><label>Tahun ajaran</label><select id="${p}-f-tahun"></select></div>
+          <div class="field"><label>Format dokumen</label><select id="${p}-f-format"></select></div>
+        </div>
+        <div class="field"><label>Capaian Pembelajaran (CP)</label>
+          <select id="${p}-f-cpsel" onchange="paPilihCp('${p}')"></select>
+          <textarea id="${p}-f-cp" rows="3" style="margin-top:6px;" placeholder="Pilih CP dari daftar atau tulis/ubah manual di sini"></textarea>
+        </div>
+        <div class="field"><label>Tujuan Pembelajaran (TP) \u2014 centang yang akan dicakup</label>
+          <div id="${p}-tp-list" class="pa-tp-list"><span class="muted">Pilih mata pelajaran dan CP terlebih dahulu.</span></div>
+          <textarea id="${p}-f-tpmanual" rows="2" style="margin-top:6px;" placeholder="TP tambahan / tulis manual (satu TP per baris)"></textarea>
+        </div>
+        <div class="field"><label>Topik / materi pokok</label><input type="text" id="${p}-f-topik" placeholder="Contoh: Operasi Hitung Bilangan Bulat" /></div>
+        <div class="grid3">
+          <div class="field"><label>Jumlah pertemuan</label><input type="number" id="${p}-f-pertemuan" min="1" max="6" value="${p==='modul'?2:1}" /></div>
+          <div class="field"><label>JP per pertemuan</label><input type="number" id="${p}-f-jp" min="1" max="10" value="2" /></div>
+          <div class="field"><label>Model pembelajaran</label><input type="text" id="${p}-f-model" list="${p}-model-list" placeholder="(opsional, AI memilih bila kosong)" /><datalist id="${p}-model-list">${PA_MODEL.map(m=>`<option value="${escapeHtml(m)}">`).join('')}</datalist></div>
+        </div>
+        <div class="field"><label>Catatan khusus untuk AI (opsional)</label><textarea id="${p}-f-catatan" rows="2" placeholder="Contoh: peserta didik banyak yang bekerja sebagai petani; gunakan contoh dari lingkungan desa"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>Nama penyusun (pendidik)</label><input type="text" id="${p}-f-penyusun" placeholder="Nama lengkap beserta gelar" /></div>
+          <div class="field"><label>NIP / NIK penyusun (opsional)</label><input type="text" id="${p}-f-nip" /></div>
+        </div>
+        <div class="toolbar" style="margin-bottom:0;">
+          <button class="btn gold" id="${p}-btn-mulai" onclick="paMulai('${p}')">Buat ${nama} dengan AI</button>
+          <span class="muted" id="${p}-status"></span>
+        </div>
+      </div>
+      <div id="${p}-progres" class="card hidden"></div>
+      <div id="${p}-editor" class="hidden"></div>
+    </div>`;
+}
+
+function paTampil(p, mode){
+  paEl(p+'-pustaka').classList.toggle('hidden', mode!=='pustaka');
+  paEl(p+'-buat').classList.toggle('hidden', mode!=='buat');
+  if(mode==='pustaka') paMuatPustaka(p);
+}
+
+// ---------- pustaka ----------
+async function paMuatPustaka(p){
+  paEl(p+'-body').innerHTML = '<tr><td colspan="7" class="muted">Memuat...</td></tr>';
+  const { data, error } = await supa.from('perangkat_ajar')
+    .select('id, jenis, format, judul, mapel_id, mapel_nama, program, kelas, fase, semester, tahun_ajaran, penyusun, dibuat_oleh, created_at, updated_at')
+    .eq('jenis', p).order('updated_at', { ascending:false }).limit(1000);
+  if(error){
+    PA_SET_TERSEDIA = false; paIsiInfo(p);
+    paEl(p+'-body').innerHTML = `<tr><td colspan="7" style="color:#b3261e;">Gagal memuat: ${escapeHtml(error.message)}. Pastikan <b>migrasi-v24-perangkat-ajar.sql</b> sudah dijalankan.</td></tr>`;
+    return;
+  }
+  PA[p].daftar = data || [];
+  const mp = [...new Set(PA[p].daftar.map(r=>r.mapel_nama).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+  const kl = [...new Set(PA[p].daftar.map(r=>r.kelas).filter(Boolean))];
+  const pm = paEl(p+'-filter-mapel').value, pk = paEl(p+'-filter-kelas').value;
+  paEl(p+'-filter-mapel').innerHTML = '<option value="">Semua mata pelajaran</option>' + mp.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+  paEl(p+'-filter-kelas').innerHTML = '<option value="">Semua kelas</option>' + kl.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+  paEl(p+'-filter-mapel').value = mp.includes(pm) ? pm : ''; paEl(p+'-filter-kelas').value = kl.includes(pk) ? pk : '';
+  paRenderPustaka(p);
+}
+function paRenderPustaka(p){
+  const q = (paEl(p+'-cari').value||'').trim().toLowerCase(), fm = paEl(p+'-filter-mapel').value, fk = paEl(p+'-filter-kelas').value;
+  const rows = PA[p].daftar.filter(r=>(!fm || r.mapel_nama===fm) && (!fk || r.kelas===fk)
+    && (!q || [r.judul,r.mapel_nama,r.penyusun,r.kelas,r.semester,r.tahun_ajaran].some(x=>String(x||'').toLowerCase().includes(q))));
+  paEl(p+'-ringkasan').textContent = `${rows.length} dari ${PA[p].daftar.length} ${PA_NAMA[p]}`;
+  paEl(p+'-kosong').classList.toggle('hidden', PA[p].daftar.length>0);
+  const admin = ADALAH_ADMIN || ADALAH_SUPER;
+  paEl(p+'-body').innerHTML = rows.map(r=>{
+    const boleh = admin || (PA_EMAIL && r.dibuat_oleh===PA_EMAIL);
+    return `<tr>
+      <td><b>${escapeHtml(r.judul||'-')}</b><br><span class="muted">${escapeHtml(r.semester||'')} ${escapeHtml(r.tahun_ajaran||'')}</span></td>
+      <td>${escapeHtml(r.mapel_nama||'-')}</td>
+      <td>${escapeHtml(r.kelas||'-')}<br><span class="muted">${escapeHtml(r.program||'')}${r.fase?' \u2022 Fase '+escapeHtml(r.fase):''}</span></td>
+      <td><span class="muted">${escapeHtml((PA_FORMAT[r.format]||{}).label ? PA_FORMAT[r.format].label.split(' (')[0] : r.format)}</span></td>
+      <td>${escapeHtml(r.penyusun||'-')}</td>
+      <td>${fmtTgl(r.updated_at||r.created_at)}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn" style="padding:4px 10px;" onclick="paUnduhId('${p}','${r.id}')">Unduh Word</button>
+        <button class="btn outline" style="padding:4px 10px;" onclick="paBuka('${p}','${r.id}')">Lihat/Ubah</button>
+        ${boleh ? `<button class="btn danger" style="padding:4px 10px;" onclick="paHapus('${p}','${r.id}')">Hapus</button>` : ''}
+      </td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Tidak ada yang cocok.</td></tr>';
+}
+async function paHapus(p, id){
+  const r = PA[p].daftar.find(x=>x.id===id); if(!r) return;
+  if(!confirm(`Hapus ${PA_NAMA[p]} "${r.judul}" dari pustaka? Tindakan ini tidak dapat dibatalkan.`)) return;
+  const { error } = await supa.from('perangkat_ajar').delete().eq('id', id);
+  if(error) return alert('Gagal menghapus: '+error.message);
+  paMuatPustaka(p);
+}
+async function paAmbilBaris(id){
+  const { data, error } = await supa.from('perangkat_ajar').select('*').eq('id', id).maybeSingle();
+  if(error || !data) throw new Error(error ? error.message : 'Data tidak ditemukan.');
+  return data;
+}
+function paDocDariBaris(r){
+  const isi = r.isi || {};
+  isi.bagian = isi.bagian || []; isi.konteks = isi.konteks || {}; isi.tahapan = isi.tahapan || [];
+  return { id:r.id, jenis:r.jenis, format:r.format, judul:r.judul, mapel_id:r.mapel_id, mapel_nama:r.mapel_nama, program:r.program, kelas:r.kelas,
+    fase:r.fase, semester:r.semester, tahun_ajaran:r.tahun_ajaran, jumlah_pertemuan:r.jumlah_pertemuan, penyusun:r.penyusun||'', nip_penyusun:r.nip_penyusun||'', isi };
+}
+async function paBuka(p, id){
+  try{
+    const r = await paAmbilBaris(id);
+    const st = PA[p]; st.doc = paDocDariBaris(r); st.status = {}; st.galat = {}; st.provider = new Set();
+    st.doc.isi.tahapan.forEach(t=>{ st.status[t.id] = st.doc.isi.bagian.some(b=>b.tahap===t.id) ? 'selesai' : 'menunggu'; });
+    paTampil(p,'buat'); paEl(p+'-formcard').classList.add('hidden'); paEl(p+'-progres').classList.add('hidden');
+    paRenderEditor(p);
+  }catch(e){ alert('Gagal membuka: '+e.message); }
+}
+
+// ---------- form ----------
+function paIsiOpsiForm(p, segarkan){
+  const selM = paEl(p+'-f-mapel'); const prev = selM.value;
+  selM.innerHTML = '<option value="">\u2014 pilih mata pelajaran \u2014</option>' + (currentMapelList||[]).map(m=>`<option value="${m.id}">${escapeHtml(labelMapel(m))}</option>`).join('');
+  if(prev && (currentMapelList||[]).some(m=>m.id===prev)) selM.value = prev;
+  const ta = tahunAjaranSekarang();
+  const selT = paEl(p+'-f-tahun'); const pt = selT.value;
+  selT.innerHTML = Array.from({length:4},(_,i)=>`<option value="${ta+i}/${ta+i+1}">${ta+i}/${ta+i+1}</option>`).join('');
+  if(pt) selT.value = pt;
+  const st = PA[p];
+  const selF = paEl(p+'-f-format'); const pf = selF.value;
+  const fmtDef = p==='rpp' ? PA_SET.format_rpp : PA_SET.format_modul;
+  selF.innerHTML = Object.entries(PA_FORMAT).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('');
+  selF.value = (!pf || pf===st.formatDef) ? fmtDef : pf;      // pilihan manual guru tidak ditimpa, bawaan mengikuti pengaturan
+  st.formatDef = fmtDef;
+  const inModel = paEl(p+'-f-model');
+  if(!inModel.value || inModel.value===st.modelDef) inModel.value = PA_SET.model_default || '';
+  st.modelDef = PA_SET.model_default || '';
+  if(!paEl(p+'-f-penyusun').value){
+    try{ paEl(p+'-f-penyusun').value = localStorage.getItem('pa_penyusun_nama')||''; paEl(p+'-f-nip').value = localStorage.getItem('pa_penyusun_nip')||''; }catch(e){}
+  }
+  if(!segarkan || selM.value) paPilihMapel(p, true);
+}
+function paFaseDari(m){ return m.program==='Paket B' ? 'D' : (FASE_KELAS[m.kelas]||''); }
+function paPilihMapel(p, jagaCp){
+  const m = (currentMapelList||[]).find(x=>x.id===paEl(p+'-f-mapel').value);
+  paEl(p+'-f-info').value = m ? `${m.program} \u2022 Kelas ${m.kelas||'?'} \u2022 Fase ${paFaseDari(m)||'?'}` : '';
+  const cps = m ? (cpList||[]).filter(c=>c.mapel_id===m.id) : [];
+  const sel = paEl(p+'-f-cpsel'); const prev = sel.value;
+  sel.innerHTML = `<option value="">${m ? (cps.length ? '\u2014 pilih CP dari daftar atau tulis manual \u2014' : 'Belum ada CP tersimpan untuk mapel ini \u2014 tulis manual') : '\u2014 pilih mata pelajaran dulu \u2014'}</option>`
+    + cps.map(c=>`<option value="${c.id}">${escapeHtml((c.kode?c.kode+' \u2014 ':'')+(c.elemen||String(c.deskripsi).slice(0,60)))}</option>`).join('');
+  if(jagaCp && prev && cps.some(c=>c.id===prev)) sel.value = prev;
+  else if(!jagaCp){ if(cps.length===1) sel.value = cps[0].id; paEl(p+'-f-cp').value = ''; }
+  if(!jagaCp) paPilihCp(p); else paRenderTp(p);
+}
+function paPilihCp(p){
+  const c = (cpList||[]).find(x=>x.id===paEl(p+'-f-cpsel').value);
+  if(c) paEl(p+'-f-cp').value = c.deskripsi || '';
+  paRenderTp(p);
+}
+function paRenderTp(p){
+  const wadah = paEl(p+'-tp-list');
+  const cpId = paEl(p+'-f-cpsel').value, smt = paEl(p+'-f-semester').value;
+  if(!cpId){ wadah.innerHTML = '<span class="muted">Pilih CP dari daftar untuk menampilkan TP-nya, atau tulis TP manual di kotak bawah.</span>'; return; }
+  const tps = (tpList||[]).filter(t=>t.cp_id===cpId);
+  if(!tps.length){ wadah.innerHTML = '<span class="muted">CP ini belum punya TP tersimpan. Tulis TP manual di kotak bawah.</span>'; return; }
+  wadah.innerHTML = tps.map(t=>`<label class="pa-tp"><input type="checkbox" value="${t.id}" ${(!t.semester || t.semester===smt)?'checked':''} /> <span><b>${escapeHtml(t.kode||'')}</b> ${escapeHtml(t.deskripsi)}${t.semester?` <span class="muted">(${t.semester})</span>`:''}</span></label>`).join('');
+}
+function paBacaForm(p){
+  const v = id=>(paEl(`${p}-f-${id}`)||{}).value;
+  const m = (currentMapelList||[]).find(x=>x.id===v('mapel'));
+  if(!m){ alert('Pilih mata pelajaran terlebih dahulu.'); return null; }
+  const topik = (v('topik')||'').trim();
+  if(!topik){ alert('Isi topik / materi pokok pembelajaran.'); return null; }
+  const cpDesk = (v('cp')||'').trim();
+  if(!cpDesk){ alert('Isi Capaian Pembelajaran (pilih dari daftar atau tulis manual).'); return null; }
+  const cpSel = (cpList||[]).find(c=>c.id===v('cpsel'));
+  const tp = [];
+  document.querySelectorAll(`#${p}-tp-list input[type=checkbox]:checked`).forEach(cb=>{ const t = (tpList||[]).find(x=>x.id===cb.value); if(t) tp.push({ kode:t.kode||'', deskripsi:t.deskripsi }); });
+  (v('tpmanual')||'').split('\n').map(s=>s.trim()).filter(Boolean).forEach(s=>tp.push({ kode:'', deskripsi:s }));
+  if(!tp.length){ alert('Pilih atau tulis minimal satu Tujuan Pembelajaran.'); return null; }
+  const n = Math.min(Math.max(parseInt(v('pertemuan'),10)||1,1),6), jp = Math.min(Math.max(parseInt(v('jp'),10)||2,1),10);
+  const menit = m.program==='Paket C' ? (PA_SET.menit_jp_c||45) : (PA_SET.menit_jp_b||40);
+  const catatan = [PA_SET.catatan_ai, (v('catatan')||'').trim()].filter(Boolean).join(' ');
+  const konteks = {
+    mapel:m.nama, program:m.program, kelas:m.kelas||'', fase:paFaseDari(m), semester:v('semester'), topik,
+    cp:{ kode:cpSel?cpSel.kode||'':'', elemen:cpSel?cpSel.elemen||'':'', deskripsi:cpDesk }, tp,
+    jp_per_pertemuan:jp, menit_jp:menit, jumlah_pertemuan:n, model:(v('model')||'').trim(),
+    karakter:PA_SET.karakter_peserta||'', catatan,
+  };
+  const penyusun = (v('penyusun')||'').trim(), nip = (v('nip')||'').trim();
+  try{ localStorage.setItem('pa_penyusun_nama', penyusun); localStorage.setItem('pa_penyusun_nip', nip); }catch(e){}
+  return { format:v('format'), konteks, doc:{
+    id:null, jenis:p, format:v('format'), judul:topik, mapel_id:m.id, mapel_nama:m.nama, program:m.program, kelas:m.kelas||'', fase:paFaseDari(m),
+    semester:v('semester'), tahun_ajaran:v('tahun'), jumlah_pertemuan:n, penyusun, nip_penyusun:nip, isi:{ identitas:[], bagian:[], tahapan:[], konteks },
+  } };
+}
+function paBaru(p){
+  const st = PA[p]; if(st.sibuk) return alert('Masih ada proses pembuatan yang berjalan. Tunggu sampai selesai.');
+  st.doc = null; st.status = {}; st.galat = {}; st.provider = new Set();
+  paTampil(p,'buat'); paEl(p+'-formcard').classList.remove('hidden');
+  paEl(p+'-progres').classList.add('hidden'); paEl(p+'-editor').classList.add('hidden'); paEl(p+'-status').textContent = '';
+  paIsiOpsiForm(p, true);
+}
+
+// ---------- pembuatan dengan AI (bertahap) ----------
+async function paPanggil(payload){
+  const { data:{ session } } = await supa.auth.getSession();
+  const res = await fetch('/api/generate-perangkat', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}` }, body:JSON.stringify(payload) });
+  const txt = await res.text(); let data;
+  try{ data = JSON.parse(txt); }catch(e){ data = { error:`Server tidak merespons dengan benar (HTTP ${res.status}). Kemungkinan waktu tunggu habis.` }; }
+  if(!res.ok) throw new Error(data.error || 'Gagal membuat bagian dokumen');
+  return data;
+}
+function paSisipTahap(doc, tahapId, baru){
+  const ids = doc.isi.tahapan.map(t=>t.id), urut = ids.indexOf(tahapId);
+  const sisa = doc.isi.bagian.filter(b=>b.tahap!==tahapId);
+  const pos = sisa.filter(b=>{ const i = ids.indexOf(b.tahap); return i>=0 && i<urut; }).length;
+  sisa.splice(pos, 0, ...baru);
+  doc.isi.bagian = sisa;
+}
+async function paBuatTahap(p, tahapId){
+  const st = PA[p], doc = st.doc; if(!doc) return false;
+  st.status[tahapId] = 'proses'; paRenderProgres(p);
+  let err = '';
+  for(let coba=1; coba<=2; coba++){
+    try{
+      const data = await paPanggil({ aksi:'bagian', format:doc.format, jenis:p, tahap:tahapId, konteks:doc.isi.konteks });
+      paSisipTahap(doc, tahapId, data.bagian);
+      if(data.provider) st.provider.add(data.provider);
+      st.status[tahapId] = 'selesai'; delete st.galat[tahapId];
+      paRenderProgres(p); paRenderEditor(p); return true;
+    }catch(e){ err = e.message; if(coba<2) await paTunggu(2500); }
+  }
+  st.status[tahapId] = 'gagal'; st.galat[tahapId] = err; paRenderProgres(p); return false;
+}
+async function paMulai(p){
+  const st = PA[p]; if(st.sibuk) return;
+  const f = paBacaForm(p); if(!f) return;
+  st.sibuk = true; paEl(p+'-btn-mulai').disabled = true; paEl(p+'-status').textContent = 'Menyusun rencana dokumen...';
+  try{
+    const r = await paPanggil({ aksi:'rencana', format:f.format, jenis:p, jumlah_pertemuan:f.konteks.jumlah_pertemuan });
+    f.doc.isi.tahapan = r.tahapan; st.doc = f.doc; st.provider = new Set(); st.galat = {};
+    st.status = Object.fromEntries(r.tahapan.map(t=>[t.id,'menunggu']));
+    st.doc.isi.identitas = paBangunIdentitas(st.doc);
+    paEl(p+'-progres').classList.remove('hidden'); paRenderProgres(p); paEl(p+'-editor').classList.add('hidden');
+    for(const t of r.tahapan){ await paBuatTahap(p, t.id); await paTunggu(400); }
+    const gagal = Object.values(st.status).filter(x=>x==='gagal').length;
+    const asal = st.provider.size ? ` (via ${[...st.provider].join(', ')})` : '';
+    paEl(p+'-status').textContent = gagal ? `${gagal} bagian belum berhasil \u2014 klik "Ulangi" pada bagian tersebut.` : `Selesai${asal}. Periksa, ubah bila perlu, lalu simpan atau unduh.`;
+  }catch(e){
+    paEl(p+'-status').textContent = 'Gagal: '+e.message; alert('Gagal memulai: '+e.message);
+  }finally{ st.sibuk = false; paEl(p+'-btn-mulai').disabled = false; }
+}
+async function paUlangiTahap(p, tahapId, konfirmasi){
+  const st = PA[p]; if(st.sibuk) return alert('Masih ada proses yang berjalan.');
+  if(konfirmasi && !confirm('Buat ulang bagian ini dengan AI? Perubahan manual pada bagian ini akan diganti.')) return;
+  st.sibuk = true;
+  try{ await paBuatTahap(p, tahapId); }finally{ st.sibuk = false; }
+}
+function paRenderProgres(p){
+  const st = PA[p], doc = st.doc; if(!doc) return;
+  const ikon = { menunggu:'\u25CB', proses:'\u23F3', selesai:'\u2705', gagal:'\u274C' };
+  const warna = { menunggu:'#6b7280', proses:'#b45309', selesai:'#15803d', gagal:'#b3261e' };
+  paEl(p+'-progres').innerHTML = `<h3 style="margin-top:0;">Proses pembuatan</h3>` + doc.isi.tahapan.map(t=>{
+    const s = st.status[t.id]||'menunggu';
+    return `<div class="pa-prog"><span style="color:${warna[s]};">${ikon[s]}</span> <span>${escapeHtml(t.label)}</span>
+      ${s==='gagal' ? `<button class="btn outline" style="padding:2px 9px;font-size:12px;" onclick="paUlangiTahap('${p}','${t.id}')">Ulangi</button><div class="muted" style="color:#b3261e;white-space:pre-line;margin-left:24px;">${escapeHtml(st.galat[t.id]||'')}</div>` : ''}</div>`; }).join('');
+}
+
+// ---------- identitas, editor, simpan, unduh ----------
+function paBangunIdentitas(doc){
+  const k = doc.isi.konteks || {};
+  const rows = [
+    ['Satuan Pendidikan', SEKOLAH.nama_aplikasi || 'PKBM'],
+    ['Nama Penyusun', (doc.penyusun||'-') + (doc.nip_penyusun ? ` (NIP/NIK ${doc.nip_penyusun})` : '')],
+    ['Mata Pelajaran', doc.mapel_nama || k.mapel || '-'],
+    ['Jenjang / Program', doc.program || '-'],
+    ['Fase / Kelas', `${doc.fase||'-'} / ${doc.kelas||'-'}`],
+    ['Semester / Tahun Ajaran', `${doc.semester||'-'} / ${doc.tahun_ajaran||'-'}`],
+    ['Topik / Materi Pokok', k.topik || doc.judul || '-'],
+    ['Alokasi Waktu', `${k.jumlah_pertemuan||1} pertemuan \u00D7 ${k.jp_per_pertemuan||2} JP (1 JP = ${k.menit_jp||40} menit)`],
+  ];
+  if(k.model) rows.push(['Model Pembelajaran', k.model]);
+  return rows;
+}
+function paRenderEditor(p){
+  const st = PA[p], doc = st.doc, el = paEl(p+'-editor');
+  if(!doc || !doc.isi.bagian.length){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  doc.isi.identitas = paBangunIdentitas(doc);
+  let grup = null, html = '';
+  doc.isi.bagian.forEach((b, i)=>{
+    if(b.grup && b.grup!==grup){ grup = b.grup; html += `<div class="pa-grup">${escapeHtml(b.grup)}</div>`; }
+    const ulang = b.tahap ? `<button class="btn outline" style="padding:2px 9px;font-size:12px;" onclick="paUlangiTahap('${p}','${escapeHtml(b.tahap)}',true)">Buat ulang dengan AI</button>` : '';
+    html += `<div class="pa-bagian" id="${p}-bg-${i}">
+      <div class="pa-bagian-head"><b>${escapeHtml(b.judul||'')}</b>
+        <span><button class="btn outline" style="padding:2px 9px;font-size:12px;" onclick="paUbahBagian('${p}',${i})">Ubah</button> ${ulang}</span></div>
+      <div class="pa-md" id="${p}-bgisi-${i}">${paMdHtml(b.teks)}</div></div>`;
+  });
+  const fmt = (PA_FORMAT[doc.format]||{}).label || doc.format;
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0;">${PA_NAMA[p]}: ${escapeHtml(doc.judul||'')}</h3>
+      <p class="muted" style="margin-top:-6px;">Format: ${escapeHtml(fmt)}</p>
+      <div class="grid3">
+        <div class="field"><label>Judul dokumen</label><input type="text" value="${escapeHtml(doc.judul||'')}" oninput="PA['${p}'].doc.judul=this.value" /></div>
+        <div class="field"><label>Nama penyusun</label><input type="text" value="${escapeHtml(doc.penyusun||'')}" onchange="PA['${p}'].doc.penyusun=this.value;paRenderEditor('${p}')" /></div>
+        <div class="field"><label>NIP / NIK penyusun</label><input type="text" value="${escapeHtml(doc.nip_penyusun||'')}" onchange="PA['${p}'].doc.nip_penyusun=this.value;paRenderEditor('${p}')" /></div>
+      </div>
+      <table class="pa-ident">${doc.isi.identitas.map(([l,v])=>`<tr><th>${escapeHtml(l)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}</table>
+      <div class="toolbar" style="margin:12px 0 0;">
+        <button class="btn" onclick="paSimpan('${p}')">${doc.id?'Simpan Perubahan':'Simpan ke Pustaka'}</button>
+        <button class="btn gold" onclick="paUnduhDoc('${p}')">Unduh Word (.docx)</button>
+        <span class="muted" id="${p}-simpan-status"></span>
+      </div>
+    </div>
+    ${html}
+    <div class="toolbar"><button class="btn" onclick="paSimpan('${p}')">${doc.id?'Simpan Perubahan':'Simpan ke Pustaka'}</button>
+      <button class="btn gold" onclick="paUnduhDoc('${p}')">Unduh Word (.docx)</button></div>`;
+}
+function paUbahBagian(p, i){
+  const b = PA[p].doc.isi.bagian[i];
+  paEl(`${p}-bgisi-${i}`).innerHTML = `<textarea id="${p}-bgta-${i}" rows="${Math.min(22, Math.max(6, String(b.teks).split('\n').length+2))}" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;">${escapeHtml(b.teks)}</textarea>
+    <div class="muted" style="margin:4px 0;">Format: <code>### Subjudul</code>, <code>- poin</code>, <code>1. langkah</code>, tabel dengan <code>| kolom | kolom |</code>, dan <code>**tebal**</code>.</div>
+    <button class="btn" style="padding:3px 12px;" onclick="paTerapkan('${p}',${i})">Terapkan</button>
+    <button class="btn outline" style="padding:3px 12px;" onclick="paRenderEditor('${p}')">Batal</button>`;
+}
+function paTerapkan(p, i){
+  const teks = paEl(`${p}-bgta-${i}`).value.trim();
+  if(!teks) return alert('Isi bagian tidak boleh kosong.');
+  PA[p].doc.isi.bagian[i].teks = teks; paRenderEditor(p);
+}
+async function paSimpan(p){
+  const doc = PA[p].doc; if(!doc) return;
+  const stt = paEl(p+'-simpan-status'); if(stt) stt.textContent = 'Menyimpan...';
+  doc.isi.identitas = paBangunIdentitas(doc);
+  const baris = { jenis:p, format:doc.format, judul:(doc.judul||doc.isi.konteks.topik||'Tanpa judul').trim(), mapel_id:doc.mapel_id||null, mapel_nama:doc.mapel_nama||null,
+    program:doc.program||null, kelas:doc.kelas||null, fase:doc.fase||null, semester:doc.semester||null, tahun_ajaran:doc.tahun_ajaran||null,
+    jumlah_pertemuan:doc.jumlah_pertemuan||1, alokasi_jp:(doc.isi.konteks.jp_per_pertemuan||2)*(doc.jumlah_pertemuan||1),
+    penyusun:doc.penyusun||null, nip_penyusun:doc.nip_penyusun||null, isi:doc.isi, updated_at:new Date().toISOString() };
+  let error;
+  if(doc.id){ ({ error } = await supa.from('perangkat_ajar').update(baris).eq('id', doc.id)); }
+  else { const r = await supa.from('perangkat_ajar').insert({ ...baris, dibuat_oleh:PA_EMAIL||null }).select('id').single(); error = r.error; if(!error) doc.id = r.data.id; }
+  if(error){ if(stt) stt.textContent = ''; return alert('Gagal menyimpan: '+error.message+'\n\nPastikan migrasi-v24-perangkat-ajar.sql sudah dijalankan.'); }
+  paRenderEditor(p); const s2 = paEl(p+'-simpan-status'); if(s2) s2.textContent = 'Tersimpan di pustaka.';
+}
+async function paEksporWord(doc){
+  const adaGagal = doc.isi.tahapan.some(t=>!doc.isi.bagian.some(b=>b.tahap===t.id));
+  if(adaGagal && !confirm('Ada bagian dokumen yang belum berhasil dibuat. Tetap unduh dokumen yang sekarang?')) return;
+  const ttdK = await ambilTtd('kepala_pkbm','').catch(()=>null);
+  const { data:{ session } } = await supa.auth.getSession();
+  const res = await fetch('/api/perangkat-docx', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}` }, body:JSON.stringify({
+    perangkat:{ jenis:doc.jenis, format:doc.format, judul:doc.judul, mapel_nama:doc.mapel_nama, penyusun:doc.penyusun, nip_penyusun:doc.nip_penyusun,
+      isi:{ identitas:paBangunIdentitas(doc), bagian:doc.isi.bagian.map(b=>({ grup:b.grup, judul:b.judul, teks:b.teks })) } },
+    sekolah:{ nama_yayasan:SEKOLAH.nama_yayasan, nama_lembaga:SEKOLAH.nama_lembaga, nama_singkat:SEKOLAH.nama_singkat, alamat:SEKOLAH.alamat, kota_ttd:SEKOLAH.kota_ttd, jabatan_kepala:SEKOLAH.jabatan_kepala },
+    ttd:{ kepala_nama:ttdK?ttdK.nama:'', kepala_nip:ttdK?ttdK.nip:'', tampil_ttd_kepala:PA_SET.tampil_ttd_kepala },
+  }) });
+  const txt = await res.text(); let data; try{ data = JSON.parse(txt); }catch(e){ data = { error:`Server tidak merespons dengan benar (HTTP ${res.status}).` }; }
+  if(!res.ok) throw new Error(data.error || 'Gagal membuat berkas Word');
+  const bin = atob(data.base64), arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([arr], { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+  a.download = data.nama_berkas || 'perangkat-ajar.docx'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+async function paUnduhDoc(p){ try{ await paEksporWord(PA[p].doc); }catch(e){ alert('Gagal mengunduh: '+e.message); } }
+async function paUnduhId(p, id){
+  try{ const r = await paAmbilBaris(id); await paEksporWord(paDocDariBaris(r)); }catch(e){ alert('Gagal mengunduh: '+e.message); }
+}
+
+// ---------- menu pengaturan ----------
+async function paBukaPengaturan(){
+  await paMuatPengaturan();
+  const opsi = Object.entries(PA_FORMAT).map(([k,v])=>`<option value="${k}">${escapeHtml(v.label)}</option>`).join('');
+  paEl('pa-set-format_rpp').innerHTML = opsi; paEl('pa-set-format_modul').innerHTML = opsi;
+  paEl('pa-set-format_rpp').value = PA_SET.format_rpp; paEl('pa-set-format_modul').value = PA_SET.format_modul;
+  ['menit_jp_b','menit_jp_c','model_default','karakter_peserta','catatan_ai'].forEach(k=>{ paEl('pa-set-'+k).value = PA_SET[k] ?? ''; });
+  paEl('pa-set-tampil_ttd_kepala').checked = !!PA_SET.tampil_ttd_kepala;
+  paEl('pa-set-status').textContent = PA_SET_TERSEDIA ? '' : 'Tabel pengaturan belum ada. Jalankan migrasi-v24-perangkat-ajar.sql di Supabase.';
+  paEl('pa-set-format-info').innerHTML = Object.values(PA_FORMAT).map(f=>`<li><b>${escapeHtml(f.label)}</b><br><span class="muted">${escapeHtml(f.alur)}</span></li>`).join('');
+}
+async function paSimpanPengaturan(){
+  if(!(ADALAH_ADMIN || ADALAH_SUPER)) return alert('Hanya admin yang dapat mengubah pengaturan ini.');
+  const baris = {
+    id:1, format_rpp:paEl('pa-set-format_rpp').value, format_modul:paEl('pa-set-format_modul').value,
+    menit_jp_b:Math.min(Math.max(parseInt(paEl('pa-set-menit_jp_b').value,10)||40,20),60),
+    menit_jp_c:Math.min(Math.max(parseInt(paEl('pa-set-menit_jp_c').value,10)||45,20),60),
+    model_default:paEl('pa-set-model_default').value.trim()||null, karakter_peserta:paEl('pa-set-karakter_peserta').value.trim()||null,
+    catatan_ai:paEl('pa-set-catatan_ai').value.trim()||null, tampil_ttd_kepala:paEl('pa-set-tampil_ttd_kepala').checked, updated_at:new Date().toISOString(),
+  };
+  const { error } = await supa.from('pengaturan_perangkat_ajar').upsert(baris, { onConflict:'id' });
+  if(error){ paEl('pa-set-status').textContent = 'Gagal: '+error.message+' (pastikan migrasi-v24-perangkat-ajar.sql sudah dijalankan dan Anda admin).'; return; }
+  await paMuatPengaturan(); paEl('pa-set-status').textContent = 'Pengaturan tersimpan.';
+}
+
 function escapeHtml(str){
   return (str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
