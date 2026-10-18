@@ -131,7 +131,7 @@ async function panggilOpenAICompat(k, promptText, totalSoal, ms, ekstra) {
   const body = {
     model: k.model,
     messages: [
-      { role: 'system', content: 'Kamu asisten pembuat soal ujian. Balas HANYA dengan JSON valid, tanpa teks lain.' },
+      { role: 'system', content: (ekstra && ekstra.system) || 'Kamu asisten pembuat soal ujian. Balas HANYA dengan JSON valid, tanpa teks lain.' },
       { role: 'user', content: promptText },
     ],
     temperature: 0.7,
@@ -523,3 +523,6 @@ Tanpa teks tambahan, tanpa markdown/code fence.`;
   const detail = log.filter((l) => !/^dilewati/.test(l.hasil)).map((l) => `• ${l.provider}/${l.model}: ${l.hasil}`).join('\n');
   return { statusCode: 503, body: JSON.stringify({ error: detail ? `${pesan}\n\nDetail:\n${detail}` : pesan, percobaan: log }) };
 };
+
+// Dipakai oleh generate-perangkat.js (RPP & Modul Ajar) agar memakai rantai provider + cadangan yang sama.
+exports.ai = { bangunKandidat, panggilGemini, panggilOpenAICompat, ekstrakArray, kategoriError, ErrorAI, BUDGET_MS };
