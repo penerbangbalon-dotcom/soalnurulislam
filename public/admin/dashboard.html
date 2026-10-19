@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Admin — Absensi PKBM Nurul Islam</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script>
+const slot = renderAdminShell('/admin/dashboard.html', 'Dashboard');
+slot.innerHTML = `
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <p style="margin:0;">Ringkasan kehadiran hari ini &mdash; <span id="live-dot" style="color:var(--success); font-weight:700;">● LIVE</span></p>
+    <span style="font-size:0.8rem; color:var(--ink-muted);" id="last-update"></span>
+  </div>
+
+  <h3 style="margin-bottom:8px;">Total Sekolah</h3>
+  <div class="stat-grid" id="grid-total"></div>
+
+  <h3 style="margin:20px 0 8px;">SD</h3>
+  <div class="stat-grid" id="grid-sd"></div>
+
+  <h3 style="margin:20px 0 8px;">Paket B / SMP</h3>
+  <div class="stat-grid" id="grid-paketb"></div>
+
+  <h3 style="margin:20px 0 8px;">Paket C / SMA</h3>
+  <div class="stat-grid" id="grid-paketc"></div>
+
+  <div class="card" style="margin-top:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+      <h3 style="margin:0;">Persentase Kehadiran Bulan Ini</h3>
+      <a class="btn btn-outline btn-sm" href="/admin/persentase.html">Lihat Rekap Lengkap →</a>
+    </div>
+    <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:2.2rem; font-weight:800; color:var(--primary);" id="persen-rata">-</div>
+        <div style="font-size:0.8rem; color:var(--ink-muted);">Rata-rata kehadiran</div>
+      </div>
+      <div style="flex:1; min-width:220px;">
+        <p style="font-weight:600; color:var(--ink); margin-bottom:6px;">5 Siswa dengan kehadiran terendah bulan ini:</p>
+        <ul id="list-terendah" style="margin:0; padding-left:18px; font-size:0.88rem;"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h3 style="margin:0;">Monitoring Absensi Realtime</h3>
+      <input type="text" id="search-live" placeholder="Cari nama / NISN..." style="width:220px;">
+    </div>
+    <div id="kelas-chips"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>No</th><th>NISN</th><th>Nama</th><th>Jenjang</th><th>Program</th><th>Kelas</th>
+          <th>Datang</th><th>Pulang</th><th>Status</th><th>Jarak</th>
+        </tr></thead>
+        <tbody id="tbody-live"><tr><td colspan="10">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+`;
+
+function statCard(num, label, color) {
+  return `<div class="stat-card"><div class="num" style="color:${color || 'var(--ink)'}">${num}</div><div class="label">${label}</div></div>`;
+}
+function renderBucket(el, b) {
+  el.innerHTML = [
+    statCard(b.total, 'Total Siswa'),
+    statCard(b.hadir, 'Hadir', 'var(--success)'),
+    statCard(b.terlambat, 'Terlambat', 'var(--warning)'),
+    statCard(b.belum_absen, 'Belum Absen'),
+    statCard(b.sudah_pulang, 'Sudah Pulang', 'var(--info)'),
+    statCard(b.izin, 'Izin', 'var(--accent)'),
+    statCard(b.sakit, 'Sakit', 'var(--accent)'),
+    statCard(b.perlu_verifikasi, 'Perlu Verifikasi', 'var(--danger)'),
+  ].join('');
+}
+
+let searchTerm = '';
+const kc = KelasChips.pasang(document.getElementById('kelas-chips'), { onChange: () => muatLive() });
+document.getElementById('search-live').addEventListener('input', (e) => { searchTerm = e.target.value; muatLive(); });
+
+async function muatStats() {
+  try {
+    const data = await apiCall('/admin-dashboard-stats');
+    renderBucket(document.getElementById('grid-total'), data.buckets.TOTAL);
+    renderBucket(document.getElementById('grid-sd'), data.buckets.SD || {total:0,hadir:0,terlambat:0,belum_absen:0,sudah_pulang:0,izin:0,sakit:0,perlu_verifikasi:0});
+    renderBucket(document.getElementById('grid-paketb'), data.buckets.PAKET_B || {total:0,hadir:0,terlambat:0,belum_absen:0,sudah_pulang:0,izin:0,sakit:0,perlu_verifikasi:0});
+    renderBucket(document.getElementById('grid-paketc'), data.buckets.PAKET_C || {total:0,hadir:0,terlambat:0,belum_absen:0,sudah_pulang:0,izin:0,sakit:0,perlu_verifikasi:0});
+    document.getElementById('last-update').textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID');
+
+    const p = data.persentase_bulan_ini || { rata_rata: 0, terendah: [] };
+    document.getElementById('persen-rata').textContent = `${p.rata_rata}%`;
+    const list = document.getElementById('list-terendah');
+    list.innerHTML = p.terendah.length
+      ? p.terendah.map((r) => `<li>${r.nama} (${(r.kelas || '-')}, ${(r.program || '').replace('_',' ')}) — <b>${r.persentase}%</b></li>`).join('')
+      : '<li>Belum ada data bulan ini.</li>';
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+  }
+}
+
+async function muatLive() {
+  try {
+    const qp = new URLSearchParams();
+    if (searchTerm) qp.set('search', searchTerm);
+    if (kc.get()) qp.set('kelas', kc.get());
+    const q = qp.toString() ? `?${qp.toString()}` : '';
+    const data = await apiCall(`/admin-attendance-live${q}`);
+    const tbody = document.getElementById('tbody-live');
+    if (!data.data.length) { tbody.innerHTML = '<tr><td colspan="10">Tidak ada data.</td></tr>'; return; }
+    tbody.innerHTML = data.data.slice(0, 100).map((r, i) => `
+      <tr>
+        <td>${i + 1}</td><td>${r.nisn || '-'}</td><td>${r.nama}</td><td>${r.jenjang}</td>
+        <td>${r.program.replace('_',' ')}</td><td>${r.kelas}</td>
+        <td>${fmtJam(r.datang)}</td><td>${fmtJam(r.pulang)}</td>
+        <td><span class="${statusBadgeClass(r.status_datang)}">${statusLabel(r.status_datang)}</span></td>
+        <td>${r.jarak_datang_m != null ? r.jarak_datang_m + ' m' : '-'}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+  }
+}
+
+muatStats(); muatLive();
+setInterval(muatStats, 8000);
+setInterval(muatLive, 8000);
+</script>
+</body>
+</html>

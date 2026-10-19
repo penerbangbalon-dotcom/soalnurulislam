@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Persentase Kehadiran — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>.filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; } .filters > * { flex: 1 1 150px; }</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script>
+const slot = renderAdminShell('/admin/persentase.html', 'Persentase Kehadiran');
+
+function rentangBulanIni() {
+  const now = new Date();
+  const awal = new Date(now.getFullYear(), now.getMonth(), 1);
+  const akhir = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return [awal.toISOString().slice(0, 10), akhir.toISOString().slice(0, 10)];
+}
+const [mulaiDefault, akhirDefault] = rentangBulanIni();
+
+slot.innerHTML = `
+  <div class="card no-print">
+    <div class="filters">
+      <div class="field" style="margin:0;">
+        <label>Periode</label>
+        <select id="f-preset">
+          <option value="bulan_ini">Bulan ini</option>
+          <option value="semester_ganjil">Semester Ganjil (Jul–Des)</option>
+          <option value="semester_genap">Semester Genap (Jan–Jun)</option>
+          <option value="custom">Rentang bebas</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;"><label>Dari</label><input type="date" id="f-mulai" value="${mulaiDefault}"></div>
+      <div class="field" style="margin:0;"><label>Sampai</label><input type="date" id="f-akhir" value="${akhirDefault}"></div>
+      <div class="field" style="margin:0;"><label>Jenjang</label><select id="f-jenjang"><option value="">Semua</option><option>SD</option><option>SMP</option><option>SMA</option></select></div>
+      <div class="field" style="margin:0;"><label>Program</label><select id="f-program"><option value="">Semua</option><option value="PAKET_B">Paket B</option><option value="PAKET_C">Paket C</option></select></div>
+      <div class="field" style="margin:0;"><label>Nama / NISN</label><input type="text" id="f-nama" placeholder="Cari..."></div>
+    </div>
+    <div id="kelas-chips"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;" class="no-print">
+      <button class="btn btn-primary" id="btn-cari">Terapkan Filter</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="btn-csv">⬇ CSV</button>
+        <button class="btn btn-outline btn-sm" id="btn-xlsx">⬇ Excel</button>
+        <button class="btn btn-outline btn-sm" id="btn-print">⬇ PDF (Cetak)</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <p id="ringkasan" style="font-weight:600; color:var(--ink);"></p>
+    <div class="table-wrap">
+      <table id="tabel-persentase">
+        <thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>Program</th><th>Total Hari</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpa</th><th>Persentase</th></tr></thead>
+        <tbody id="tbody-persentase"><tr><td colspan="10">Gunakan filter lalu klik "Terapkan Filter".</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+`;
+
+function terapkanPreset() {
+  const preset = document.getElementById('f-preset').value;
+  const y = new Date().getFullYear();
+  const inputMulai = document.getElementById('f-mulai');
+  const inputAkhir = document.getElementById('f-akhir');
+  const editable = preset === 'custom';
+  inputMulai.readOnly = !editable;
+  inputAkhir.readOnly = !editable;
+
+  if (preset === 'bulan_ini') { [inputMulai.value, inputAkhir.value] = rentangBulanIni(); }
+  else if (preset === 'semester_ganjil') { inputMulai.value = `${y}-07-01`; inputAkhir.value = `${y}-12-31`; }
+  else if (preset === 'semester_genap') { inputMulai.value = `${y}-01-01`; inputAkhir.value = `${y}-06-30`; }
+}
+document.getElementById('f-preset').addEventListener('change', terapkanPreset);
+terapkanPreset();
+
+const kc = KelasChips.pasang(document.getElementById('kelas-chips'), { onChange: () => cari() });
+['f-jenjang','f-program'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => kc.setFilter({
+    program: document.getElementById('f-program').value, jenjang: document.getElementById('f-jenjang').value,
+  }));
+});
+
+function buildQuery() {
+  const p = new URLSearchParams();
+  if (kc.get()) p.set('kelas', kc.get());
+  const map = {
+    'f-mulai': 'tanggal_mulai', 'f-akhir': 'tanggal_akhir', 'f-jenjang': 'jenjang',
+    'f-program': 'program', 'f-nama': 'nama',
+  };
+  for (const [id, key] of Object.entries(map)) {
+    const v = document.getElementById(id).value.trim();
+    if (v) p.set(key, v);
+  }
+  return p.toString();
+}
+
+function kelasPersentase(p) {
+  if (p >= 90) return 'color:var(--success); font-weight:700;';
+  if (p >= 75) return 'color:var(--warning); font-weight:700;';
+  return 'color:var(--danger); font-weight:700;';
+}
+
+async function cari() {
+  try {
+    const data = await apiCall(`/admin-persentase?${buildQuery()}`);
+    document.getElementById('ringkasan').textContent = `${data.total} siswa, periode ${data.tanggal_mulai} s/d ${data.tanggal_akhir}.`;
+    const tbody = document.getElementById('tbody-persentase');
+    if (!data.data.length) { tbody.innerHTML = '<tr><td colspan="10">Tidak ada data untuk filter ini.</td></tr>'; return; }
+    tbody.innerHTML = data.data.map((r) => `
+      <tr>
+        <td>${r.nisn || '-'}</td><td>${r.nama}</td><td>${r.kelas}</td><td>${(r.program || '').replace('_', ' ')}</td>
+        <td>${r.total_hari}</td><td>${r.hadir}</td><td>${r.izin}</td><td>${r.sakit}</td><td>${r.alpa}</td>
+        <td style="${kelasPersentase(r.persentase)}">${r.persentase}%</td>
+      </tr>
+    `).join('');
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+document.getElementById('btn-cari').onclick = cari;
+
+function unduh(format) {
+  const token = adminToken();
+  const url = `/api/admin-persentase-export?${buildQuery()}&format=${format}`;
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(async (res) => {
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Gagal mengunduh.'); }
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="(.+)"/);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = match ? match[1] : `persentase-kehadiran.${format}`;
+      a.click();
+    })
+    .catch((err) => toast(err.message, 'error'));
+}
+document.getElementById('btn-csv').onclick = () => unduh('csv');
+document.getElementById('btn-xlsx').onclick = () => unduh('xlsx');
+document.getElementById('btn-print').onclick = () => window.print();
+
+cari();
+</script>
+</body>
+</html>

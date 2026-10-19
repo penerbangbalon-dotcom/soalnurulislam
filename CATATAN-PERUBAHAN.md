@@ -1,5 +1,15 @@
 # Perubahan terbaru
 
+## v16.0 — Generate RPP, Modul Ajar (AI), dan Pengaturannya
+**Jalankan `migrasi-v24-rpp-modul.sql`** di Supabase SQL Editor (sekali; aman diulang). File berubah: `index.html`, `netlify/functions/generate-soal.js`, `netlify/functions/cadangan-data.js` (tanpa fungsi Vercel baru).
+- **Grup menu baru "Perangkat Ajar"**: *Generate RPP*, *Modul Ajar*, *Pengaturan RPP & Modul*.
+- **Generate RPP** per mapel dari CP/TP yang sudah ada (atau topik manual). Tiga format: *Kurikulum Merdeka (lengkap)*, *Ringkas 1 halaman* (komponen inti: tujuan, langkah kegiatan, penilaian), dan *Pembelajaran Mendalam* (identitas, identifikasi, desain, pengalaman belajar Memahami-Mengaplikasi-Merefleksi, asesmen awal-proses-akhir). Bisa membuat satu RPP per TP sekaligus.
+- **Modul Ajar**: Informasi Umum, Komponen Inti, Lampiran (LKPD, bahan bacaan, soal + kunci, glosarium, pustaka). Dibuat AI dalam 3 tahap; tahap yang gagal bisa diulang tanpa mengulang semuanya. Daftar modul dibagi ke semua guru untuk diunduh.
+- Hasil tampil sebagai dokumen yang **bisa diedit langsung**, lalu **Simpan**, **Unduh Word (.doc)**, atau **Cetak/PDF**. Kop, tanda tangan Kepala (menu Tanda Tangan), nama guru, kota & tanggal otomatis.
+- **Pengaturan RPP & Modul** (diubah Admin): format bawaan, profil (8 Dimensi Profil Lulusan / Profil Pelajar Pancasila), kerincian, model pembelajaran, pertemuan/JP/menit per JP, komponen & lampiran yang dibuat, tampilan dokumen (kop, TTD, huruf, kertas, margin), dan konteks sekolah untuk AI. Ada tombol pratinjau contoh.
+- Waktu tunggu AI untuk RPP/Modul 50 detik (ubah lewat env `AI_BUDGET_PERANGKAT_MS`, maks. di bawah `maxDuration` 60 detik di vercel.json).
+
+
 ## v15.14 — Mapel tidak diujikan lebih mudah dilihat dan diatur
 File berubah: `index.html` saja (tanpa migrasi SQL).
 - **Menu Mata Pelajaran**: filter *Semua / Diujikan saja / Tidak diujikan saja*, kotak cari, ringkasan jumlah, baris mapel tidak diujikan tampil redup dengan lencana, dan tombol satu klik **Tidak diujikan / Ujikan kembali** di tiap baris.

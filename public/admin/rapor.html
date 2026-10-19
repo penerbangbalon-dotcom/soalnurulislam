@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rekap Semester (Rapor) — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .filters > * { flex: 1 1 150px; }
+  .rapor-card { border:1px solid var(--border); border-radius:var(--radius); padding:30px; background:#fff; }
+  .rapor-card + .rapor-card { margin-top:16px; }
+
+  .rapor-head { text-align:center; border-bottom:3px double var(--ink); padding-bottom:10px; margin-bottom:14px; }
+  .rapor-head-row { display:flex; align-items:center; justify-content:center; gap:14px; }
+  .rapor-logo { flex:0 0 auto; max-height:90px; object-fit:contain; }
+  .rapor-head-text { flex:0 1 auto; }
+  .rapor-head .yayasan { margin:0; font-size:0.82rem; font-weight:700; letter-spacing:.02em; }
+  .rapor-head h2 { margin:2px 0; font-size:1.3rem; letter-spacing:.03em; }
+  .rapor-head .kecil { margin:1px 0; font-size:0.74rem; color:var(--ink-muted); line-height:1.4; }
+
+  .rapor-judul { text-align:center; text-decoration:underline; font-size:1.05rem; margin:14px 0 2px; }
+  .rapor-sub { text-align:center; font-size:0.88rem; color:var(--ink-muted); margin:0 0 18px; }
+
+  .rapor-bio2 { width:100%; margin-bottom:16px; border-collapse:collapse; }
+  .rapor-bio2 td { padding:3px 8px 3px 0; font-size:0.92rem; border:none; vertical-align:top; }
+  .rapor-bio2 td:first-child { width:110px; color:var(--ink-muted); white-space:nowrap; }
+
+  .rapor-tbl2 { width:100%; border-collapse:collapse; margin-bottom:16px; }
+  .rapor-tbl2 th, .rapor-tbl2 td { border:1px solid var(--ink); padding:6px 10px; font-size:0.9rem; }
+  .rapor-tbl2 th { background:var(--paper); }
+  .rapor-tbl2 th:first-child, .rapor-tbl2 td:first-child { text-align:center; width:34px; }
+  .rapor-tbl2 th:last-child, .rapor-tbl2 td:last-child { text-align:center; width:110px; }
+  .rapor-tbl2 tr.total td { font-weight:800; }
+
+  .rapor-desc2 { font-size:0.92rem; line-height:1.65; margin:0 0 34px; }
+
+  .rapor-ttd2 { display:flex; justify-content:space-between; gap:24px; text-align:center; font-size:0.88rem; }
+  .rapor-ttd2 .slot { flex:1; }
+  .rapor-ttd2 .tempat-tgl { margin:0 0 4px; color:var(--ink-muted); }
+  .rapor-ttd2 .ttd-img-wrap { height:64px; display:flex; align-items:flex-end; justify-content:center; margin-top:6px; }
+  .rapor-ttd2 .ttd-img-wrap img { max-height:64px; max-width:100%; object-fit:contain; }
+  .rapor-ttd2 .garis { display:block; width:170px; max-width:80%; margin:2px auto 0; border-top:1px solid var(--ink); }
+  .rapor-ttd2 .nama-ttd { display:block; margin-top:4px; font-weight:700; }
+
+  @media print { .rapor-card { border:none; padding:0; } }
+
+  /* ---- Menu Kelola Tanda Tangan ---- */
+  .ttd-preview {
+    width:220px; height:92px; border:1px dashed var(--border); border-radius:var(--radius-sm);
+    display:flex; align-items:center; justify-content:center; background:var(--paper);
+    font-size:0.8rem; color:var(--ink-muted); text-align:center; padding:6px; overflow:hidden;
+  }
+  .ttd-preview img { max-width:100%; max-height:100%; object-fit:contain; }
+  .ttd-head-toggle { display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
+</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script>
+const slot = renderAdminShell('/admin/rapor.html', 'Rekap Semester (Rapor)');
+
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function rentangSemester(tahun, semester) {
+  if (semester === 'ganjil') return [`${tahun}-07-01`, `${tahun}-12-31`, `Semester Ganjil Tahun Ajaran ${tahun}/${Number(tahun)+1}`];
+  return [`${Number(tahun)+1}-01-01`, `${Number(tahun)+1}-06-30`, `Semester Genap Tahun Ajaran ${tahun}/${Number(tahun)+1}`];
+}
+const now = new Date();
+const tahunDefault = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1; // Jul-Des dianggap tahun ajaran berjalan
+const tanggalHariIni = now.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+
+slot.innerHTML = `
+  <div class="card no-print" id="card-ttd">
+    <div class="ttd-head-toggle" id="toggle-ttd">
+      <h3 style="margin:0;">🖋️ Kelola Tanda Tangan (Kepala PKBM &amp; Wali Kelas)</h3>
+      <span id="ttd-caret">▾</span>
+    </div>
+    <div id="ttd-body" style="margin-top:16px; display:none;">
+      <h4 style="margin:0 0 8px;">Kepala PKBM</h4>
+      <div class="field"><label>Nama Kepala PKBM</label><input type="text" id="kp-nama" placeholder="mis. Drs. Ombi Romli"></div>
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+        <div>
+          <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Pratinjau Tanda Tangan</label>
+          <div class="ttd-preview" id="kp-preview">Belum ada tanda tangan</div>
+        </div>
+        <div class="field" style="flex:1; min-width:220px; margin:0;">
+          <label>Unggah Gambar Tanda Tangan</label>
+          <input type="file" accept="image/*" id="kp-file">
+          <div class="hint">Gambar apa pun otomatis dikonversi ke format PNG.</div>
+        </div>
+        <div class="field" style="flex:0 0 160px; margin:0;">
+          <label>Ukuran Tampilan</label>
+          <select id="kp-ukuran">
+            <option value="90">Kecil</option>
+            <option value="140" selected>Sedang</option>
+            <option value="190">Besar</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn btn-primary btn-sm" id="btn-simpan-kp">Simpan Kepala PKBM</button>
+        <button class="btn btn-outline btn-sm" id="btn-hapus-kp-ttd">Hapus Tanda Tangan</button>
+      </div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid var(--border);">
+
+      <h4 style="margin:0 0 6px;">Wali Kelas</h4>
+      <p class="hint" style="margin-top:0;">Ketik nama Kelas persis seperti pada Data Siswa (mis. "10", "11 IPA"), lalu isi nama &amp; tanda tangan wali kelasnya.</p>
+      <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="field" style="flex:0 0 140px; margin:0;"><label>Kelas</label><input type="text" id="wk-kelas" placeholder="mis. 10"></div>
+        <div class="field" style="flex:1; margin:0; min-width:200px;"><label>Nama Wali Kelas</label><input type="text" id="wk-nama" placeholder="mis. Intan Permatasari, S.E"></div>
+        <button class="btn btn-outline btn-sm" id="btn-muat-wk" type="button">Muat Data Kelas Ini</button>
+      </div>
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-top:12px;">
+        <div>
+          <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Pratinjau Tanda Tangan</label>
+          <div class="ttd-preview" id="wk-preview">Belum ada tanda tangan</div>
+        </div>
+        <div class="field" style="flex:1; min-width:220px; margin:0;">
+          <label>Unggah Gambar Tanda Tangan</label>
+          <input type="file" accept="image/*" id="wk-file">
+        </div>
+        <div class="field" style="flex:0 0 160px; margin:0;">
+          <label>Ukuran Tampilan</label>
+          <select id="wk-ukuran">
+            <option value="90">Kecil</option>
+            <option value="140" selected>Sedang</option>
+            <option value="190">Besar</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn btn-primary btn-sm" id="btn-simpan-wk">Simpan Wali Kelas</button>
+        <button class="btn btn-outline btn-sm" id="btn-hapus-wk-ttd">Hapus Tanda Tangan</button>
+      </div>
+
+      <div class="table-wrap" style="margin-top:18px;">
+        <table>
+          <thead><tr><th>Kelas</th><th>Wali Kelas</th><th>Tanda Tangan</th><th></th></tr></thead>
+          <tbody id="tbody-wali-kelas"><tr><td colspan="4">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <p>Rekap kehadiran per semester lengkap dengan deskripsi otomatis, siap dicetak/disimpan sebagai PDF untuk lampiran rapor. Kata-kata penilaian pada deskripsi &amp; identitas kop surat dapat diubah di menu <a href="/admin/pengaturan.html">Pengaturan Sekolah</a>.</p>
+    <div class="field" style="max-width:520px;">
+      <label>Pilih Siswa</label>
+      <select id="f-siswa"><option value="">— Semua siswa (gunakan filter di bawah) —</option></select>
+    </div>
+    <div class="filters">
+      <div class="field" style="margin:0;"><label>Periode</label>
+        <select id="f-periode"><option value="ganjil">Semester Ganjil</option><option value="genap">Semester Genap</option><option value="custom">Rentang bebas</option></select>
+      </div>
+      <div class="field" style="margin:0;" id="wrap-tahun"><label>Tahun Ajaran Mulai</label><input type="number" id="f-tahun" value="${tahunDefault}"></div>
+      <div class="field" style="margin:0;"><label>Dari</label><input type="date" id="f-mulai"></div>
+      <div class="field" style="margin:0;"><label>Sampai</label><input type="date" id="f-akhir"></div>
+      <div class="field" style="margin:0;"><label>Jenjang</label><select id="f-jenjang"><option value="">Semua</option><option>SD</option><option>SMP</option><option>SMA</option></select></div>
+      <div class="field" style="margin:0;"><label>Program</label><select id="f-program"><option value="">Semua</option><option value="PAKET_B">Paket B</option><option value="PAKET_C">Paket C</option></select></div>
+      <div class="field" style="margin:0;"><label>Nama / NISN</label><input type="text" id="f-nama" placeholder="Cari satu siswa..."></div>
+    </div>
+    <div id="kelas-chips"></div>
+    <p class="hint" style="margin:-4px 0 12px;">Jika "Pilih Siswa" di atas diisi, filter Jenjang/Program/Kelas/Nama di bawahnya diabaikan.</p>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <button class="btn btn-primary" id="btn-cari">Tampilkan Rekap</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="btn-xlsx">⬇ Excel (tabel + deskripsi)</button>
+        <button class="btn btn-outline btn-sm" id="btn-print">⬇ PDF (Cetak lampiran rapor)</button>
+      </div>
+    </div>
+  </div>
+  <p class="no-print" id="ringkasan" style="font-weight:600; color:var(--ink); margin:14px 0;"></p>
+  <div id="hasil-rapor"></div>
+`;
+
+/* ============== Filter siswa & rentang tanggal ============== */
+
+const periodeSelect = document.getElementById('f-periode');
+const wrapTahun = document.getElementById('wrap-tahun');
+const inputMulai = document.getElementById('f-mulai');
+const inputAkhir = document.getElementById('f-akhir');
+let periodeLabelAktif = '';
+
+function terapkanPreset() {
+  const preset = periodeSelect.value;
+  const editable = preset === 'custom';
+  wrapTahun.style.display = editable ? 'none' : 'block';
+  inputMulai.readOnly = !editable;
+  inputAkhir.readOnly = !editable;
+  if (!editable) {
+    const [mulai, akhir, label] = rentangSemester(document.getElementById('f-tahun').value || tahunDefault, preset);
+    inputMulai.value = mulai; inputAkhir.value = akhir; periodeLabelAktif = label;
+  } else {
+    periodeLabelAktif = '';
+  }
+}
+periodeSelect.addEventListener('change', terapkanPreset);
+document.getElementById('f-tahun').addEventListener('change', terapkanPreset);
+terapkanPreset();
+
+let daftarSiswa = [];
+// Isi dropdown "Pilih Siswa"; bila tombol kelas dipilih, hanya siswa kelas itu yang ditampilkan.
+function isiDropdownSiswa() {
+  const select = document.getElementById('f-siswa');
+  const kelas = kc.get();
+  const dipilih = select.value;
+  const list = kelas ? daftarSiswa.filter((s) => s.kelas === kelas) : daftarSiswa;
+  select.innerHTML = `<option value="">${kelas ? `— Semua siswa kelas ${esc(kelas)} —` : '— Semua siswa (gunakan filter di bawah) —'}</option>` +
+    list.map((s) => `
+      <option value="${s.id}">${esc(s.nama)} — ${esc(s.kelas)} (${esc(s.nisn || 'Tanpa NISN')})</option>
+    `).join('');
+  if (list.some((s) => String(s.id) === dipilih)) select.value = dipilih;
+}
+
+const kc = KelasChips.pasang(document.getElementById('kelas-chips'), {
+  onChange: () => { isiDropdownSiswa(); cari(); },
+});
+['f-jenjang','f-program'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => {
+    kc.setFilter({ program: document.getElementById('f-program').value, jenjang: document.getElementById('f-jenjang').value });
+    isiDropdownSiswa();
+  });
+});
+
+async function muatDropdownSiswa() {
+  const select = document.getElementById('f-siswa');
+  try {
+    let semua = [];
+    let page = 1;
+    // Ambil SEMUA siswa terdaftar (baik yang mendaftar/login sendiri maupun
+    // yang ditambahkan admin secara manual lewat menu Data Siswa) -- keduanya
+    // tersimpan di tabel yang sama, jadi cukup baca semua halaman di sini.
+    for (;;) {
+      const res = await apiCall(`/admin-students?page=${page}&per_page=100`);
+      semua = semua.concat(res.data || []);
+      if (!res.data || !res.data.length || semua.length >= res.total) break;
+      page++;
+      if (page > 100) break; // pengaman
+    }
+    semua.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+    daftarSiswa = semua;
+    isiDropdownSiswa();
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+    toast('Gagal memuat daftar siswa untuk dropdown.', 'error');
+  }
+}
+
+function buildQuery() {
+  const p = new URLSearchParams();
+  p.set('tanggal_mulai', inputMulai.value);
+  p.set('tanggal_akhir', inputAkhir.value);
+  if (periodeLabelAktif) p.set('periode', periodeLabelAktif);
+
+  const siswaId = document.getElementById('f-siswa').value;
+  if (siswaId) {
+    p.set('student_id', siswaId);
+    return p.toString();
+  }
+
+  if (kc.get()) p.set('kelas', kc.get());
+  const map = { 'f-jenjang': 'jenjang', 'f-program': 'program', 'f-nama': 'nama' };
+  for (const [id, key] of Object.entries(map)) {
+    const v = document.getElementById(id).value.trim();
+    if (v) p.set(key, v);
+  }
+  return p.toString();
+}
+
+function kelasPersentase(p) {
+  if (p >= 90) return 'color:var(--success); font-weight:700;';
+  if (p >= 75) return 'color:var(--warning); font-weight:700;';
+  return 'color:var(--danger); font-weight:700;';
+}
+
+/* ============== Kartu laporan (format kop + tanda tangan) ============== */
+
+function blokTtd(label, nama, ttd, ttdLebar, tempatTgl) {
+  return `
+    <div class="slot">
+      <div class="tempat-tgl">${tempatTgl ? esc(tempatTgl) : '&nbsp;'}</div>
+      ${esc(label)}
+      <div class="ttd-img-wrap">${ttd ? `<img src="${ttd}" style="width:${Math.min(Number(ttdLebar) || 140, 260)}px;">` : ''}</div>
+      <span class="garis"></span>
+      <span class="nama-ttd">${nama ? esc(nama) : '&nbsp;'}</span>
+    </div>`;
+}
+
+function kartuSiswa(r, sekolah, periode) {
+  const wali = r.wali_kelas || {};
+  return `
+    <div class="rapor-card print-page">
+      <div class="rapor-head">
+        <div class="rapor-head-row">
+          ${sekolah.kop_logo ? `<img class="rapor-logo" src="${sekolah.kop_logo}" style="width:${Math.min(Number(sekolah.kop_logo_lebar) || 70, 140)}px;">` : ''}
+          <div class="rapor-head-text">
+            ${sekolah.yayasan_nama ? `<p class="yayasan">${esc(sekolah.yayasan_nama)}</p>` : ''}
+            <h2>${esc(sekolah.nama_sekolah || 'Sekolah')}</h2>
+            ${sekolah.npsn ? `<p class="kecil">NPSN : ${esc(sekolah.npsn)}</p>` : ''}
+            ${sekolah.sk_kemenhukum ? `<p class="kecil">SK Kemenhukum No : ${esc(sekolah.sk_kemenhukum)}</p>` : ''}
+            ${sekolah.ijin_operasional ? `<p class="kecil">${esc(sekolah.ijin_operasional)}</p>` : ''}
+            ${sekolah.alamat ? `<p class="kecil">${esc(sekolah.alamat)}</p>` : ''}
+          </div>
+        </div>
+      </div>
+      <h3 class="rapor-judul">LAPORAN HASIL ABSENSI SISWA</h3>
+      <p class="rapor-sub">${esc(periode)}</p>
+
+      <table class="rapor-bio2">
+        <tr><td>Nama Siswa</td><td>: <b>${esc(r.nama)}</b></td></tr>
+        <tr><td>NISN</td><td>: ${esc(r.nisn || '-')}</td></tr>
+        <tr><td>Kelas</td><td>: ${esc(r.kelas)}</td></tr>
+        <tr><td>Program</td><td>: ${esc((r.program || '').replace('_', ' '))}</td></tr>
+      </table>
+
+      <table class="rapor-tbl2">
+        <thead><tr><th>No</th><th>Keterangan</th><th>Jumlah Hari</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Hadir</td><td>${r.hadir}</td></tr>
+          <tr><td>2</td><td>Terlambat</td><td>${r.terlambat}</td></tr>
+          <tr><td>3</td><td>Izin</td><td>${r.izin}</td></tr>
+          <tr><td>4</td><td>Sakit</td><td>${r.sakit}</td></tr>
+          <tr><td>5</td><td>Alpa (Tanpa Keterangan)</td><td>${r.alpa}</td></tr>
+          <tr class="total"><td colspan="2">Total Hari Efektif</td><td>${r.total_hari}</td></tr>
+          <tr class="total"><td colspan="2">Persentase Kehadiran</td><td style="${kelasPersentase(r.persentase)}">${r.persentase}%</td></tr>
+        </tbody>
+      </table>
+
+      <p class="rapor-desc2"><b>Deskripsi:</b> ${esc(r.deskripsi)}</p>
+
+      <div class="rapor-ttd2">
+        ${blokTtd(`Wali Kelas ${r.kelas}`, wali.nama, wali.ttd, wali.ttd_lebar, null)}
+        ${blokTtd('Kepala PKBM', sekolah.kepala_pkbm_nama, sekolah.kepala_pkbm_ttd, sekolah.kepala_pkbm_ttd_lebar, `${sekolah.kota_ttd || 'Karawang'}, ${tanggalHariIni}`)}
+      </div>
+    </div>
+  `;
+}
+
+let dataTerakhir = null;
+
+async function cari() {
+  try {
+    if (!inputMulai.value || !inputAkhir.value) { toast('Tentukan rentang tanggal.', 'error'); return; }
+    const data = await apiCall(`/admin-rapor-semester?${buildQuery()}`);
+    dataTerakhir = data;
+    document.getElementById('ringkasan').textContent = `${data.total} siswa, ${data.periode}.`;
+    const hasil = document.getElementById('hasil-rapor');
+    if (!data.data.length) { hasil.innerHTML = '<div class="card"><p>Tidak ada data untuk filter ini.</p></div>'; return; }
+    hasil.innerHTML = data.data.map((r) => kartuSiswa(r, data.sekolah, data.periode)).join('');
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+document.getElementById('btn-cari').onclick = cari;
+
+function unduh(format) {
+  const token = adminToken();
+  const url = `/api/admin-rapor-semester-export?${buildQuery()}&format=${format}`;
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(async (res) => {
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Gagal mengunduh.'); }
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="(.+)"/);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = match ? match[1] : `rekap-semester.${format}`;
+      a.click();
+    })
+    .catch((err) => toast(err.message, 'error'));
+}
+document.getElementById('btn-xlsx').onclick = () => unduh('xlsx');
+document.getElementById('btn-print').onclick = () => {
+  if (!dataTerakhir || !dataTerakhir.data.length) { toast('Tampilkan rekap terlebih dahulu sebelum mencetak.', 'error'); return; }
+  window.print();
+};
+
+/* ============== Menu Kelola Tanda Tangan ============== */
+
+let ttdTerbuka = false;
+document.getElementById('toggle-ttd').onclick = () => {
+  ttdTerbuka = !ttdTerbuka;
+  document.getElementById('ttd-body').style.display = ttdTerbuka ? 'block' : 'none';
+  document.getElementById('ttd-caret').textContent = ttdTerbuka ? '▴' : '▾';
+};
+
+/** Baca file gambar apa pun, lalu ubah jadi PNG (base64 data URL) dengan lebar maksimum tertentu. */
+function fileKeDataUrlPng(file, maxLebarSimpan = 500) {
+  return new Promise((resolve, reject) => {
+    if (!file) { resolve(null); return; }
+    if (!file.type.startsWith('image/')) { reject(new Error('File harus berupa gambar.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Gagal memuat gambar. Coba file lain.'));
+      img.onload = () => {
+        const skala = Math.min(1, maxLebarSimpan / img.width);
+        const w = Math.max(1, Math.round(img.width * skala));
+        const h = Math.max(1, Math.round(img.height * skala));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPreview(elId, dataUrl, lebar) {
+  const el = document.getElementById(elId);
+  el.innerHTML = dataUrl ? `<img src="${dataUrl}" style="width:${Math.min(Number(lebar) || 140, 200)}px;">` : 'Belum ada tanda tangan';
+}
+
+/* ---- Kepala PKBM ---- */
+let identitasSekolah = null;
+let kpTtdBaru; // undefined = tak diubah; null = dihapus; string = tanda tangan baru
+
+async function muatKepalaPkbm() {
+  try {
+    const { data } = await apiCall('/admin-rapor-identitas');
+    identitasSekolah = data;
+    document.getElementById('kp-nama').value = data.kepala_pkbm_nama || '';
+    document.getElementById('kp-ukuran').value = String(data.kepala_pkbm_ttd_lebar || 140);
+    renderPreview('kp-preview', data.kepala_pkbm_ttd, data.kepala_pkbm_ttd_lebar || 140);
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+
+document.getElementById('kp-file').onchange = async (e) => {
+  try {
+    kpTtdBaru = await fileKeDataUrlPng(e.target.files[0]);
+    renderPreview('kp-preview', kpTtdBaru, document.getElementById('kp-ukuran').value);
+  } catch (err) { toast(err.message, 'error'); }
+};
+document.getElementById('kp-ukuran').onchange = () => {
+  const current = kpTtdBaru !== undefined ? kpTtdBaru : (identitasSekolah && identitasSekolah.kepala_pkbm_ttd);
+  renderPreview('kp-preview', current, document.getElementById('kp-ukuran').value);
+};
+document.getElementById('btn-simpan-kp').onclick = async () => {
+  try {
+    const body = {
+      kepala_pkbm_nama: document.getElementById('kp-nama').value.trim(),
+      kepala_pkbm_ttd_lebar: Number(document.getElementById('kp-ukuran').value),
+    };
+    if (kpTtdBaru !== undefined) body.kepala_pkbm_ttd = kpTtdBaru;
+    const { data } = await apiCall('/admin-rapor-identitas', { method: 'PUT', body });
+    identitasSekolah = data; kpTtdBaru = undefined;
+    document.getElementById('kp-file').value = '';
+    renderPreview('kp-preview', data.kepala_pkbm_ttd, data.kepala_pkbm_ttd_lebar);
+    toast('Data Kepala PKBM disimpan.', 'success');
+    if (dataTerakhir) cari();
+  } catch (err) { toast(err.message, 'error'); }
+};
+document.getElementById('btn-hapus-kp-ttd').onclick = async () => {
+  if (!confirm('Hapus tanda tangan Kepala PKBM? Nama Kepala PKBM tetap disimpan.')) return;
+  try {
+    const { data } = await apiCall('/admin-rapor-identitas', { method: 'PUT', body: { hapus_ttd_kepala: true } });
+    identitasSekolah = data; kpTtdBaru = undefined;
+    document.getElementById('kp-file').value = '';
+    document.getElementById('kp-ukuran').value = '140';
+    renderPreview('kp-preview', null, 140);
+    toast('Tanda tangan Kepala PKBM dihapus.', 'success');
+    if (dataTerakhir) cari();
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+/* ---- Wali Kelas ---- */
+let daftarWaliKelas = [];
+let wkAda = null;
+let wkTtdBaru;
+
+async function muatDaftarWaliKelas() {
+  try {
+    const { data } = await apiCall('/admin-wali-kelas');
+    daftarWaliKelas = data || [];
+    const tbody = document.getElementById('tbody-wali-kelas');
+    if (!daftarWaliKelas.length) { tbody.innerHTML = '<tr><td colspan="4">Belum ada data wali kelas ditambahkan.</td></tr>'; return; }
+    tbody.innerHTML = daftarWaliKelas.map((w) => `
+      <tr>
+        <td>${esc(w.kelas)}</td>
+        <td>${esc(w.nama || '-')}</td>
+        <td>${w.ttd ? `<img src="${w.ttd}" style="height:34px;">` : '-'}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-outline btn-sm" data-edit-wk="${esc(w.kelas)}" type="button">Edit</button>
+          <button class="btn btn-outline btn-sm" data-hapus-wk="${esc(w.kelas)}" type="button">Hapus</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+
+function muatFormWaliKelas(kelas) {
+  const found = daftarWaliKelas.find((w) => w.kelas === kelas) || null;
+  wkAda = found; wkTtdBaru = undefined;
+  document.getElementById('wk-nama').value = found ? (found.nama || '') : '';
+  document.getElementById('wk-ukuran').value = String((found && found.ttd_lebar) || 140);
+  document.getElementById('wk-file').value = '';
+  renderPreview('wk-preview', found ? found.ttd : null, (found && found.ttd_lebar) || 140);
+}
+
+document.getElementById('btn-muat-wk').onclick = () => {
+  const kelas = document.getElementById('wk-kelas').value.trim();
+  if (!kelas) { toast('Isi nama Kelas terlebih dahulu.', 'error'); return; }
+  muatFormWaliKelas(kelas);
+  toast(wkAda ? `Data wali kelas "${kelas}" dimuat.` : `Belum ada data untuk kelas "${kelas}" — silakan isi baru.`, '');
+};
+document.getElementById('wk-file').onchange = async (e) => {
+  try {
+    wkTtdBaru = await fileKeDataUrlPng(e.target.files[0]);
+    renderPreview('wk-preview', wkTtdBaru, document.getElementById('wk-ukuran').value);
+  } catch (err) { toast(err.message, 'error'); }
+};
+document.getElementById('wk-ukuran').onchange = () => {
+  const current = wkTtdBaru !== undefined ? wkTtdBaru : (wkAda && wkAda.ttd);
+  renderPreview('wk-preview', current, document.getElementById('wk-ukuran').value);
+};
+document.getElementById('btn-simpan-wk').onclick = async () => {
+  const kelas = document.getElementById('wk-kelas').value.trim();
+  if (!kelas) { toast('Isi nama Kelas terlebih dahulu.', 'error'); return; }
+  try {
+    const body = {
+      kelas,
+      nama: document.getElementById('wk-nama').value.trim(),
+      ttd_lebar: Number(document.getElementById('wk-ukuran').value),
+    };
+    if (wkTtdBaru !== undefined) body.ttd = wkTtdBaru;
+    const { data } = await apiCall('/admin-wali-kelas', { method: 'POST', body });
+    wkTtdBaru = undefined;
+    document.getElementById('wk-file').value = '';
+    toast(`Wali kelas "${kelas}" disimpan.`, 'success');
+    await muatDaftarWaliKelas();
+    muatFormWaliKelas(kelas);
+    if (dataTerakhir) cari();
+  } catch (err) { toast(err.message, 'error'); }
+};
+document.getElementById('btn-hapus-wk-ttd').onclick = async () => {
+  const kelas = document.getElementById('wk-kelas').value.trim();
+  if (!kelas) { toast('Isi/muat data Kelas terlebih dahulu.', 'error'); return; }
+  if (!confirm(`Hapus tanda tangan wali kelas "${kelas}"? Nama wali kelas tetap disimpan.`)) return;
+  try {
+    const { data } = await apiCall('/admin-wali-kelas', { method: 'POST', body: { kelas, hapus_ttd: true } });
+    toast('Tanda tangan wali kelas dihapus.', 'success');
+    await muatDaftarWaliKelas();
+    muatFormWaliKelas(kelas);
+    if (dataTerakhir) cari();
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('tbody-wali-kelas').addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('[data-edit-wk]');
+  if (editBtn) {
+    document.getElementById('wk-kelas').value = editBtn.dataset.editWk;
+    muatFormWaliKelas(editBtn.dataset.editWk);
+    return;
+  }
+  const delBtn = e.target.closest('[data-hapus-wk]');
+  if (delBtn) {
+    if (!confirm(`Hapus seluruh data wali kelas "${delBtn.dataset.hapusWk}" (nama & tanda tangan)?`)) return;
+    try {
+      await apiCall(`/admin-wali-kelas?kelas=${encodeURIComponent(delBtn.dataset.hapusWk)}`, { method: 'DELETE' });
+      toast('Data wali kelas dihapus.', 'success');
+      await muatDaftarWaliKelas();
+      if (document.getElementById('wk-kelas').value.trim() === delBtn.dataset.hapusWk) muatFormWaliKelas(delBtn.dataset.hapusWk);
+      if (dataTerakhir) cari();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+});
+
+muatDropdownSiswa();
+muatKepalaPkbm();
+muatDaftarWaliKelas();
+cari();
+</script>
+</body>
+</html>

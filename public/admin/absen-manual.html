@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Absen Manual — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .filters > * { flex: 1 1 160px; }
+  .siswa-pick { border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; }
+  .siswa-pick:hover { border-color:var(--primary); background:var(--primary-soft); }
+  .siswa-pick + .siswa-pick { margin-top:6px; }
+  .selected-box { background:var(--primary-soft); border:1px solid var(--primary); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+  .tab-switch { display:flex; gap:8px; margin-bottom:14px; }
+  .tab-switch button { flex:1; padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:600; }
+  .tab-switch button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .baris-massal select, .baris-massal input { font-size:0.85rem; }
+</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script>
+const slot = renderAdminShell('/admin/absen-manual.html', 'Absen Manual');
+
+const infoAdmin = JSON.parse(localStorage.getItem('admin_info') || '{}');
+if (infoAdmin.role !== 'SUPER_ADMIN') {
+  slot.innerHTML = `<div class="card"><p style="color:var(--danger); font-weight:600;">Halaman ini hanya dapat diakses oleh Super Admin.</p></div>`;
+  throw new Error('bukan super admin');
+}
+
+const STATUS_OPTIONS = [
+  { v: 'HADIR', l: 'Hadir' }, { v: 'TERLAMBAT', l: 'Terlambat' }, { v: 'IZIN', l: 'Izin' },
+  { v: 'SAKIT', l: 'Sakit' }, { v: 'TIDAK_HADIR', l: 'Tidak Hadir' },
+];
+function selectStatus(id, current) {
+  return `<select id="${id}" class="st-select">${STATUS_OPTIONS.map((o) => `<option value="${o.v}" ${o.v===current?'selected':''}>${o.l}</option>`).join('')}</select>`;
+}
+
+slot.innerHTML = `
+  <div class="card">
+    <p>Gunakan menu ini untuk mencatat kehadiran siswa yang <b>tidak memiliki HP / tidak bisa absen mandiri</b> lewat aplikasi (mis. seluruh siswa jenjang SD). Absen yang diinput lewat sini otomatis ditandai "Manual oleh Super Admin" pada audit log.</p>
+    <div class="tab-switch">
+      <button class="active" id="tab-satu">Per Siswa</button>
+      <button id="tab-kelas">Per Kelas (Massal)</button>
+    </div>
+  </div>
+
+  <div id="mode-satu">
+    <div class="card">
+      <div id="kelas-chips-satu"></div>
+      <div class="filters">
+        <input type="text" id="f-search" placeholder="Cari nama / NISN...">
+        <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; flex:0 0 auto;">
+          <input type="checkbox" id="f-tanpa-hp" style="width:auto;"> Hanya tampilkan siswa tanpa No. HP
+        </label>
+      </div>
+      <div id="hasil-cari"></div>
+    </div>
+
+    <div class="card" id="card-form" style="display:none;">
+      <div class="selected-box">
+        <div>
+          <div style="font-weight:700;" id="sel-nama"></div>
+          <div style="font-size:0.82rem; color:var(--ink-muted);" id="sel-meta"></div>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-ganti-siswa">Ganti Siswa</button>
+      </div>
+      <form id="form-manual">
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label>Tanggal</label><input type="date" id="m-tanggal" required></div>
+          <div class="field" style="flex:1;"><label>Status Kehadiran</label>
+            <select id="m-status">
+              ${STATUS_OPTIONS.map((o) => `<option value="${o.v}">${o.l}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div id="wrap-jam" style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label>Jam Datang</label><input type="time" id="m-jam-datang"></div>
+          <div class="field" style="flex:1;"><label>Jam Pulang (opsional)</label><input type="time" id="m-jam-pulang"></div>
+        </div>
+        <div class="field"><label>Keterangan (opsional)</label><input type="text" id="m-keterangan" placeholder="mis. Tidak punya HP, dititipkan wali kelas, dst."></div>
+        <button type="submit" class="btn btn-primary btn-block">Simpan Absen Manual</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:8px;">Baru saja diinput (sesi ini)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nama</th><th>Tanggal</th><th>Status</th><th>Jam Datang</th><th>Jam Pulang</th><th>Keterangan</th></tr></thead>
+          <tbody id="tbody-riwayat-sesi"><tr><td colspan="6">Belum ada input pada sesi ini.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="mode-kelas" style="display:none;">
+    <div class="card">
+      <div id="kelas-chips-massal"></div>
+      <div class="filters">
+        <div class="field" style="margin:0;"><label>Tanggal</label><input type="date" id="k-tanggal"></div>
+        <div class="field" style="margin:0;"><label>Kelas</label><input type="text" id="k-kelas" placeholder="mis. 1, 2A, dst."></div>
+        <div class="field" style="margin:0;"><label>Jam Datang Default</label><input type="time" id="k-jam-default" value="07:00"></div>
+        <button class="btn btn-primary" id="btn-muat-kelas" style="align-self:flex-end;">Muat Siswa</button>
+      </div>
+      <div id="info-kelas"></div>
+    </div>
+    <div class="card" id="card-kelas" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="btn-semua-hadir">Tandai Semua Hadir (jam default)</button>
+        <button class="btn btn-primary" id="btn-simpan-massal">Simpan Semua</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nama</th><th>NISN</th><th>Status</th><th>Jam Datang</th><th>Keterangan</th></tr></thead>
+          <tbody id="tbody-kelas"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+`;
+
+// ---------- Tab switching ----------
+document.getElementById('tab-satu').onclick = () => {
+  document.getElementById('tab-satu').classList.add('active');
+  document.getElementById('tab-kelas').classList.remove('active');
+  document.getElementById('mode-satu').style.display = 'block';
+  document.getElementById('mode-kelas').style.display = 'none';
+};
+document.getElementById('tab-kelas').onclick = () => {
+  document.getElementById('tab-kelas').classList.add('active');
+  document.getElementById('tab-satu').classList.remove('active');
+  document.getElementById('mode-kelas').style.display = 'block';
+  document.getElementById('mode-satu').style.display = 'none';
+};
+
+const today = new Date().toISOString().slice(0, 10);
+document.getElementById('m-tanggal').value = today;
+document.getElementById('k-tanggal').value = today;
+
+// ---------- Mode: Per Siswa ----------
+let siswaTerpilih = null;
+let searchTimer = null;
+const kcSatu = KelasChips.pasang(document.getElementById('kelas-chips-satu'), { onChange: () => cariSiswa() });
+
+function updateWrapJam() {
+  const status = document.getElementById('m-status').value;
+  document.getElementById('wrap-jam').style.display = (status === 'HADIR' || status === 'TERLAMBAT') ? 'flex' : 'none';
+}
+document.getElementById('m-status').addEventListener('change', updateWrapJam);
+
+async function cariSiswa() {
+  const search = document.getElementById('f-search').value.trim();
+  const tanpaHp = document.getElementById('f-tanpa-hp').checked;
+  const kelas = kcSatu.get();
+  const hasil = document.getElementById('hasil-cari');
+  if (!search && !tanpaHp && !kelas) { hasil.innerHTML = ''; return; }
+  hasil.innerHTML = '<p>Mencari...</p>';
+  try {
+    // Bila kelas dipilih, tampilkan seluruh siswa di kelas itu (maks. 100) supaya mudah dipilih satu per satu.
+    const p = new URLSearchParams({ per_page: kelas ? '100' : '15', status: 'AKTIF' });
+    if (search) p.set('search', search);
+    if (kelas) p.set('kelas', kelas);
+    if (tanpaHp) p.set('tanpa_hp', 'true');
+    const data = await apiCall(`/admin-students?${p.toString()}`);
+    if (!data.data.length) { hasil.innerHTML = '<p>Tidak ada siswa yang cocok.</p>'; return; }
+    hasil.innerHTML = data.data.map((s) => `
+      <div class="siswa-pick" data-id="${s.id}" data-nama="${s.nama}" data-nisn="${s.nisn || ''}" data-kelas="${s.kelas}" data-program="${s.program}">
+        <span>${s.nama} <span style="color:var(--ink-muted); font-size:0.82rem;">— ${s.kelas}, ${(s.program||'').replace('_',' ')}${s.hp ? '' : ' · <b style="color:var(--warning);">Tanpa HP</b>'}</span></span>
+        <span class="btn btn-outline btn-sm">Pilih</span>
+      </div>
+    `).join('');
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+document.getElementById('f-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(cariSiswa, 300); });
+document.getElementById('f-tanpa-hp').addEventListener('change', cariSiswa);
+
+document.getElementById('hasil-cari').addEventListener('click', (e) => {
+  const box = e.target.closest('.siswa-pick');
+  if (!box) return;
+  siswaTerpilih = { id: box.dataset.id, nama: box.dataset.nama, nisn: box.dataset.nisn, kelas: box.dataset.kelas, program: box.dataset.program };
+  document.getElementById('sel-nama').textContent = siswaTerpilih.nama;
+  document.getElementById('sel-meta').textContent = `${siswaTerpilih.nisn || 'Tanpa NISN'} · ${siswaTerpilih.kelas} · ${(siswaTerpilih.program||'').replace('_',' ')}`;
+  document.getElementById('card-form').style.display = 'block';
+  document.getElementById('hasil-cari').innerHTML = '';
+  document.getElementById('f-search').value = '';
+  updateWrapJam();
+  document.getElementById('card-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.getElementById('btn-ganti-siswa').onclick = () => {
+  siswaTerpilih = null;
+  document.getElementById('card-form').style.display = 'none';
+  cariSiswa(); // bila tombol kelas masih aktif, daftar siswa kelas itu tampil lagi
+};
+
+const riwayatSesi = [];
+function renderRiwayatSesi() {
+  const tbody = document.getElementById('tbody-riwayat-sesi');
+  if (!riwayatSesi.length) { tbody.innerHTML = '<tr><td colspan="6">Belum ada input pada sesi ini.</td></tr>'; return; }
+  tbody.innerHTML = riwayatSesi.map((r) => `
+    <tr>
+      <td>${r.nama}</td><td>${r.tanggal}</td>
+      <td><span class="${statusBadgeClass(r.status)}">${statusLabel(r.status)}</span></td>
+      <td>${r.jam_datang || '-'}</td><td>${r.jam_pulang || '-'}</td><td>${r.keterangan || '-'}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('form-manual').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!siswaTerpilih) { toast('Pilih siswa terlebih dahulu.', 'error'); return; }
+  const status = document.getElementById('m-status').value;
+  const tanggal = document.getElementById('m-tanggal').value;
+  const jamDatang = document.getElementById('m-jam-datang').value || null;
+  const jamPulang = document.getElementById('m-jam-pulang').value || null;
+  const keterangan = document.getElementById('m-keterangan').value.trim() || null;
+
+  const payload = { student_id: siswaTerpilih.id, tanggal, status, keterangan };
+  if (status === 'HADIR' || status === 'TERLAMBAT') {
+    if (jamDatang) payload.jam_datang = jamDatang;
+    if (jamPulang) payload.jam_pulang = jamPulang;
+  }
+
+  try {
+    await apiCall('/admin-absen-manual', { method: 'POST', body: payload });
+    toast(`Absen manual untuk ${siswaTerpilih.nama} berhasil disimpan.`, 'success');
+    riwayatSesi.unshift({ nama: siswaTerpilih.nama, tanggal, status, jam_datang: jamDatang, jam_pulang: jamPulang, keterangan });
+    renderRiwayatSesi();
+    document.getElementById('m-keterangan').value = '';
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+    if (err.status === 403) { toast('Hanya Super Admin yang dapat menginput absen manual.', 'error'); return; }
+    toast(err.message, 'error');
+  }
+});
+
+// ---------- Mode: Per Kelas (Massal) ----------
+let siswaKelas = [];
+
+// Tombol kelas pada mode massal: isi kolom Kelas lalu langsung muat daftar siswanya
+const kcMassal = KelasChips.pasang(document.getElementById('kelas-chips-massal'), {
+  onChange: (k) => {
+    document.getElementById('k-kelas').value = k;
+    if (k) document.getElementById('btn-muat-kelas').click();
+  },
+});
+
+document.getElementById('btn-muat-kelas').onclick = async () => {
+  const kelas = document.getElementById('k-kelas').value.trim();
+  const info = document.getElementById('info-kelas');
+  if (!kelas) { toast('Isi nama kelas terlebih dahulu.', 'error'); return; }
+  info.innerHTML = '<p>Memuat siswa...</p>';
+  try {
+    const data = await apiCall(`/admin-students?kelas=${encodeURIComponent(kelas)}&status=AKTIF&per_page=100`);
+    siswaKelas = data.data;
+    info.innerHTML = '';
+    if (!siswaKelas.length) {
+      document.getElementById('card-kelas').style.display = 'none';
+      info.innerHTML = '<p>Tidak ada siswa aktif pada kelas tersebut.</p>';
+      return;
+    }
+    renderTabelKelas();
+    document.getElementById('card-kelas').style.display = 'block';
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+};
+
+function renderTabelKelas() {
+  const jamDefault = document.getElementById('k-jam-default').value || '07:00';
+  document.getElementById('tbody-kelas').innerHTML = siswaKelas.map((s, i) => `
+    <tr class="baris-massal" data-idx="${i}">
+      <td>${s.nama}${s.hp ? '' : ' <b style="color:var(--warning); font-size:0.75rem;">(Tanpa HP)</b>'}</td>
+      <td>${s.nisn || '-'}</td>
+      <td>${selectStatus(`st-${i}`, 'HADIR')}</td>
+      <td><input type="time" id="jd-${i}" value="${jamDefault}" style="width:110px;"></td>
+      <td><input type="text" id="kt-${i}" placeholder="opsional" style="width:100%;"></td>
+    </tr>
+  `).join('');
+  document.querySelectorAll('.st-select').forEach((sel, i) => {
+    sel.addEventListener('change', () => {
+      const jamCell = document.getElementById(`jd-${i}`);
+      jamCell.disabled = !(sel.value === 'HADIR' || sel.value === 'TERLAMBAT');
+    });
+  });
+}
+
+document.getElementById('btn-semua-hadir').onclick = () => {
+  const jamDefault = document.getElementById('k-jam-default').value || '07:00';
+  siswaKelas.forEach((_, i) => {
+    document.getElementById(`st-${i}`).value = 'HADIR';
+    const jamCell = document.getElementById(`jd-${i}`);
+    jamCell.disabled = false;
+    jamCell.value = jamDefault;
+  });
+};
+
+document.getElementById('btn-simpan-massal').onclick = async () => {
+  const tanggal = document.getElementById('k-tanggal').value;
+  if (!tanggal) { toast('Pilih tanggal terlebih dahulu.', 'error'); return; }
+  const items = siswaKelas.map((s, i) => {
+    const status = document.getElementById(`st-${i}`).value;
+    const jamDatang = document.getElementById(`jd-${i}`).value || null;
+    const keterangan = document.getElementById(`kt-${i}`).value.trim() || null;
+    const item = { student_id: s.id, status, keterangan };
+    if (status === 'HADIR' || status === 'TERLAMBAT') item.jam_datang = jamDatang;
+    return item;
+  });
+
+  const btn = document.getElementById('btn-simpan-massal');
+  btn.disabled = true;
+  try {
+    const res = await apiCall('/admin-absen-manual-bulk', { method: 'POST', body: { tanggal, kelas: document.getElementById('k-kelas').value.trim(), items } });
+    const gagal = res.hasil.filter((h) => !h.ok);
+    if (gagal.length) {
+      toast(`${res.berhasil}/${res.total} berhasil disimpan. ${gagal.length} gagal: ${gagal.map((g) => g.error).join(', ')}`, 'error');
+    } else {
+      toast(`Berhasil menyimpan absen ${res.berhasil} siswa untuk ${tanggal}.`, 'success');
+    }
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+    if (err.status === 403) { toast('Hanya Super Admin yang dapat menginput absen manual.', 'error'); return; }
+    toast(err.message, 'error');
+  } finally { btn.disabled = false; }
+};
+</script>
+</body>
+</html>

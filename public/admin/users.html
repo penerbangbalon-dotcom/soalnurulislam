@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User Admin — Absensi PKBM Nurul Islam</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script>
+const slot = renderAdminShell('/admin/users.html', 'User Admin');
+slot.innerHTML = `
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <p style="margin:0;">Kelola akun Admin &amp; Super Admin. Hanya Super Admin yang dapat mengakses halaman ini.</p>
+      <button class="btn btn-primary" id="btn-tambah">+ Tambah Admin</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody id="tbody-users"><tr><td colspan="5">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+`;
+
+async function muat() {
+  try {
+    const { data } = await apiCall('/admin-users');
+    document.getElementById('tbody-users').innerHTML = data.map((a) => `
+      <tr>
+        <td>${a.nama}</td><td>${a.email}</td>
+        <td><span class="badge ${a.role==='SUPER_ADMIN'?'badge-verifikasi':'badge-belum'}">${a.role.replace('_',' ')}</span></td>
+        <td>${a.aktif ? '<span class="badge badge-hadir">Aktif</span>' : '<span class="badge badge-tidak_hadir">Nonaktif</span>'}</td>
+        <td><button class="btn btn-outline btn-sm" data-toggle="${a.id}" data-aktif="${a.aktif}">${a.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    if (err.status === 403) { slot.innerHTML = '<div class="card">Hanya Super Admin yang dapat mengakses halaman ini.</div>'; return; }
+    if (err.status === 401) { logoutAdmin(); return; }
+    toast(err.message, 'error');
+  }
+}
+
+document.getElementById('btn-tambah').onclick = () => {
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>Tambah Admin</h3>
+      <form id="form-admin">
+        <div class="field"><label>Nama</label><input type="text" id="a-nama" required></div>
+        <div class="field"><label>Email</label><input type="email" id="a-email" required></div>
+        <div class="field"><label>Password (min. 8 karakter)</label><input type="password" id="a-password" minlength="8" required></div>
+        <div class="field"><label>Role</label><select id="a-role"><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Super Admin</option></select></div>
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="btn btn-outline btn-block" id="btn-batal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-block">Simpan</button>
+        </div>
+      </form>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector('#btn-batal').onclick = () => modal.remove();
+  modal.querySelector('#form-admin').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await apiCall('/admin-users', { method: 'POST', body: {
+        nama: modal.querySelector('#a-nama').value,
+        email: modal.querySelector('#a-email').value,
+        password: modal.querySelector('#a-password').value,
+        role: modal.querySelector('#a-role').value,
+      }});
+      toast('Admin ditambahkan.', 'success');
+      modal.remove(); muat();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+};
+
+slot.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-toggle]');
+  if (!btn) return;
+  const aktifBaru = btn.dataset.aktif !== 'true';
+  try {
+    await apiCall(`/admin-users?id=${btn.dataset.toggle}`, { method: 'PUT', body: { aktif: aktifBaru } });
+    toast('Status admin diperbarui.', 'success'); muat();
+  } catch (err) { toast(err.message, 'error'); }
+});
+
+muat();
+</script>
+</body>
+</html>

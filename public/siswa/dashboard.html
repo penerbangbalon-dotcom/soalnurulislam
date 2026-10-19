@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Beranda — Absensi Siswa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  .attend-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .attend-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+  .attend-box .jam { font-size: 1.3rem; font-weight: 800; margin: 6px 0; }
+  #qr-reader { width: 100%; border-radius: var(--radius-sm); overflow: hidden; }
+</style>
+</head>
+<body>
+  <div class="siswa-shell">
+    <div class="siswa-header">
+      <img class="siswa-logo" src="/assets/img/logo-pkbm.png" alt="Logo PKBM Nurul Islam">
+      <div class="greeting" id="greeting">Selamat Datang,</div>
+      <div class="name" id="nama-siswa">Memuat...</div>
+      <div class="meta">
+        <span id="meta-nisn">NISN: -</span>
+        <span id="meta-program">-</span>
+        <span id="meta-kelas">-</span>
+      </div>
+    </div>
+
+    <div class="siswa-body">
+      <div class="card" id="skeleton-card">
+        <div class="skeleton" style="height:20px;width:60%;margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:60px;"></div>
+      </div>
+
+      <div id="main-content" class="hidden">
+        <div class="card">
+          <h3>Absensi Hari Ini</h3>
+          <p id="tanggal-hari-ini">-</p>
+          <div class="attend-row">
+            <div class="attend-box">
+              <div style="font-size:0.78rem;color:var(--ink-muted);">DATANG</div>
+              <div class="jam" id="jam-datang">Belum Absen</div>
+              <span class="badge" id="badge-datang">-</span>
+            </div>
+            <div class="attend-box">
+              <div style="font-size:0.78rem;color:var(--ink-muted);">PULANG</div>
+              <div class="jam" id="jam-pulang">Belum Tersedia</div>
+              <span class="badge" id="badge-pulang">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Status Sesi</h3>
+          <div id="sesi-datang-status" class="session-status session-closed" style="margin-bottom:10px;">
+            <span class="dot"></span> <span>Memuat status sesi datang...</span>
+          </div>
+          <div id="sesi-pulang-status" class="session-status session-closed">
+            <span class="dot"></span> <span>Memuat status sesi pulang...</span>
+          </div>
+        </div>
+
+        <div class="card" style="text-align:center;">
+          <button class="btn btn-primary btn-block" id="btn-datang">Absen Datang</button>
+          <div style="height:10px;"></div>
+          <button class="btn btn-accent btn-block" id="btn-pulang">Absen Pulang</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="/siswa/dashboard.html" class="active"><span class="icon">🏠</span>Beranda</a>
+    <a href="/siswa/riwayat.html"><span class="icon">📅</span>Riwayat</a>
+    <a href="/siswa/laporan.html"><span class="icon">📄</span>Laporan</a>
+    <a href="/siswa/profil.html"><span class="icon">👤</span>Profil</a>
+  </nav>
+
+  <!-- Modal absen -->
+  <div class="modal-backdrop hidden" id="modal-absen">
+    <div class="modal">
+      <h3 id="modal-title">Absen Datang</h3>
+      <p id="modal-desc">Masukkan kode 6 digit dari layar admin, atau pindai QR.</p>
+      <div class="field">
+        <label>Kode Absensi</label>
+        <input type="text" id="input-token" maxlength="6" style="text-transform:uppercase;letter-spacing:.2em;font-weight:700;text-align:center;font-size:1.3rem;" placeholder="ABCXYZ">
+      </div>
+      <button class="btn btn-outline btn-block" id="btn-scan-qr" type="button">📷 Pindai QR</button>
+      <div id="qr-reader" class="hidden" style="margin-top:10px;"></div>
+      <div id="lokasi-info" class="field hint" style="margin-top:14px;"></div>
+      <div style="display:flex; gap:10px; margin-top:10px;">
+        <button class="btn btn-outline btn-block" id="btn-batal" type="button">Batal</button>
+        <button class="btn btn-primary btn-block" id="btn-konfirmasi" type="button">Konfirmasi</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/absen-sukses.js"></script>
+  <script>
+    requireSiswaAuth();
+    let currentMode = null; // 'datang' | 'pulang'
+    let qrScanner = null;
+    let profileCache = null;
+
+    function setSessionBox(el, info, label) {
+      if (info) {
+        el.className = 'session-status session-open';
+        const sisa = Math.max(0, Math.floor((new Date(info.expires_at) - new Date()) / 1000));
+        const mm = String(Math.floor(sisa / 60)).padStart(2, '0');
+        const ss = String(sisa % 60).padStart(2, '0');
+        el.innerHTML = `<span class="dot"></span> <span>🟢 ${label} Dibuka — tutup dalam <b>${mm}:${ss}</b></span>`;
+      } else {
+        el.className = 'session-status session-closed';
+        el.innerHTML = `<span class="dot"></span> <span>🔴 ${label} Ditutup</span>`;
+      }
+    }
+
+    async function muatData() {
+      try {
+        const data = await apiCall('/siswa-me', { isSiswa: true });
+        profileCache = data;
+        document.getElementById('skeleton-card').classList.add('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+
+        document.getElementById('nama-siswa').textContent = data.student.nama;
+        document.getElementById('meta-nisn').textContent = `NISN: ${data.student.nisn || '-'}`;
+        document.getElementById('meta-program').textContent = data.student.program.replace('_', ' ');
+        document.getElementById('meta-kelas').textContent = `Kelas ${data.student.kelas}`;
+        document.getElementById('tanggal-hari-ini').textContent = fmtTanggal(data.tanggal);
+
+        const a = data.attendance;
+        document.getElementById('jam-datang').textContent = a && a.checkin_time ? fmtJam(a.checkin_time) : 'Belum Absen';
+        document.getElementById('badge-datang').className = statusBadgeClass(a ? a.checkin_status : 'BELUM_ABSEN');
+        document.getElementById('badge-datang').textContent = statusLabel(a ? a.checkin_status : 'BELUM_ABSEN');
+
+        document.getElementById('jam-pulang').textContent = a && a.checkout_time ? fmtJam(a.checkout_time) : 'Belum Tersedia';
+        document.getElementById('badge-pulang').className = statusBadgeClass(a && a.checkout_time ? 'SUDAH_PULANG' : 'BELUM_ABSEN');
+        document.getElementById('badge-pulang').textContent = a && a.checkout_time ? 'Sudah Pulang' : '-';
+
+        setSessionBox(document.getElementById('sesi-datang-status'), data.sesi_aktif.datang, 'Absensi Datang');
+        setSessionBox(document.getElementById('sesi-pulang-status'), data.sesi_aktif.pulang, 'Absensi Pulang');
+
+        document.getElementById('btn-datang').disabled = !data.sesi_aktif.datang || (a && a.checkin_time);
+        document.getElementById('btn-pulang').disabled = !data.sesi_aktif.pulang || !(a && a.checkin_time) || (a && a.checkout_time);
+      } catch (err) {
+        if (err.status === 401) { logoutSiswa(); return; }
+        toast(err.message, 'error');
+      }
+    }
+
+    function bukaModal(mode) {
+      currentMode = mode;
+      document.getElementById('modal-title').textContent = mode === 'datang' ? 'Absen Datang' : 'Absen Pulang';
+      document.getElementById('input-token').value = '';
+      document.getElementById('lokasi-info').textContent = '';
+      document.getElementById('modal-absen').classList.remove('hidden');
+    }
+    function tutupModal() {
+      document.getElementById('modal-absen').classList.add('hidden');
+      if (qrScanner) { qrScanner.stop().catch(() => {}); qrScanner = null; document.getElementById('qr-reader').classList.add('hidden'); }
+    }
+    document.getElementById('btn-batal').onclick = tutupModal;
+    document.getElementById('btn-datang').onclick = () => bukaModal('datang');
+    document.getElementById('btn-pulang').onclick = () => bukaModal('pulang');
+
+    document.getElementById('btn-scan-qr').onclick = () => {
+      const el = document.getElementById('qr-reader');
+      el.classList.remove('hidden');
+      qrScanner = new Html5Qrcode('qr-reader');
+      qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, (text) => {
+        document.getElementById('input-token').value = text.trim().toUpperCase().slice(0, 6);
+        qrScanner.stop().catch(() => {});
+        el.classList.add('hidden');
+        toast('QR terbaca.', 'success');
+      }).catch(() => toast('Kamera tidak dapat diakses. Gunakan input manual.', 'error'));
+    };
+
+    document.getElementById('btn-konfirmasi').onclick = async () => {
+      const token = document.getElementById('input-token').value.trim().toUpperCase();
+      if (token.length !== 6) { toast('Masukkan kode 6 digit yang valid.', 'error'); return; }
+      const btn = document.getElementById('btn-konfirmasi');
+      siapkanSuaraAbsen(); // buka izin suara selagi ada klik pengguna
+      btn.disabled = true; btn.textContent = 'Mengambil lokasi...';
+      document.getElementById('lokasi-info').textContent = 'Mengambil lokasi GPS Anda...';
+      try {
+        const loc = await ambilLokasi();
+        document.getElementById('lokasi-info').textContent = `Akurasi GPS: ±${Math.round(loc.accuracy)} m`;
+        btn.textContent = 'Mengirim...';
+        const endpoint = currentMode === 'datang' ? '/siswa-checkin' : '/siswa-checkout';
+        const res = await apiCall(endpoint, {
+          method: 'POST', isSiswa: true,
+          body: { lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy, is_mock_location: loc.is_mock_location, token, device_info: deviceInfo() },
+        });
+        const modeSukses = currentMode;
+        tutupModal();
+        tampilkanAbsenBerhasil({
+          mode: modeSukses,
+          nama: profileCache && profileCache.student ? profileCache.student.nama : '',
+          jam: res.jam, status: res.status, jarak: res.jarak_meter,
+        });
+        muatData();
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Konfirmasi';
+      }
+    };
+
+    muatData();
+    setInterval(muatData, 15000); // refresh status & countdown tiap 15 detik
+  </script>
+</body>
+</html>

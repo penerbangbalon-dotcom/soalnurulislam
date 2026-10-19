@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Siswa — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>.filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; } .filters > * { flex: 1 1 140px; }</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script>
+const slot = renderAdminShell('/admin/siswa.html', 'Data Siswa');
+slot.innerHTML = `
+  <div class="card">
+    <div class="filters">
+      <input type="text" id="f-search" placeholder="Cari nama / NISN...">
+      <select id="f-jenjang"><option value="">Semua Jenjang</option><option>SD</option><option>SMP</option><option>SMA</option></select>
+      <select id="f-program"><option value="">Semua Program</option><option value="PAKET_B">Paket B</option><option value="PAKET_C">Paket C</option><option value="UMUM">Umum (SD)</option></select>
+      <select id="f-status"><option value="">Semua Status</option><option value="AKTIF">Aktif</option><option value="NONAKTIF">Nonaktif</option></select>
+      <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; flex:0 0 auto;">
+        <input type="checkbox" id="f-flag" style="width:auto;"> Perlu Konfirmasi
+      </label>
+    </div>
+    <div id="kelas-chips"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <button class="btn btn-primary" id="btn-tambah">+ Tambah Siswa</button>
+      <span id="total-info" style="font-size:0.85rem; color:var(--ink-muted);"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>NISN</th><th>Nama</th><th>Jenjang</th><th>Program</th><th>Kelas</th><th>JK</th><th>Status</th><th></th></tr></thead>
+        <tbody id="tbody-siswa"><tr><td colspan="8">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+    <div style="display:flex; justify-content:center; gap:8px; margin-top:14px;" id="pagination"></div>
+  </div>
+`;
+
+let page = 1;
+const perPage = 25;
+const kc = KelasChips.pasang(document.getElementById('kelas-chips'), { onChange: () => { page = 1; muat(); } });
+
+function buildQuery() {
+  const p = new URLSearchParams();
+  const search = document.getElementById('f-search').value.trim();
+  const jenjang = document.getElementById('f-jenjang').value;
+  const program = document.getElementById('f-program').value;
+  const status = document.getElementById('f-status').value;
+  const flag = document.getElementById('f-flag').checked;
+  if (search) p.set('search', search);
+  if (jenjang) p.set('jenjang', jenjang);
+  if (program) p.set('program', program);
+  if (status) p.set('status', status);
+  if (kc.get()) p.set('kelas', kc.get());
+  if (flag) p.set('butuh_konfirmasi', 'true');
+  p.set('page', page); p.set('per_page', perPage);
+  return p.toString();
+}
+
+async function muat() {
+  try {
+    const data = await apiCall(`/admin-students?${buildQuery()}`);
+    const tbody = document.getElementById('tbody-siswa');
+    if (!data.data.length) { tbody.innerHTML = '<tr><td colspan="8">Tidak ada data.</td></tr>'; }
+    else {
+      tbody.innerHTML = data.data.map((s) => `
+        <tr>
+          <td>${s.nisn || '<span style="color:var(--danger);">Belum ada</span>'}</td>
+          <td>${s.nama} ${s.butuh_konfirmasi_admin ? '<span class="badge badge-verifikasi" title="' + (s.catatan_konfirmasi||'') + '">Perlu Konfirmasi</span>' : ''}</td>
+          <td>${s.jenjang}</td><td>${s.program.replace('_',' ')}</td><td>${s.kelas}</td><td>${s.jk||'-'}</td>
+          <td><span class="${s.status === 'AKTIF' ? 'badge badge-hadir' : 'badge badge-tidak_hadir'}">${s.status}</span></td>
+          <td><button class="btn btn-outline btn-sm" data-edit="${s.id}">Kelola</button></td>
+        </tr>
+      `).join('');
+    }
+    document.getElementById('total-info').textContent = `${data.total} siswa`;
+    renderPagination(data.total);
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+
+function renderPagination(total) {
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const el = document.getElementById('pagination');
+  let html = '';
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - page) <= 2) {
+      html += `<button class="btn btn-sm ${i===page?'btn-primary':'btn-outline'}" data-page="${i}">${i}</button>`;
+    } else if (Math.abs(i - page) === 3) html += '<span>...</span>';
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('[data-page]').forEach((b) => b.onclick = () => { page = Number(b.dataset.page); muat(); });
+}
+
+// Program/Jenjang membatasi tombol kelas yang tampil (didaftarkan lebih dulu agar kelas ter-reset sebelum muat())
+['f-jenjang','f-program'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => kc.setFilter({
+    program: document.getElementById('f-program').value, jenjang: document.getElementById('f-jenjang').value,
+  }));
+});
+['f-search','f-jenjang','f-program','f-status'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => { page = 1; muat(); });
+});
+document.getElementById('f-flag').addEventListener('change', () => { page = 1; muat(); });
+
+function tampilkanFormSiswa(data) {
+  const isEdit = Boolean(data && data.id);
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <h3>${isEdit ? 'Kelola Siswa' : 'Tambah Siswa'}</h3>
+      <form id="form-siswa">
+        <div class="field"><label>Nama Lengkap</label><input type="text" id="m-nama" required value="${data?.nama||''}"></div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label>NISN</label><input type="text" id="m-nisn" value="${data?.nisn||''}"></div>
+          <div class="field" style="flex:1;"><label>NIPD</label><input type="text" id="m-nipd" value="${data?.nipd||''}"></div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label>Jenjang</label>
+            <select id="m-jenjang">${['SD','SMP','SMA'].map(j=>`<option ${data?.jenjang===j?'selected':''}>${j}</option>`).join('')}</select>
+          </div>
+          <div class="field" style="flex:1;"><label>Program</label>
+            <select id="m-program">
+              <option value="UMUM" ${data?.program==='UMUM'?'selected':''}>Umum (SD)</option>
+              <option value="PAKET_B" ${data?.program==='PAKET_B'?'selected':''}>Paket B</option>
+              <option value="PAKET_C" ${data?.program==='PAKET_C'?'selected':''}>Paket C</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label>Kelas</label><input type="text" id="m-kelas" required value="${data?.kelas||''}"></div>
+          <div class="field" style="flex:1;"><label>Jenis Kelamin</label>
+            <select id="m-jk"><option value="L" ${data?.jk==='L'?'selected':''}>Laki-laki</option><option value="P" ${data?.jk==='P'?'selected':''}>Perempuan</option></select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label>Tanggal Lahir</label><input type="date" id="m-tgl" value="${data?.tanggal_lahir||''}"></div>
+          <div class="field" style="flex:1;"><label>No. HP</label><input type="text" id="m-hp" value="${data?.hp||''}"></div>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="m-status"><option value="AKTIF" ${data?.status==='AKTIF'?'selected':''}>Aktif</option><option value="NONAKTIF" ${data?.status==='NONAKTIF'?'selected':''}>Nonaktif</option></select>
+        </div>
+        ${isEdit ? `<label style="display:flex; gap:8px; align-items:center; font-size:0.85rem; margin-bottom:14px;"><input type="checkbox" id="m-reset" style="width:auto;"> Reset password ke tanggal lahir</label>` : ''}
+        <div style="display:flex; gap:10px;">
+          ${isEdit ? `<button type="button" class="btn btn-danger" id="btn-hapus">Hapus</button>` : ''}
+          <button type="button" class="btn btn-outline btn-block" id="btn-batal-modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-block">Simpan</button>
+        </div>
+      </form>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector('#btn-batal-modal').onclick = () => modal.remove();
+
+  if (isEdit) {
+    modal.querySelector('#btn-hapus').onclick = async () => {
+      if (!confirm(`Hapus data siswa "${data.nama}"? Tindakan ini tidak dapat dibatalkan.`)) return;
+      try { await apiCall(`/admin-students-detail?id=${data.id}`, { method: 'DELETE' }); toast('Siswa dihapus.', 'success'); modal.remove(); muat(); }
+      catch (err) { toast(err.message, 'error'); }
+    };
+  }
+
+  modal.querySelector('#form-siswa').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      nama: modal.querySelector('#m-nama').value.trim(),
+      nisn: modal.querySelector('#m-nisn').value.trim() || null,
+      nipd: modal.querySelector('#m-nipd').value.trim() || null,
+      jenjang: modal.querySelector('#m-jenjang').value,
+      program: modal.querySelector('#m-program').value,
+      kelas: modal.querySelector('#m-kelas').value.trim(),
+      jk: modal.querySelector('#m-jk').value,
+      tanggal_lahir: modal.querySelector('#m-tgl').value || null,
+      hp: modal.querySelector('#m-hp').value.trim() || null,
+      status: modal.querySelector('#m-status').value,
+    };
+    if (isEdit && modal.querySelector('#m-reset')?.checked) payload.reset_password = true;
+    try {
+      if (isEdit) await apiCall(`/admin-students-detail?id=${data.id}`, { method: 'PUT', body: payload });
+      else await apiCall('/admin-students', { method: 'POST', body: payload });
+      toast('Data siswa disimpan.', 'success');
+      modal.remove(); muat();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
+document.getElementById('btn-tambah').onclick = () => tampilkanFormSiswa(null);
+slot.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-edit]');
+  if (!btn) return;
+  try {
+    const { data } = await apiCall(`/admin-students-detail?id=${btn.dataset.edit}`);
+    tampilkanFormSiswa(data);
+  } catch (err) { toast(err.message, 'error'); }
+});
+
+muat();
+</script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sesi &amp; Token Absensi — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  .sesi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .sesi-grid { grid-template-columns: 1fr; } }
+  .layar-penuh { position: fixed; inset: 0; background: #fff; z-index: 200; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script>
+const slot = renderAdminShell('/admin/token.html', 'Sesi & Token Absensi');
+slot.innerHTML = `
+  <p>Buat sesi untuk membuka jendela absensi. Kode/QR berganti otomatis setiap <b>15 menit</b> selama sesi masih berjalan.</p>
+  <div class="sesi-grid">
+    ${['PAKET_B', 'PAKET_C'].map((prog) => `
+      <div class="card" data-program="${prog}">
+        <h3>${prog.replace('_',' ')}</h3>
+        ${['DATANG','PULANG'].map((s) => `
+          <div style="border-top:1px solid var(--border); padding-top:12px; margin-top:12px;" data-sesi="${s}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <b>${s === 'DATANG' ? 'Absen Datang' : 'Absen Pulang'}</b>
+              <span class="badge badge-belum" data-el="status">Tidak Aktif</span>
+            </div>
+            <div style="text-align:center; margin:14px 0;">
+              <div id="qr-${prog}-${s}" style="display:flex; justify-content:center; margin-bottom:8px;"></div>
+              <div class="countdown" data-el="code">------</div>
+              <div class="hint" data-el="countdown" style="margin-top:4px;">-</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-primary btn-sm btn-block" data-action="mulai">Mulai / Perpanjang</button>
+              <button class="btn btn-outline btn-sm btn-block" data-action="stop">Hentikan</button>
+              <button class="btn btn-ghost btn-sm" data-action="layar-penuh" title="Layar Penuh">⤢</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}
+  </div>
+  <div id="layar-penuh-root"></div>
+`;
+
+let sessionData = {};
+
+async function muatSesi() {
+  try {
+    const data = await apiCall('/admin-token-current');
+    sessionData = data.sessions;
+    for (const [combo, info] of Object.entries(data.sessions)) {
+      const [program, sesi] = combo.split(':');
+      const box = document.querySelector(`[data-program="${program}"] [data-sesi="${sesi}"]`);
+      if (!box) continue;
+      const statusEl = box.querySelector('[data-el="status"]');
+      const codeEl = box.querySelector('[data-el="code"]');
+      const cdEl = box.querySelector('[data-el="countdown"]');
+      const qrEl = document.getElementById(`qr-${program}-${sesi}`);
+      qrEl.innerHTML = '';
+      if (info) {
+        statusEl.className = 'badge badge-hadir'; statusEl.textContent = 'Aktif';
+        codeEl.textContent = info.token;
+        new QRCode(qrEl, { text: info.token, width: 120, height: 120 });
+        const sisa = Math.max(0, Math.floor((new Date(info.expires_at) - new Date()) / 1000));
+        const terlambat = (new Date() - new Date(info.expires_at)) / 1000; // detik sejak kedaluwarsa
+        if (terlambat > 90) {
+          cdEl.innerHTML = `<span style="color:var(--danger); font-weight:600;">⚠ Belum diperpanjang otomatis (${Math.floor(terlambat/60)} menit lewat). Klik "Mulai / Perpanjang".</span>`;
+        } else {
+          cdEl.textContent = `Berganti dalam ${String(Math.floor(sisa/60)).padStart(2,'0')}:${String(sisa%60).padStart(2,'0')}`;
+        }
+      } else {
+        statusEl.className = 'badge badge-belum'; statusEl.textContent = 'Tidak Aktif';
+        codeEl.textContent = '------';
+        cdEl.textContent = '-';
+      }
+    }
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+  }
+}
+
+slot.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const box = btn.closest('[data-sesi]');
+  const card = btn.closest('[data-program]');
+  const program = card.dataset.program;
+  const sesi = box.dataset.sesi;
+  const action = btn.dataset.action;
+
+  if (action === 'mulai') {
+    btn.disabled = true;
+    try {
+      await apiCall('/admin-token-rotate', { method: 'POST', body: { program, sesi, auto_rotate: true } });
+      toast(`Sesi ${sesi} ${program.replace('_',' ')} dimulai.`, 'success');
+      muatSesi();
+    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+  } else if (action === 'stop') {
+    if (!confirm('Hentikan sesi ini? Siswa tidak akan bisa absen sampai sesi dibuka kembali.')) return;
+    try {
+      await apiCall('/admin-token-stop', { method: 'POST', body: { program, sesi } });
+      toast('Sesi dihentikan.', 'success');
+      muatSesi();
+    } catch (err) { toast(err.message, 'error'); }
+  } else if (action === 'layar-penuh') {
+    tampilkanLayarPenuh(program, sesi);
+  }
+});
+
+function tampilkanLayarPenuh(program, sesi) {
+  const root = document.getElementById('layar-penuh-root');
+  root.innerHTML = `
+    <div class="layar-penuh" id="lp">
+      <button class="btn btn-outline" style="position:absolute; top:20px; right:20px;" id="lp-tutup">Tutup ✕</button>
+      <h2 style="font-size:1.4rem;">${program.replace('_',' ')} — ${sesi === 'DATANG' ? 'Absen Datang' : 'Absen Pulang'}</h2>
+      <div id="lp-qr" style="margin:20px 0;"></div>
+      <div class="countdown" id="lp-code" style="font-size:4rem;">------</div>
+      <p id="lp-cd" style="font-size:1.1rem;">-</p>
+    </div>`;
+  document.getElementById('lp-tutup').onclick = () => { root.innerHTML = ''; clearInterval(lpTimer); };
+  const render = () => {
+    const info = sessionData[`${program}:${sesi}`];
+    document.getElementById('lp-qr').innerHTML = '';
+    if (info) {
+      new QRCode(document.getElementById('lp-qr'), { text: info.token, width: 260, height: 260 });
+      document.getElementById('lp-code').textContent = info.token;
+      const sisa = Math.max(0, Math.floor((new Date(info.expires_at) - new Date()) / 1000));
+      document.getElementById('lp-cd').textContent = `Berganti dalam ${String(Math.floor(sisa/60)).padStart(2,'0')}:${String(sisa%60).padStart(2,'0')}`;
+    } else {
+      document.getElementById('lp-code').textContent = 'TIDAK AKTIF';
+      document.getElementById('lp-cd').textContent = 'Mulai sesi ini dari panel admin.';
+    }
+  };
+  render();
+  const lpTimer = setInterval(render, 1000);
+}
+
+muatSesi();
+setInterval(muatSesi, 5000);
+</script>
+</body>
+</html>

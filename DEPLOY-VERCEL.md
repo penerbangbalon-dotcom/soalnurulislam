@@ -92,5 +92,6 @@ Instalasi baru: jalankan berurutan. Instalasi lama: jalankan hanya yang belum pe
 16. `migrasi-v20-kenaikan-kelas.sql` (bila `students.status` bertipe teks dengan CHECK, pastikan LULUS, PINDAH, KELUAR diizinkan)
 17. `migrasi-v21-mapel-jurusan.sql`
 18. `migrasi-v22-rapor-mapel-sembunyi.sql`
+19. `migrasi-v24-rpp-modul.sql` (menu Generate RPP & Modul Ajar)
 
 Catatan: jumlah fungsi di folder `api/` saat ini 11 (batas paket gratis Vercel 12). Tambahkan aksi baru ke fungsi yang ada, jangan membuat file baru di `api/`.

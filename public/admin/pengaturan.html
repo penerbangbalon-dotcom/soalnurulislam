@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pengaturan Sekolah — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>
+  .ttd-preview {
+    width:200px; height:80px; border:1px dashed var(--border); border-radius:var(--radius-sm);
+    display:flex; align-items:center; justify-content:center; background:var(--paper);
+    font-size:0.8rem; color:var(--ink-muted); text-align:center; padding:6px; overflow:hidden;
+  }
+  .ttd-preview img { max-width:100%; max-height:100%; object-fit:contain; }
+</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script>
+const slot = renderAdminShell('/admin/pengaturan.html', 'Pengaturan Sekolah');
+const HARI = [{v:1,l:'Senin'},{v:2,l:'Selasa'},{v:3,l:'Rabu'},{v:4,l:'Kamis'},{v:5,l:'Jumat'},{v:6,l:'Sabtu'},{v:7,l:'Minggu'}];
+let identitasSekolah = null;
+
+slot.innerHTML = `
+  <div class="card">
+    <h3>Lokasi &amp; Radius Sekolah</h3>
+    <p>Koordinat ini menjadi acuan validasi jarak absensi siswa. Hanya Super Admin yang dapat mengubah bagian ini.</p>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label>Nama Sekolah</label><input type="text" id="s-nama"></div>
+    </div>
+    <div class="field"><label>Alamat</label><input type="text" id="s-alamat"></div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label>Latitude</label><input type="number" step="any" id="s-lat"></div>
+      <div class="field" style="flex:1;"><label>Longitude</label><input type="number" step="any" id="s-lng"></div>
+      <div class="field" style="flex:0 0 auto; align-self:flex-end;"><button class="btn btn-outline" id="btn-lokasi-sekarang" type="button">📍 Gunakan Lokasi Saat Ini</button></div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label>Radius Absensi (50&ndash;100 m)</label><input type="number" id="s-radius" min="50" max="100"></div>
+      <div class="field" style="flex:1;"><label>Akurasi GPS Maksimum (m)</label><input type="number" id="s-akurasi"></div>
+    </div>
+    <div class="field">
+      <label>Hari Aktif Sekolah</label>
+      <div style="display:flex; flex-wrap:wrap; gap:10px;">
+        ${HARI.map(h => `<label style="display:flex; gap:6px; align-items:center; font-size:0.85rem;"><input type="checkbox" class="hari-aktif" value="${h.v}" style="width:auto;"> ${h.l}</label>`).join('')}
+      </div>
+    </div>
+    <label style="display:flex; gap:8px; align-items:center; margin-bottom:16px;"><input type="checkbox" id="s-selfie" style="width:auto;"> Wajibkan foto selfie saat absen</label>
+    <button class="btn btn-primary" id="btn-simpan-settings">Simpan Pengaturan</button>
+  </div>
+
+  <div class="card">
+    <h3>Jadwal Program</h3>
+    <div id="jadwal-wrap"></div>
+    <button class="btn btn-primary" id="btn-simpan-jadwal">Simpan Jadwal</button>
+  </div>
+
+  <div class="card">
+    <h3>Identitas Yayasan / PKBM (Kop Rekap Semester &amp; Rapor)</h3>
+    <p>Data ini muncul sebagai kop surat pada halaman <b>Rekap Semester (Rapor)</b>. Tanda tangan Kepala PKBM &amp; Wali Kelas dikelola langsung di halaman tersebut, pada menu <b>Kelola Tanda Tangan</b>.</p>
+    <div class="field"><label>Nama Yayasan</label><input type="text" id="id-yayasan" placeholder="mis. YAYASAN NURUL ISLAM SINDANGPALAY"></div>
+    <p class="hint" style="margin:-6px 0 12px;">Nama Sekolah/PKBM diambil otomatis dari field <b>Nama Sekolah</b> pada kartu "Lokasi &amp; Radius Sekolah" di atas, ditampilkan tepat di bawah Nama Yayasan pada kop surat.</p>
+    <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-bottom:14px;">
+      <div>
+        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Pratinjau Logo/Kop</label>
+        <div class="ttd-preview" id="logo-preview">Belum ada logo</div>
+      </div>
+      <div class="field" style="flex:1; min-width:220px; margin:0;">
+        <label>Unggah Logo Kop Surat</label>
+        <input type="file" accept="image/*" id="logo-file">
+        <div class="hint">Logo tampil di sebelah kiri kop surat pada Rekap Semester (Rapor). Gambar apa pun otomatis dikonversi ke PNG.</div>
+      </div>
+      <div class="field" style="flex:0 0 160px; margin:0;">
+        <label>Ukuran Tampilan</label>
+        <select id="logo-ukuran">
+          <option value="50">Kecil</option>
+          <option value="70" selected>Sedang</option>
+          <option value="100">Besar</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm" id="btn-hapus-logo" type="button" style="margin-bottom:14px;">Hapus Logo</button>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label>NPSN</label><input type="text" id="id-npsn"></div>
+      <div class="field" style="flex:1;"><label>Kota untuk Tanggal Penandatanganan</label><input type="text" id="id-kota" placeholder="mis. Karawang"></div>
+    </div>
+    <div class="field"><label>No. SK Kemenkumham</label><input type="text" id="id-sk" placeholder="mis. AHU-0011701.AH.01.04"></div>
+    <div class="field"><label>Ijin Operasional / SK Penyelenggaraan</label><input type="text" id="id-ijin" placeholder="mis. 503/3278/23/IMPBM/VIII/DPMPTSP/2020 - SK Penyelenggaraan 421.9/SK-IO-PKBM-001.2/PAUD-DIKMAS"></div>
+    <button class="btn btn-primary" id="btn-simpan-identitas">Simpan Identitas</button>
+  </div>
+
+  <div class="card">
+    <h3>Templat Deskripsi Kehadiran (Rekap Semester / Lampiran Rapor)</h3>
+    <p>Kalimat penilaian otomatis yang muncul pada halaman <b>Rekap Semester (Rapor)</b>, sesuai kategori persentase kehadiran siswa. Gunakan <code>{nama}</code> sebagai placeholder nama siswa.</p>
+    <div class="field"><label>≥ 95% — Sangat Baik</label><input type="text" id="t-sangat-baik"></div>
+    <div class="field"><label>85% – 94,9% — Baik</label><input type="text" id="t-baik"></div>
+    <div class="field"><label>75% – 84,9% — Cukup</label><input type="text" id="t-cukup"></div>
+    <div class="field"><label>&lt; 75% — Kurang</label><input type="text" id="t-kurang"></div>
+    <button class="btn btn-primary" id="btn-simpan-templat">Simpan Templat Deskripsi</button>
+  </div>
+  <div class="card">
+    <h3>Kalender Hari Libur</h3>
+    <p>Tanggal di sini <b>dikecualikan</b> dari perhitungan hari efektif sekolah pada Persentase Kehadiran &amp; Rekap Semester (Rapor), dan absensi mandiri siswa otomatis ditutup pada tanggal ini. Libur nasional &amp; cuti bersama 2026 sudah terisi otomatis — tambahkan sendiri libur khusus sekolah (mis. libur semester) di bawah ini.</p>
+    <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:14px;">
+      <div class="field" style="flex:0 0 auto; margin:0;"><label>Tanggal</label><input type="date" id="hl-tanggal"></div>
+      <div class="field" style="flex:1; margin:0;"><label>Keterangan</label><input type="text" id="hl-keterangan" placeholder="mis. Libur Semester Ganjil"></div>
+      <button class="btn btn-primary" id="btn-tambah-libur">+ Tambah</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tanggal</th><th>Keterangan</th><th></th></tr></thead>
+        <tbody id="tbody-hari-libur"><tr><td colspan="3">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+`;
+
+function baris(sch) {
+  return `
+    <div style="border-top:1px solid var(--border); padding-top:12px; margin-top:12px;" data-program="${sch.program}">
+      <b>${sch.program.replace('_',' ')}</b>
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <div class="field" style="flex:1;"><label>Mulai Absen Datang</label><input type="time" class="j-mulai" value="${sch.jam_masuk_mulai.slice(0,5)}"></div>
+        <div class="field" style="flex:1;"><label>Akhir Absen Datang</label><input type="time" class="j-selesai" value="${sch.jam_masuk_selesai.slice(0,5)}"></div>
+        <div class="field" style="flex:1;"><label>Jam Pulang</label><input type="time" class="j-pulang" value="${sch.jam_pulang.slice(0,5)}"></div>
+        <div class="field" style="flex:1;"><label>Toleransi (menit)</label><input type="number" class="j-toleransi" value="${sch.toleransi_menit}"></div>
+      </div>
+    </div>`;
+}
+
+async function muat() {
+  try {
+    const data = await apiCall('/admin-settings');
+    const s = data.settings;
+    document.getElementById('s-nama').value = s.nama_sekolah || '';
+    document.getElementById('s-alamat').value = s.alamat || '';
+    document.getElementById('s-lat').value = s.latitude ?? '';
+    document.getElementById('s-lng').value = s.longitude ?? '';
+    document.getElementById('s-radius').value = s.radius_m;
+    document.getElementById('s-akurasi').value = s.gps_accuracy_max_m;
+    document.getElementById('s-selfie').checked = s.selfie_wajib;
+    document.querySelectorAll('.hari-aktif').forEach((cb) => { cb.checked = s.hari_aktif.includes(Number(cb.value)); });
+    document.getElementById('jadwal-wrap').innerHTML = data.schedules.map(baris).join('');
+    document.getElementById('t-sangat-baik').value = s.templat_deskripsi_sangat_baik || '';
+    document.getElementById('t-baik').value = s.templat_deskripsi_baik || '';
+    document.getElementById('t-cukup').value = s.templat_deskripsi_cukup || '';
+    document.getElementById('t-kurang').value = s.templat_deskripsi_kurang || '';
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+
+async function muatIdentitas() {
+  try {
+    const { data } = await apiCall('/admin-rapor-identitas');
+    identitasSekolah = data;
+    document.getElementById('id-yayasan').value = data.yayasan_nama || '';
+    document.getElementById('id-npsn').value = data.npsn || '';
+    document.getElementById('id-kota').value = data.kota_ttd || '';
+    document.getElementById('id-sk').value = data.sk_kemenhukum || '';
+    document.getElementById('id-ijin').value = data.ijin_operasional || '';
+    document.getElementById('logo-ukuran').value = String(data.kop_logo_lebar || 70);
+    renderLogoPreview(data.kop_logo, data.kop_logo_lebar || 70);
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+
+/** Baca file gambar apa pun, lalu ubah jadi PNG (base64 data URL) dengan lebar maksimum tertentu. */
+function fileKeDataUrlPng(file, maxLebarSimpan = 500) {
+  return new Promise((resolve, reject) => {
+    if (!file) { resolve(null); return; }
+    if (!file.type.startsWith('image/')) { reject(new Error('File harus berupa gambar.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Gagal memuat gambar. Coba file lain.'));
+      img.onload = () => {
+        const skala = Math.min(1, maxLebarSimpan / img.width);
+        const w = Math.max(1, Math.round(img.width * skala));
+        const h = Math.max(1, Math.round(img.height * skala));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function renderLogoPreview(dataUrl, lebar) {
+  const el = document.getElementById('logo-preview');
+  el.innerHTML = dataUrl ? `<img src="${dataUrl}" style="width:${Math.min(Number(lebar) || 70, 150)}px;">` : 'Belum ada logo';
+}
+let logoBaru; // undefined = tak diubah; null = dihapus; string = logo baru
+document.getElementById('logo-file').onchange = async (e) => {
+  try {
+    logoBaru = await fileKeDataUrlPng(e.target.files[0]);
+    renderLogoPreview(logoBaru, document.getElementById('logo-ukuran').value);
+  } catch (err) { toast(err.message, 'error'); }
+};
+document.getElementById('logo-ukuran').onchange = () => {
+  const current = logoBaru !== undefined ? logoBaru : (identitasSekolah && identitasSekolah.kop_logo);
+  renderLogoPreview(current, document.getElementById('logo-ukuran').value);
+};
+document.getElementById('btn-hapus-logo').onclick = async () => {
+  if (!confirm('Hapus logo kop surat?')) return;
+  try {
+    const { data } = await apiCall('/admin-rapor-identitas', { method: 'PUT', body: { hapus_logo: true } });
+    identitasSekolah = data; logoBaru = undefined;
+    document.getElementById('logo-file').value = '';
+    document.getElementById('logo-ukuran').value = '70';
+    renderLogoPreview(null, 70);
+    toast('Logo kop surat dihapus.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('btn-simpan-identitas').onclick = async () => {
+  try {
+    const body = {
+      yayasan_nama: document.getElementById('id-yayasan').value.trim(),
+      npsn: document.getElementById('id-npsn').value.trim(),
+      kota_ttd: document.getElementById('id-kota').value.trim() || 'Karawang',
+      sk_kemenhukum: document.getElementById('id-sk').value.trim(),
+      ijin_operasional: document.getElementById('id-ijin').value.trim(),
+      kop_logo_lebar: Number(document.getElementById('logo-ukuran').value),
+    };
+    if (logoBaru !== undefined) body.kop_logo = logoBaru;
+    const { data } = await apiCall('/admin-rapor-identitas', { method: 'PUT', body });
+    identitasSekolah = data; logoBaru = undefined;
+    document.getElementById('logo-file').value = '';
+    renderLogoPreview(data.kop_logo, data.kop_logo_lebar);
+    toast('Identitas yayasan/PKBM disimpan.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('btn-lokasi-sekarang').onclick = () => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { document.getElementById('s-lat').value = pos.coords.latitude; document.getElementById('s-lng').value = pos.coords.longitude; toast('Lokasi diambil.', 'success'); },
+    () => toast('Gagal mengambil lokasi perangkat.', 'error')
+  );
+};
+
+document.getElementById('btn-simpan-settings').onclick = async () => {
+  const hariAktif = Array.from(document.querySelectorAll('.hari-aktif:checked')).map((c) => Number(c.value));
+  try {
+    await apiCall('/admin-settings', { method: 'PUT', body: { settings: {
+      nama_sekolah: document.getElementById('s-nama').value,
+      alamat: document.getElementById('s-alamat').value,
+      latitude: Number(document.getElementById('s-lat').value),
+      longitude: Number(document.getElementById('s-lng').value),
+      radius_m: Number(document.getElementById('s-radius').value),
+      gps_accuracy_max_m: Number(document.getElementById('s-akurasi').value),
+      selfie_wajib: document.getElementById('s-selfie').checked,
+      hari_aktif: hariAktif,
+    }}});
+    toast('Pengaturan sekolah disimpan.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('btn-simpan-jadwal').onclick = async () => {
+  const schedules = Array.from(document.querySelectorAll('#jadwal-wrap [data-program]')).map((box) => ({
+    program: box.dataset.program,
+    jam_masuk_mulai: box.querySelector('.j-mulai').value,
+    jam_masuk_selesai: box.querySelector('.j-selesai').value,
+    jam_pulang: box.querySelector('.j-pulang').value,
+    toleransi_menit: Number(box.querySelector('.j-toleransi').value),
+  }));
+  try {
+    await apiCall('/admin-settings', { method: 'PUT', body: { schedules } });
+    toast('Jadwal disimpan.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('btn-simpan-templat').onclick = async () => {
+  try {
+    await apiCall('/admin-settings', { method: 'PUT', body: { settings: {
+      templat_deskripsi_sangat_baik: document.getElementById('t-sangat-baik').value,
+      templat_deskripsi_baik: document.getElementById('t-baik').value,
+      templat_deskripsi_cukup: document.getElementById('t-cukup').value,
+      templat_deskripsi_kurang: document.getElementById('t-kurang').value,
+    }}});
+    toast('Templat deskripsi kehadiran disimpan.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+async function muatHariLibur() {
+  try {
+    const { data } = await apiCall('/admin-hari-libur');
+    const tbody = document.getElementById('tbody-hari-libur');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="3">Belum ada hari libur ditambahkan.</td></tr>'; return; }
+    tbody.innerHTML = data.map((h) => `
+      <tr>
+        <td>${new Date(h.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })}</td>
+        <td>${h.keterangan}</td>
+        <td><button class="btn btn-outline btn-sm" data-hapus="${h.tanggal}">Hapus</button></td>
+      </tr>
+    `).join('');
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+
+document.getElementById('btn-tambah-libur').onclick = async () => {
+  const tanggal = document.getElementById('hl-tanggal').value;
+  const keterangan = document.getElementById('hl-keterangan').value.trim();
+  if (!tanggal || !keterangan) { toast('Tanggal dan keterangan wajib diisi.', 'error'); return; }
+  try {
+    await apiCall('/admin-hari-libur', { method: 'POST', body: { tanggal, keterangan } });
+    toast('Hari libur ditambahkan.', 'success');
+    document.getElementById('hl-tanggal').value = '';
+    document.getElementById('hl-keterangan').value = '';
+    muatHariLibur();
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('tbody-hari-libur').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-hapus]');
+  if (!btn) return;
+  if (!confirm('Hapus tanggal ini dari kalender hari libur?')) return;
+  try {
+    await apiCall(`/admin-hari-libur?tanggal=${btn.dataset.hapus}`, { method: 'DELETE' });
+    toast('Hari libur dihapus.', 'success');
+    muatHariLibur();
+  } catch (err) { toast(err.message, 'error'); }
+});
+
+muat();
+muatIdentitas();
+muatHariLibur();
+</script>
+</body>
+</html>

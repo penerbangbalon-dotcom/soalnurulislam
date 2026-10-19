@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login Admin — Absensi PKBM Nurul Islam</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; background: var(--primary-dark); }
+  .wrap { max-width: 400px; width: 100%; }
+  .wrap h1 { color: #fff; }
+  .wrap p { color: rgba(255,255,255,.7); }
+  .back { display:inline-block; margin-bottom:14px; font-size:0.85rem; color: rgba(255,255,255,.7); text-decoration:none; }
+  .logo-badge { width: 72px; height: 72px; margin: 0 auto 14px; }
+  .logo-badge img { width: 100%; height: 100%; object-fit: contain; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/" class="back">&larr; Kembali</a>
+    <div class="logo-badge"><img src="/assets/img/logo-pkbm.png" alt="Logo PKBM Nurul Islam"></div>
+    <h1>Panel Admin</h1>
+    <p>Absensi Digital PKBM Nurul Islam</p>
+    <div class="card">
+      <form id="form-login">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-submit">Masuk</button>
+      </form>
+    </div>
+  </div>
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true; btn.textContent = 'Memproses...';
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const data = await apiCall('/auth-login-admin', { method: 'POST', body: { email, password } });
+        localStorage.setItem('admin_token', data.token);
+        localStorage.setItem('admin_info', JSON.stringify(data.admin));
+        window.location.href = '/admin/dashboard.html';
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Masuk';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Riwayat — Absensi Siswa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="siswa-shell">
+    <div class="siswa-header" style="border-radius:0 0 20px 20px; padding:20px;">
+      <img class="siswa-logo" src="/assets/img/logo-pkbm.png" alt="Logo PKBM Nurul Islam">
+      <div class="name" style="margin:0;">Riwayat Absensi</div>
+    </div>
+    <div class="siswa-body">
+      <div class="card">
+        <div class="field" style="margin-bottom:12px;">
+          <label for="mode">Jenis Periode</label>
+          <select id="mode">
+            <option value="bulan">Bulanan</option>
+            <option value="semester">Semester</option>
+            <option value="custom">Rentang Tanggal Bebas</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;" id="wrap-bulan">
+          <label for="bulan">Pilih Bulan</label>
+          <input type="month" id="bulan">
+        </div>
+        <div id="wrap-semester" style="display:none; gap:10px;">
+          <div class="field" style="flex:1;"><label for="tahun-ajaran">Tahun Ajaran Mulai</label><input type="number" id="tahun-ajaran"></div>
+          <div class="field" style="flex:1; margin-bottom:0;"><label for="semester">Semester</label>
+            <select id="semester"><option value="ganjil">Ganjil (Jul&ndash;Des)</option><option value="genap">Genap (Jan&ndash;Jun)</option></select>
+          </div>
+        </div>
+        <div id="wrap-custom" style="display:none; gap:10px;">
+          <div class="field" style="flex:1;"><label for="dari">Dari</label><input type="date" id="dari"></div>
+          <div class="field" style="flex:1; margin-bottom:0;"><label for="sampai">Sampai</label><input type="date" id="sampai"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p style="font-weight:600; color:var(--ink); margin-bottom:10px;" id="periode-label"></p>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="num" id="s-hadir">-</div><div class="label">Hadir</div></div>
+          <div class="stat-card"><div class="num" id="s-terlambat">-</div><div class="label">Terlambat</div></div>
+          <div class="stat-card"><div class="num" id="s-izin">-</div><div class="label">Izin</div></div>
+          <div class="stat-card"><div class="num" id="s-sakit">-</div><div class="label">Sakit</div></div>
+          <div class="stat-card"><div class="num" id="s-alpa">-</div><div class="label">Alpa</div></div>
+        </div>
+        <p style="margin-top:14px; font-weight:700; color:var(--ink);">Persentase Kehadiran: <span id="s-persen">-</span>%</p>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tanggal</th><th>Datang</th><th>Status</th><th>Pulang</th><th>Ket.</th></tr></thead>
+            <tbody id="tbody-riwayat"><tr><td colspan="5">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="/siswa/dashboard.html"><span class="icon">🏠</span>Beranda</a>
+    <a href="/siswa/riwayat.html" class="active"><span class="icon">📅</span>Riwayat</a>
+    <a href="/siswa/laporan.html"><span class="icon">📄</span>Laporan</a>
+    <a href="/siswa/profil.html"><span class="icon">👤</span>Profil</a>
+  </nav>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    requireSiswaAuth();
+    const now = new Date();
+    const bulanInput = document.getElementById('bulan');
+    bulanInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('tahun-ajaran').value = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+
+    const modeSelect = document.getElementById('mode');
+    function terapkanTampilanMode() {
+      const m = modeSelect.value;
+      document.getElementById('wrap-bulan').style.display = m === 'bulan' ? 'block' : 'none';
+      document.getElementById('wrap-semester').style.display = m === 'semester' ? 'flex' : 'none';
+      document.getElementById('wrap-custom').style.display = m === 'custom' ? 'flex' : 'none';
+    }
+    modeSelect.addEventListener('change', () => { terapkanTampilanMode(); muat(); });
+    terapkanTampilanMode();
+
+    function buildQuery() {
+      const m = modeSelect.value;
+      const p = new URLSearchParams({ mode: m });
+      if (m === 'bulan') p.set('bulan', bulanInput.value);
+      else if (m === 'semester') {
+        p.set('tahun', document.getElementById('tahun-ajaran').value);
+        p.set('semester', document.getElementById('semester').value);
+      } else {
+        p.set('tanggal_mulai', document.getElementById('dari').value);
+        p.set('tanggal_akhir', document.getElementById('sampai').value);
+      }
+      return p.toString();
+    }
+
+    async function muat() {
+      if (modeSelect.value === 'custom' && (!document.getElementById('dari').value || !document.getElementById('sampai').value)) return;
+      try {
+        const data = await apiCall(`/siswa-riwayat?${buildQuery()}`, { isSiswa: true });
+        document.getElementById('periode-label').textContent = `Periode: ${data.periode}`;
+        document.getElementById('s-hadir').textContent = data.statistik.hadir;
+        document.getElementById('s-terlambat').textContent = data.statistik.terlambat;
+        document.getElementById('s-izin').textContent = data.statistik.izin;
+        document.getElementById('s-sakit').textContent = data.statistik.sakit;
+        document.getElementById('s-alpa').textContent = data.statistik.alpa;
+        document.getElementById('s-persen').textContent = data.statistik.persentase_kehadiran;
+
+        const tbody = document.getElementById('tbody-riwayat');
+        if (!data.riwayat.length) {
+          tbody.innerHTML = '<tr><td colspan="5">Belum ada data pada periode ini.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.riwayat.map((r) => `
+          <tr>
+            <td>${new Date(r.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</td>
+            <td>${fmtJam(r.checkin_time)}</td>
+            <td><span class="${statusBadgeClass(r.checkin_status)}">${statusLabel(r.checkin_status)}</span></td>
+            <td>${fmtJam(r.checkout_time)}</td>
+            <td>${r.keterangan || '-'}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        if (err.status === 401) { logoutSiswa(); return; }
+        toast(err.message, 'error');
+      }
+    }
+    bulanInput.addEventListener('change', muat);
+    document.getElementById('tahun-ajaran').addEventListener('change', muat);
+    document.getElementById('semester').addEventListener('change', muat);
+    document.getElementById('dari').addEventListener('change', muat);
+    document.getElementById('sampai').addEventListener('change', muat);
+    muat();
+  </script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+/* ===== PKBM Nurul Islam — Absensi Digital: Design System ===== */
+:root {
+  --ink: #1C2420;
+  --ink-muted: #5B665F;
+  --paper: #F6F5F0;
+  --surface: #FFFFFF;
+  --border: #E3E0D4;
+  --primary: #0E5C4A;
+  --primary-dark: #093F32;
+  --primary-soft: #E4F0EC;
+  --accent: #D97B29;
+  --accent-soft: #FBEADA;
+  --success: #1F8A5F;
+  --success-soft: #E4F5EC;
+  --danger: #C1443A;
+  --danger-soft: #FBE7E5;
+  --warning: #B8860B;
+  --warning-soft: #FBF1DA;
+  --info: #2A6F97;
+  --info-soft: #E4EEF5;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(28,36,32,.06);
+  --shadow-lg: 0 12px 32px rgba(28,36,32,.14);
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+a { color: inherit; }
+button, input, select, textarea { font-family: inherit; font-size: 1rem; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+h1, h2, h3, h4 { margin: 0 0 4px; font-weight: 700; letter-spacing: -0.01em; }
+p { margin: 0 0 8px; color: var(--ink-muted); }
+
+.container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+.hidden { display: none !important; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: 11px 18px; font-weight: 600; font-size: 0.95rem;
+  cursor: pointer; transition: transform .05s ease, filter .15s ease, background .15s ease;
+  text-decoration: none;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-accent { background: var(--accent); color: #fff; }
+.btn-accent:hover:not(:disabled) { filter: brightness(0.94); }
+.btn-outline { background: var(--surface); border-color: var(--border); color: var(--ink); }
+.btn-outline:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-ghost { background: transparent; color: var(--ink-muted); padding: 8px 10px; }
+.btn-sm { padding: 7px 12px; font-size: 0.85rem; }
+.btn-block { width: 100%; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 16px; }
+
+/* ---------- Form ---------- */
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+.field .hint { font-size: 0.78rem; color: var(--ink-muted); margin-top: 4px; }
+input[type=text], input[type=password], input[type=number], input[type=date],
+input[type=email], input[type=time], select, textarea {
+  width: 100%; padding: 11px 13px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface); color: var(--ink);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+}
+.badge-hadir { background: var(--success-soft); color: var(--success); }
+.badge-terlambat { background: var(--warning-soft); color: var(--warning); }
+.badge-belum { background: var(--border); color: var(--ink-muted); }
+.badge-pulang { background: var(--info-soft); color: var(--info); }
+.badge-izin, .badge-sakit { background: var(--accent-soft); color: var(--accent); }
+.badge-tidak_hadir { background: var(--danger-soft); color: var(--danger); }
+.badge-verifikasi { background: var(--danger-soft); color: var(--danger); }
+
+/* ---------- Toast ---------- */
+#toast-root { position: fixed; top: 16px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--ink); color: #fff; padding: 12px 16px; border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg); font-size: 0.9rem; max-width: 320px; animation: toast-in .2s ease;
+}
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { background: var(--paper); font-weight: 700; color: var(--ink-muted); font-size: 0.78rem; }
+tbody tr:hover { background: var(--primary-soft); }
+
+/* ---------- Stat cards ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.stat-card .num { font-size: 1.8rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.stat-card .label { font-size: 0.8rem; color: var(--ink-muted); }
+
+/* ---------- Admin shell ---------- */
+.admin-shell { display: flex; min-height: 100vh; }
+.admin-sidebar {
+  width: 240px; background: var(--primary-dark); color: #fff; flex-shrink: 0;
+  padding: 20px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.admin-sidebar .brand { font-weight: 800; font-size: 1.05rem; padding: 0 10px 20px; }
+.admin-sidebar .brand small { display: block; font-weight: 400; opacity: .7; font-size: .75rem; }
+.admin-sidebar nav a {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+  color: rgba(255,255,255,.8); text-decoration: none; font-size: 0.9rem; margin-bottom: 2px;
+}
+.admin-sidebar nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
+.admin-sidebar nav a.active { background: rgba(255,255,255,.14); color: #fff; }
+.admin-sidebar .nav-group { margin-bottom: 2px; }
+.admin-sidebar .nav-group summary {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+  color: rgba(255,255,255,.8); font-size: 0.9rem; cursor: pointer; list-style: none; user-select: none;
+}
+.admin-sidebar .nav-group summary::-webkit-details-marker { display: none; }
+.admin-sidebar .nav-group summary:hover { background: rgba(255,255,255,.08); color: #fff; }
+.admin-sidebar .nav-group.has-active > summary { color: #fff; font-weight: 600; }
+.admin-sidebar .nav-group .caret { margin-left: auto; font-size: .75rem; opacity: .7; transition: transform .15s ease; }
+.admin-sidebar .nav-group:not([open]) .caret { transform: rotate(-90deg); }
+.admin-sidebar .nav-sub { margin: 2px 0 6px 18px; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.16); }
+.admin-sidebar .nav-sub a { padding: 8px 10px; font-size: 0.86rem; margin-bottom: 1px; }
+.admin-main { flex: 1; min-width: 0; }
+.admin-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.admin-content { padding: 24px; }
+.menu-toggle { display: none; }
+
+@media (max-width: 860px) {
+  .admin-sidebar { position: fixed; left: -260px; z-index: 40; transition: left .2s ease; }
+  .admin-sidebar.open { left: 0; }
+  .menu-toggle { display: inline-flex; }
+  .admin-content { padding: 16px; }
+}
+
+/* ---------- Siswa mobile shell ---------- */
+.siswa-shell { max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 84px; background: var(--paper); }
+.siswa-header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;
+  padding: 24px 20px 30px; border-radius: 0 0 24px 24px; position: relative;
+}
+.siswa-header .siswa-logo { position: absolute; top: 16px; right: 16px; width: 38px; height: 38px; object-fit: contain; }
+.siswa-header .greeting { font-size: 0.85rem; opacity: .85; }
+.siswa-header .name { font-size: 1.4rem; font-weight: 800; margin: 2px 0 12px; }
+.siswa-header .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.78rem; }
+.siswa-header .meta span { background: rgba(255,255,255,.16); padding: 4px 10px; border-radius: 999px; }
+.siswa-body { padding: 16px; margin-top: -18px; }
+
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px;
+  background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 30;
+}
+.bottom-nav a {
+  flex: 1; text-align: center; padding: 10px 0 8px; text-decoration: none; color: var(--ink-muted); font-size: 0.72rem;
+}
+.bottom-nav a.active { color: var(--primary); font-weight: 700; }
+.bottom-nav .icon { font-size: 1.25rem; display: block; margin-bottom: 2px; }
+
+.session-status { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600; }
+.session-open { background: var(--success-soft); color: var(--success); }
+.session-closed { background: var(--border); color: var(--ink-muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+.countdown { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.4rem; }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,20,18,.5); display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 16px;
+}
+.modal { background: var(--surface); border-radius: var(--radius); padding: 22px; max-width: 420px; width: 100%; box-shadow: var(--shadow-lg); }
+
+.skeleton { background: linear-gradient(90deg, var(--border) 25%, #f0efe8 37%, var(--border) 63%); background-size: 400% 100%; animation: sk 1.4s ease infinite; border-radius: 6px; }
+@keyframes sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+.token-display { text-align: center; padding: 40px 20px; }
+.token-display .code { font-size: 3.2rem; font-weight: 800; letter-spacing: 0.2em; color: var(--primary); margin: 14px 0; }
+.token-display #qr-canvas { margin: 0 auto; }
+
+/* ---------- Cetak (Print to PDF) ---------- */
+/* Halaman admin memakai window.print() sebagai jalur ekspor PDF (lihat README).
+   Tanpa aturan ini, hasil cetak akan ikut menyertakan sidebar/topbar/tombol. */
+@media print {
+  .admin-sidebar, .admin-topbar, .no-print, .bottom-nav { display: none !important; }
+  .admin-shell, .admin-main { display: block !important; }
+  .admin-content { padding: 0 !important; }
+  body { background: #fff !important; }
+  .card { box-shadow: none !important; border: none !important; padding: 0 !important; }
+  .table-wrap { border: none !important; overflow: visible !important; }
+  a[href]:after { content: ''; }
+  .print-page { page-break-after: always; }
+  .print-page:last-child { page-break-after: auto; }
+}
+
+/* ---------- Tombol Kelas (filter cepat per kelas) ---------- */
+.kelas-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.kelas-chips-label { font-size: 0.78rem; font-weight: 700; color: var(--ink-muted); margin-right: 2px; }
+.kelas-chips-grup {
+  font-size: 0.72rem; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .04em;
+  margin-left: 8px; padding-left: 10px; border-left: 2px solid var(--border);
+}
+.kelas-chips-info { font-size: 0.82rem; color: var(--ink-muted); }
+.kelas-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  font-size: 0.84rem; font-weight: 600; cursor: pointer; transition: background .12s ease, border-color .12s ease;
+}
+.kelas-chip:hover { border-color: var(--primary); color: var(--primary); }
+.kelas-chip.aktif { background: var(--primary); border-color: var(--primary); color: #fff; }
+.kelas-chip .jml {
+  font-size: 0.72rem; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary);
+}
+.kelas-chip.aktif .jml { background: rgba(255,255,255,.22); color: #fff; }
+@media print { .kelas-chips { display: none !important; } }

@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jadwal Pelajaran — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>
+  .tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .row > .field { margin:0; }
+  .hari-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:14px; margin-top:14px; }
+  .hari-blok { border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); overflow:hidden; }
+  .hari-head { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; background:var(--primary-soft); }
+  .hari-head .rentang { font-size:.8rem; color:var(--ink-muted); margin-left:6px; font-weight:500; }
+  .hari-blok table { width:100%; border-collapse:collapse; }
+  .hari-blok td { padding:6px 10px; border-top:1px solid var(--border); vertical-align:middle; font-size:.88rem; }
+  .hari-blok td.jam { white-space:nowrap; width:1%; }
+  .hari-blok td.jam small { display:block; color:var(--ink-muted); font-size:.74rem; }
+  .hari-blok tr.istirahat td { background:var(--paper); color:var(--ink-muted); font-size:.8rem; text-align:center; }
+  .hari-blok select, .hari-blok input[type=text] { display:block; width:100%; max-width:100%; box-sizing:border-box; padding:7px 8px; font-size:.88rem; }
+  .hari-blok input.inp-manual { margin-top:6px; }
+  .hari-blok input.inp-manual.hidden { display:none !important; }
+  .mini { padding:5px 8px !important; font-size:.78rem !important; width:auto !important; }
+  .sub-card { border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-top:14px; background:var(--surface); }
+  .slot-tbl { width:100%; border-collapse:collapse; margin-top:10px; }
+  .slot-tbl th, .slot-tbl td { padding:6px 8px; border-top:1px solid var(--border); font-size:.88rem; text-align:left; }
+  .slot-tbl input, .slot-tbl select { padding:6px 8px; font-size:.88rem; }
+  .slot-tbl td.no { white-space:nowrap; color:var(--ink-muted); }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.75rem; font-weight:600; background:var(--info-soft); color:var(--info); }
+  .warn { background:var(--warning-soft); color:var(--warning); padding:10px 12px; border-radius:var(--radius-sm); font-size:.85rem; margin:10px 0; }
+  .muted { color:var(--ink-muted); font-size:.82rem; }
+  .pill-bad { background:var(--danger-soft, #fde8e6); color:var(--danger, #b3261e); }
+  .pill-ok { background:var(--success-soft); color:var(--success); }
+  .pill-warn { background:var(--warning-soft); color:var(--warning); }
+  .info-box { background:var(--paper); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; font-size:.86rem; margin:10px 0; }
+  .info-box ul { margin:6px 0 0 18px; padding:0; } .info-box li { margin-bottom:3px; }
+  .cetak-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; margin-bottom:14px; }
+  .cetak-bar .field { margin:0; min-width:220px; }
+  details.gen-kelas > summary { cursor:pointer; list-style:none; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  details.gen-kelas > summary::-webkit-details-marker { display:none; }
+  details.gen-kelas > summary::before { content:'▸'; color:var(--ink-muted); }
+  details.gen-kelas[open] > summary::before { content:'▾'; }
+  table.jt { width:100%; border-collapse:collapse; }
+  .jt th, .jt td { border:1px solid var(--border); padding:6px 8px; font-size:.82rem; vertical-align:middle; }
+  .jt th { background:var(--primary-soft); text-align:center; }
+  .jt td.c { text-align:center; } .jt td.w { white-space:nowrap; font-size:.74rem; color:var(--ink-muted); }
+  .jt td.ist { background:var(--paper); color:var(--ink-muted); font-style:italic; text-align:center; }
+  .grup-head td { background:var(--paper); font-weight:700; font-size:.8rem; letter-spacing:.02em; }
+</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/jadwal-generator.js"></script>
+<script>
+const slot = renderAdminShell('/admin/jadwal.html', 'Jadwal Pelajaran');
+const HARI = [{v:1,l:'Senin'},{v:2,l:'Selasa'},{v:3,l:'Rabu'},{v:4,l:'Kamis'},{v:5,l:'Jumat'}];
+const PROGRAM_LABEL = { PAKET_B: 'Paket B (SMP/MTs)', PAKET_C: 'Paket C (SMA/MA)' };
+const isSuper = (JSON.parse(localStorage.getItem('admin_info') || '{}').role === 'SUPER_ADMIN');
+const MANUAL = '__manual__';
+
+const state = {
+  kelas: [], slots: [], jumat: [], reguler: [], mapel: [],
+  kelasAktif: null, dirty: false,
+  programJam: 'PAKET_B', draft: {},   // draft[program][tipe] = [{jenis, mulai, selesai, label}]
+  tab: 'jadwal',
+};
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const titik = (t) => String(t || '').slice(0,5).replace(':', '.');
+const toMin = (t) => Number(t.slice(0,2)) * 60 + Number(t.slice(3,5));
+const fromMin = (m) => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+const tipeHari = (hari) => (hari === 5 ? 'JUMAT' : 'REGULER');
+const slotsFor = (program, tipe) => state.slots.filter((s) => s.program === program && s.tipe_hari === tipe).sort((a,b) => a.urut - b.urut);
+function handleErr(err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+
+slot.innerHTML = `
+  <div class="cetak-bar no-print">
+    <div class="field"><label>🖨️ Cetak jadwal pelajaran</label><select id="cetak-kelas"><option value="SEMUA">Semua kelas</option></select></div>
+    <button class="btn btn-outline" id="btn-cetak-xlsx" type="button">📊 Excel</button>
+    <button class="btn btn-outline" id="btn-cetak-pdf" type="button">📄 PDF</button>
+    <span class="muted" style="flex:1; min-width:200px;">Mencetak jadwal yang <b>sudah tersimpan</b>. PDF: pada jendela cetak pilih tujuan <i>Simpan sebagai PDF</i>.</span>
+  </div>
+  <div class="tabs no-print">
+    <button class="btn btn-primary" data-tab="jadwal">📅 Jadwal Mapel per Kelas</button>
+    <button class="btn btn-outline" data-tab="gen">🪄 Generate Otomatis</button>
+    <button class="btn btn-outline" data-tab="jam">⏰ Jam Belajar</button>
+    <button class="btn btn-outline" data-tab="mapel">📚 Daftar Mapel</button>
+  </div>
+  <div id="tab-jadwal"></div>
+  <div id="tab-gen" class="hidden"></div>
+  <div id="tab-jam" class="hidden"></div>
+  <div id="tab-mapel" class="hidden"></div>
+`;
+
+document.querySelector('.tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  if (state.tab === 'jadwal' && state.dirty && b.dataset.tab !== 'jadwal' && !confirm('Perubahan jadwal mapel belum disimpan. Pindah tab dan buang perubahan?')) return;
+  if (state.tab === 'jadwal' && b.dataset.tab !== 'jadwal') { state.dirty = false; if (state.kelasAktif) pilihKelas(state.kelasAktif.grup); }
+  state.tab = b.dataset.tab;
+  document.querySelectorAll('.tabs [data-tab]').forEach((x) => { x.className = 'btn ' + (x.dataset.tab === state.tab ? 'btn-primary' : 'btn-outline'); });
+  ['jadwal','gen','jam','mapel'].forEach((t) => document.getElementById('tab-' + t).classList.toggle('hidden', t !== state.tab));
+  if (state.tab === 'gen') renderGen();
+});
+
+/* ============================================================
+   TAB 1 — JADWAL MAPEL PER KELAS
+   ============================================================ */
+function opsiMapelHtml(program, nilai) {
+  const aktif = state.mapel.filter((m) => m.aktif && (m.program === 'SEMUA' || m.program === program));
+  const cocok = aktif.find((m) => m.nama.toLowerCase() === String(nilai || '').toLowerCase());
+  const grup = {};
+  aktif.forEach((m) => { (grup[m.kelompok] = grup[m.kelompok] || []).push(m); });
+  let html = `<option value="">— kosong —</option>`;
+  Object.keys(grup).forEach((k) => {
+    html += `<optgroup label="${esc(k)}">` + grup[k].map((m) => `<option value="${esc(m.nama)}" ${cocok && cocok.id === m.id ? 'selected' : ''}>${esc(m.nama)}</option>`).join('') + `</optgroup>`;
+  });
+  const manual = nilai && !cocok;
+  html += `<option value="${MANUAL}" ${manual ? 'selected' : ''}>✏️ Lainnya (isi manual)…</option>`;
+  return { html, manual: !!manual };
+}
+
+function barisJam(program, hari, nilaiMap) {
+  const rows = slotsFor(program, tipeHari(hari));
+  if (!rows.length) return `<tr><td colspan="2" class="muted">Jam belajar belum diatur (lihat tab Jam Belajar).</td></tr>`;
+  return rows.map((s) => {
+    if (s.jenis === 'ISTIRAHAT') return `<tr class="istirahat"><td colspan="2">${esc(s.label || 'Istirahat')} · ${titik(s.mulai)}–${titik(s.selesai)}</td></tr>`;
+    const nilai = nilaiMap[`${hari}-${s.jam_ke}`] || '';
+    const { html, manual } = opsiMapelHtml(program, nilai);
+    return `<tr data-hari="${hari}" data-jam="${s.jam_ke}">
+      <td class="jam"><b>Jam ke-${s.jam_ke}</b><small>${titik(s.mulai)}–${titik(s.selesai)}</small></td>
+      <td><select class="sel-mapel">${html}</select>
+          <input type="text" class="inp-manual ${manual ? '' : 'hidden'}" maxlength="80" placeholder="Ketik nama mapel…" value="${manual ? esc(nilai) : ''}"></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderJadwal(nilaiMap = {}) {
+  const el = document.getElementById('tab-jadwal');
+  const k = state.kelasAktif;
+  const opsiKelas = state.kelas.map((c) => `<option value="${esc(c.grup)}" ${k && k.grup === c.grup ? 'selected' : ''}>${esc(c.grup)} — ${PROGRAM_LABEL[c.program]} · ${c.jumlah_siswa} siswa (${esc(c.rombel.join(', '))})</option>`).join('');
+  let isi = '';
+  if (k) {
+    const lain = state.kelas.filter((c) => c.program === k.program && c.grup !== k.grup);
+    isi = `
+      <div class="row" style="margin-top:14px;">
+        <div class="field" style="min-width:230px;">
+          <label>Salin jadwal dari kelas lain</label>
+          <select id="salin-kelas"><option value="">— pilih kelas —</option>${lain.map((c) => `<option value="${esc(c.grup)}">${esc(c.grup)}</option>`).join('')}</select>
+        </div>
+        <label style="display:flex; gap:8px; align-items:center; font-size:.85rem; margin-bottom:6px;"><input type="checkbox" id="simpan-manual" checked style="width:auto;"> Simpan mapel isian manual yang baru ke daftar dropdown</label>
+        <button class="btn btn-primary" id="btn-simpan-jadwal" style="margin-left:auto;">💾 Simpan Jadwal Kelas ${esc(k.grup)}</button>
+      </div>
+      <p class="muted" style="margin-top:8px;">Jadwal ini berlaku untuk semua rombel di kelas ${esc(k.grup)} (${esc(k.rombel.join(', '))}). Jam pelajaran yang berurutan dengan mapel yang sama otomatis digabung (mis. "Jam ke: 1–2") pada rekap Word.</p>
+      <div class="hari-grid">
+        ${HARI.map((h) => {
+          const rows = slotsFor(k.program, tipeHari(h.v)).filter((s) => s.jenis === 'PELAJARAN');
+          const rentang = rows.length ? `${titik(rows[0].mulai)}–${titik(slotsFor(k.program, tipeHari(h.v)).slice(-1)[0].selesai)}` : '';
+          return `<div class="hari-blok" data-blok="${h.v}">
+            <div class="hari-head">
+              <span><b>${h.l}</b><span class="rentang">${rentang}</span></span>
+              <span style="display:flex; gap:6px;">
+                <select class="mini salin-hari"><option value="">Salin dari…</option>${HARI.filter((x) => x.v !== h.v).map((x) => `<option value="${x.v}">${x.l}</option>`).join('')}</select>
+                <button class="btn btn-outline btn-sm kosongkan" type="button">Kosongkan</button>
+              </span>
+            </div>
+            <table>${barisJam(k.program, h.v, nilaiMap)}</table>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+  el.innerHTML = `
+    <div class="card">
+      <h3>Jadwal Mata Pelajaran</h3>
+      <p>Pilih kelas, lalu isi mapel untuk tiap jam pelajaran (Senin–Jumat). Pilih dari dropdown, atau pilih <b>✏️ Lainnya</b> untuk mengetik mapel yang tidak ada di daftar. Jadwal inilah yang otomatis muncul di kolom mapel pada <b>Rekap Word Harian</b>.</p>
+      <div class="field" style="max-width:640px; margin-bottom:0;">
+        <label>Kelas</label>
+        <select id="pilih-kelas"><option value="">— pilih kelas —</option>${opsiKelas}</select>
+      </div>
+      ${isi}
+    </div>`;
+}
+
+function bacaGrid() {
+  const map = {};
+  document.querySelectorAll('#tab-jadwal tr[data-hari]').forEach((tr) => {
+    const sel = tr.querySelector('.sel-mapel');
+    const v = sel.value === MANUAL ? tr.querySelector('.inp-manual').value.trim() : sel.value;
+    if (v) map[`${tr.dataset.hari}-${tr.dataset.jam}`] = v;
+  });
+  return map;
+}
+function isiGrid(map) { renderJadwal(map); }
+
+async function pilihKelas(grup) {
+  if (!grup) { state.kelasAktif = null; state.dirty = false; renderJadwal(); return; }
+  try {
+    const res = await apiCall(`/admin-jadwal-pelajaran?kelas=${encodeURIComponent(grup)}`);
+    state.kelasAktif = state.kelas.find((c) => c.grup === grup);
+    const map = {}; res.jadwal.forEach((j) => { map[`${j.hari}-${j.jam_ke}`] = j.mapel; });
+    state.dirty = false;
+    renderJadwal(map);
+  } catch (err) { handleErr(err); }
+}
+
+document.getElementById('tab-jadwal').addEventListener('change', async (e) => {
+  const t = e.target;
+  if (t.id === 'pilih-kelas') {
+    if (state.dirty && !confirm('Perubahan belum disimpan. Pindah kelas dan buang perubahan?')) { t.value = state.kelasAktif ? state.kelasAktif.grup : ''; return; }
+    pilihKelas(t.value); return;
+  }
+  if (t.classList.contains('sel-mapel')) {
+    const inp = t.closest('td').querySelector('.inp-manual');
+    inp.classList.toggle('hidden', t.value !== MANUAL);
+    if (t.value === MANUAL) inp.focus();
+    state.dirty = true; return;
+  }
+  if (t.id === 'salin-kelas' && t.value) {
+    if (!confirm(`Timpa isian di layar dengan jadwal kelas ${t.value}? (Belum tersimpan sampai Anda klik Simpan.)`)) { t.value = ''; return; }
+    try {
+      const res = await apiCall(`/admin-jadwal-pelajaran?kelas=${encodeURIComponent(t.value)}`);
+      const map = {}; res.jadwal.forEach((j) => { map[`${j.hari}-${j.jam_ke}`] = j.mapel; });
+      state.dirty = true; isiGrid(map); toast('Jadwal disalin. Klik Simpan untuk menyimpan.', 'success');
+    } catch (err) { handleErr(err); }
+    return;
+  }
+  if (t.classList.contains('salin-hari') && t.value) {
+    const dari = Number(t.value), ke = Number(t.closest('.hari-blok').dataset.blok);
+    const map = bacaGrid();
+    Object.keys(map).filter((k) => k.startsWith(`${ke}-`)).forEach((k) => delete map[k]);
+    Object.keys(map).filter((k) => k.startsWith(`${dari}-`)).forEach((k) => { map[`${ke}-${k.split('-')[1]}`] = map[k]; });
+    // jam ke yang tidak ada pada hari tujuan (mis. Jumat lebih pendek) akan diabaikan saat disimpan/ditampilkan
+    state.dirty = true; isiGrid(map); toast('Jadwal hari disalin. Klik Simpan untuk menyimpan.', 'success');
+  }
+});
+document.getElementById('tab-jadwal').addEventListener('input', (e) => { if (e.target.classList.contains('inp-manual')) state.dirty = true; });
+document.getElementById('tab-jadwal').addEventListener('click', async (e) => {
+  const kos = e.target.closest('.kosongkan');
+  if (kos) {
+    const ke = kos.closest('.hari-blok').dataset.blok;
+    const map = bacaGrid(); Object.keys(map).filter((k) => k.startsWith(`${ke}-`)).forEach((k) => delete map[k]);
+    state.dirty = true; isiGrid(map); return;
+  }
+  if (e.target.id === 'btn-simpan-jadwal') {
+    const k = state.kelasAktif; if (!k) return;
+    const map = bacaGrid();
+    const jadwal = Object.entries(map).map(([key, mapel]) => { const [hari, jam_ke] = key.split('-').map(Number); return { hari, jam_ke, mapel }; });
+    const btn = e.target; btn.disabled = true;
+    try {
+      await apiCall('/admin-jadwal-pelajaran', { method: 'PUT', body: { kelas: k.grup, jadwal } });
+      state.dirty = false;
+      if (document.getElementById('simpan-manual').checked) {
+        const baru = [...new Set(jadwal.map((j) => j.mapel))].filter((n) => !state.mapel.some((m) => m.nama.toLowerCase() === n.toLowerCase()));
+        for (const nama of baru) { await apiCall('/admin-mapel', { method: 'POST', body: { nama, program: k.program, kelompok: 'Tambahan' } }); }
+        if (baru.length) { await muatMapel(); renderMapel(); }
+      }
+      toast(`Jadwal kelas ${k.grup} disimpan.`, 'success');
+      renderJadwal(map);
+    } catch (err) { handleErr(err); } finally { btn.disabled = false; }
+  }
+});
+window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ============================================================
+   TAB 2 — JAM BELAJAR (slot jam pelajaran, fleksibel)
+   ============================================================ */
+function muatDraftDariServer() {
+  state.draft = {};
+  ['PAKET_B','PAKET_C'].forEach((p) => {
+    state.draft[p] = {};
+    ['REGULER','JUMAT'].forEach((t) => {
+      state.draft[p][t] = slotsFor(p, t).map((s) => ({ jenis: s.jenis, mulai: s.mulai, selesai: s.selesai, label: s.jenis === 'ISTIRAHAT' ? (s.label || 'Istirahat') : '' }));
+    });
+  });
+}
+
+function generator(p, t, defaults) {
+  return `
+    <div class="row" data-gen="${p}|${t}">
+      <div class="field"><label>Mulai</label><input type="time" class="g-mulai" value="${defaults.mulai}"></div>
+      <div class="field"><label>Selesai</label><input type="time" class="g-selesai" value="${defaults.selesai}"></div>
+      <div class="field"><label>Durasi 1 jam pelajaran (menit)</label><input type="number" class="g-durasi" min="5" max="120" value="${defaults.durasi}" style="width:110px;"></div>
+      <div class="field"><label>Istirahat setelah jam ke-</label><input type="number" class="g-setelah" min="0" max="19" value="${defaults.setelah}" style="width:90px;"></div>
+      <div class="field"><label>Lama istirahat (menit)</label><input type="number" class="g-lama" min="0" max="120" value="${defaults.lama}" style="width:100px;"></div>
+      <button class="btn btn-outline btn-sm g-buat" type="button" style="margin-bottom:2px;">⚙️ Buat Otomatis</button>
+    </div>`;
+}
+
+function tabelSlot(p, t) {
+  const rows = state.draft[p][t];
+  let jam = 0;
+  const body = rows.map((r, i) => {
+    if (r.jenis === 'PELAJARAN') jam += 1;
+    return `<tr data-i="${i}">
+      <td class="no">${r.jenis === 'PELAJARAN' ? 'Jam ke-' + jam : '☕'}</td>
+      <td><select class="s-jenis"><option value="PELAJARAN" ${r.jenis === 'PELAJARAN' ? 'selected' : ''}>Pelajaran</option><option value="ISTIRAHAT" ${r.jenis === 'ISTIRAHAT' ? 'selected' : ''}>Istirahat</option></select></td>
+      <td><input type="time" class="s-mulai" value="${r.mulai}"></td>
+      <td><input type="time" class="s-selesai" value="${r.selesai}"></td>
+      <td>${r.jenis === 'ISTIRAHAT' ? `<input type="text" class="s-label" maxlength="40" value="${esc(r.label)}" placeholder="mis. Istirahat / Salat">` : '<span class="muted">—</span>'}</td>
+      <td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm s-hapus" type="button" title="Hapus baris">🗑</button></td>
+    </tr>`;
+  }).join('');
+  const nJam = rows.filter((r) => r.jenis === 'PELAJARAN').length;
+  const rentang = rows.length ? `${titik(rows[0].mulai)}–${titik(rows[rows.length - 1].selesai)}` : '-';
+  return `
+    <p style="margin:10px 0 0;"><span class="pill">${nJam} jam pelajaran</span> <span class="pill">${rentang}</span></p>
+    <div class="table-wrap" style="margin-top:8px;"><table class="slot-tbl">
+      <thead><tr><th>Jam</th><th>Jenis</th><th>Mulai</th><th>Selesai</th><th>Keterangan</th><th></th></tr></thead>
+      <tbody>${body || '<tr><td colspan="6" class="muted">Belum ada baris. Klik "Buat Otomatis" atau tambah manual.</td></tr>'}</tbody>
+    </table></div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+      <button class="btn btn-outline btn-sm s-tambah" data-jenis="PELAJARAN" type="button">+ Jam Pelajaran</button>
+      <button class="btn btn-outline btn-sm s-tambah" data-jenis="ISTIRAHAT" type="button">+ Istirahat</button>
+      <button class="btn btn-primary btn-sm s-simpan" type="button" style="margin-left:auto;">💾 Simpan Jam Belajar</button>
+    </div>`;
+}
+
+function kartuJam(p, t) {
+  const judul = t === 'REGULER' ? 'Senin – Kamis' : 'Jumat';
+  const defaults = t === 'REGULER'
+    ? (p === 'PAKET_B' ? { mulai:'07:30', selesai:'12:00', durasi:40, setelah:3, lama:30 } : { mulai:'12:30', selesai:'17:00', durasi:40, setelah:3, lama:30 })
+    : { mulai:'07:30', selesai:'10:45', durasi:30, setelah:3, lama:15 };
+  let absen = '';
+  if (t === 'REGULER') {
+    const r = state.reguler.find((x) => x.program === p);
+    absen = r ? `<p class="muted" style="margin-top:12px;">Jam absen Senin–Kamis: datang mulai ${titik(r.jam_masuk_mulai)} (akhir ${titik(r.jam_masuk_selesai)}), pulang ${titik(r.jam_pulang)}, toleransi ${r.toleransi_menit} menit. Diatur di <a href="/admin/pengaturan.html" style="color:var(--primary); font-weight:600;">Pengaturan Sekolah → Jadwal Program</a>.</p>` : '';
+  } else {
+    const j = state.jumat.find((x) => x.program === p) || { jam_masuk_mulai:'07:00', jam_masuk_selesai:'08:00', jam_pulang:'10:45', toleransi_menit:15, aktif:true };
+    const dis = isSuper ? '' : 'disabled';
+    absen = `
+      <div class="sub-card" data-jumat="${p}" style="background:var(--paper);">
+        <b>Jam absen datang &amp; pulang khusus Jumat</b>
+        <p class="muted" style="margin:4px 0 10px;">Karena Jumat semua masuk pagi, jam absen Jumat diatur terpisah (jika dimatikan, Jumat memakai jam absen Senin–Kamis). ${isSuper ? '' : '<b>Hanya Super Admin yang dapat mengubah bagian ini.</b>'}</p>
+        <label style="display:flex; gap:8px; align-items:center; margin-bottom:10px; font-size:.88rem;"><input type="checkbox" class="j-aktif" style="width:auto;" ${j.aktif ? 'checked' : ''} ${dis}> Pakai jam absen khusus Jumat</label>
+        <div class="row">
+          <div class="field"><label>Mulai Absen Datang</label><input type="time" class="j-mulai" value="${j.jam_masuk_mulai}" ${dis}></div>
+          <div class="field"><label>Akhir Absen Datang</label><input type="time" class="j-selesai" value="${j.jam_masuk_selesai}" ${dis}></div>
+          <div class="field"><label>Jam Pulang</label><input type="time" class="j-pulang" value="${j.jam_pulang}" ${dis}></div>
+          <div class="field"><label>Toleransi (menit)</label><input type="number" class="j-tol" value="${j.toleransi_menit}" min="0" max="120" style="width:100px;" ${dis}></div>
+          <button class="btn btn-primary btn-sm j-simpan" type="button" ${dis} style="margin-bottom:2px;">💾 Simpan Jam Absen Jumat</button>
+        </div>
+      </div>`;
+  }
+  return `<div class="sub-card" data-kartu="${p}|${t}">
+    <h4 style="margin-bottom:6px;">${judul}</h4>
+    ${generator(p, t, defaults)}
+    <div class="slot-area">${tabelSlot(p, t)}</div>
+    ${absen}
+  </div>`;
+}
+
+function renderJam() {
+  const p = state.programJam;
+  document.getElementById('tab-jam').innerHTML = `
+    <div class="card">
+      <h3>Jam Belajar</h3>
+      <p>Atur jam pelajaran dan istirahat untuk tiap program. Default: <b>Paket B 07.30–12.00</b>, <b>Paket C 12.30–17.00</b> (Senin–Kamis), dan hari <b>Jumat semua masuk pagi</b>. Gunakan <b>Buat Otomatis</b> lalu ubah per baris sesuai kebutuhan — jam mulai/selesai tiap jam pelajaran, jumlah jam, dan istirahat bebas diatur.</p>
+      <div class="field" style="max-width:280px; margin-bottom:0;">
+        <label>Program</label>
+        <select id="pilih-program-jam">
+          <option value="PAKET_B" ${p === 'PAKET_B' ? 'selected' : ''}>Paket B (SMP/MTs)</option>
+          <option value="PAKET_C" ${p === 'PAKET_C' ? 'selected' : ''}>Paket C (SMA/MA)</option>
+        </select>
+      </div>
+      ${state.slots.length ? '' : '<div class="warn">Data jam belajar belum ada. Pastikan <code>supabase/migration_05_jadwal_pelajaran.sql</code> sudah dijalankan di Supabase SQL Editor.</div>'}
+      ${kartuJam(p, 'REGULER')}
+      ${kartuJam(p, 'JUMAT')}
+    </div>`;
+}
+
+function sinkronDraftDariDom(kartu) {
+  const [p, t] = kartu.dataset.kartu.split('|');
+  state.draft[p][t] = [...kartu.querySelectorAll('tr[data-i]')].map((tr) => ({
+    jenis: tr.querySelector('.s-jenis').value,
+    mulai: tr.querySelector('.s-mulai').value,
+    selesai: tr.querySelector('.s-selesai').value,
+    label: tr.querySelector('.s-label') ? tr.querySelector('.s-label').value : '',
+  }));
+  return [p, t];
+}
+function renderArea(kartu, p, t) { kartu.querySelector('.slot-area').innerHTML = tabelSlot(p, t); }
+
+document.getElementById('tab-jam').addEventListener('change', (e) => {
+  if (e.target.id === 'pilih-program-jam') { state.programJam = e.target.value; renderJam(); return; }
+  const kartu = e.target.closest('[data-kartu]');
+  if (kartu && e.target.classList.contains('s-jenis')) { const [p, t] = sinkronDraftDariDom(kartu); renderArea(kartu, p, t); }
+});
+
+document.getElementById('tab-jam').addEventListener('click', async (e) => {
+  const kartu = e.target.closest('[data-kartu]');
+  if (e.target.classList.contains('j-simpan')) {
+    const box = e.target.closest('[data-jumat]');
+    try {
+      await apiCall('/admin-jam-belajar', { method: 'PUT', body: { jumat: {
+        program: box.dataset.jumat,
+        aktif: box.querySelector('.j-aktif').checked,
+        jam_masuk_mulai: box.querySelector('.j-mulai').value,
+        jam_masuk_selesai: box.querySelector('.j-selesai').value,
+        jam_pulang: box.querySelector('.j-pulang').value,
+        toleransi_menit: Number(box.querySelector('.j-tol').value),
+      } } });
+      await muatJam(); renderJam(); toast('Jam absen Jumat disimpan.', 'success');
+    } catch (err) { handleErr(err); }
+    return;
+  }
+  if (!kartu) return;
+  const [p, t] = kartu.dataset.kartu.split('|');
+
+  if (e.target.classList.contains('g-buat')) {
+    const g = kartu.querySelector('[data-gen]');
+    const mulai = g.querySelector('.g-mulai').value, selesai = g.querySelector('.g-selesai').value;
+    const durasi = Number(g.querySelector('.g-durasi').value), setelah = Number(g.querySelector('.g-setelah').value), lama = Number(g.querySelector('.g-lama').value);
+    if (!mulai || !selesai || toMin(selesai) <= toMin(mulai)) { toast('Jam selesai harus lebih besar dari jam mulai.', 'error'); return; }
+    if (!(durasi >= 5)) { toast('Durasi 1 jam pelajaran minimal 5 menit.', 'error'); return; }
+    if (state.draft[p][t].length && !confirm('Ganti seluruh baris jam belajar di layar dengan hasil otomatis?')) return;
+    const rows = []; let cur = toMin(mulai), jam = 0; const batas = toMin(selesai);
+    while (cur + durasi <= batas && rows.length < 20) {
+      rows.push({ jenis: 'PELAJARAN', mulai: fromMin(cur), selesai: fromMin(cur + durasi), label: '' }); cur += durasi; jam += 1;
+      if (setelah > 0 && jam === setelah && lama > 0 && cur + lama < batas) { rows.push({ jenis: 'ISTIRAHAT', mulai: fromMin(cur), selesai: fromMin(cur + lama), label: 'Istirahat' }); cur += lama; }
+    }
+    state.draft[p][t] = rows; renderArea(kartu, p, t);
+    const sisa = batas - cur;
+    toast(sisa > 0 ? `${jam} jam pelajaran dibuat. Sisa ${sisa} menit tidak terpakai.` : `${jam} jam pelajaran dibuat.`, 'success');
+    return;
+  }
+  if (e.target.classList.contains('s-tambah')) {
+    sinkronDraftDariDom(kartu);
+    const rows = state.draft[p][t]; const terakhir = rows[rows.length - 1];
+    const jenis = e.target.dataset.jenis;
+    const mulai = terakhir ? terakhir.selesai : (t === 'JUMAT' || p === 'PAKET_B' ? '07:30' : '12:30');
+    const dur = jenis === 'ISTIRAHAT' ? 15 : (t === 'JUMAT' ? 30 : 40);
+    const sel = fromMin(Math.min(toMin(mulai) + dur, 23 * 60 + 59));
+    rows.push({ jenis, mulai, selesai: sel, label: jenis === 'ISTIRAHAT' ? 'Istirahat' : '' });
+    renderArea(kartu, p, t); return;
+  }
+  if (e.target.closest('.s-hapus')) {
+    sinkronDraftDariDom(kartu);
+    state.draft[p][t].splice(Number(e.target.closest('tr').dataset.i), 1);
+    renderArea(kartu, p, t); return;
+  }
+  if (e.target.classList.contains('s-simpan')) {
+    sinkronDraftDariDom(kartu);
+    try {
+      await apiCall('/admin-jam-belajar', { method: 'PUT', body: { program: p, tipe_hari: t, slots: state.draft[p][t] } });
+      await muatJam(); renderJam(); toast('Jam belajar disimpan.', 'success');
+      if (state.kelasAktif) pilihKelas(state.kelasAktif.grup); // segarkan grid jadwal agar ikut jam baru
+    } catch (err) { handleErr(err); }
+  }
+});
+
+/* ============================================================
+   TAB 3 — DAFTAR MAPEL
+   ============================================================ */
+function renderMapel() {
+  const grup = {};
+  state.mapel.forEach((m) => { (grup[m.kelompok] = grup[m.kelompok] || []).push(m); });
+  const body = Object.keys(grup).map((k) => `
+    <tr class="grup-head"><td colspan="4">${esc(k)}</td></tr>
+    ${grup[k].map((m) => `<tr data-id="${m.id}">
+      <td>${esc(m.nama)}</td>
+      <td><select class="m-program mini">
+        <option value="SEMUA" ${m.program === 'SEMUA' ? 'selected' : ''}>Paket B &amp; C</option>
+        <option value="PAKET_B" ${m.program === 'PAKET_B' ? 'selected' : ''}>Paket B</option>
+        <option value="PAKET_C" ${m.program === 'PAKET_C' ? 'selected' : ''}>Paket C</option>
+      </select></td>
+      <td><label style="display:flex; gap:6px; align-items:center; font-size:.85rem;"><input type="checkbox" class="m-aktif" style="width:auto;" ${m.aktif ? 'checked' : ''}> Tampil di dropdown</label></td>
+      <td><button class="btn btn-outline btn-sm m-hapus" type="button">Hapus</button></td>
+    </tr>`).join('')}`).join('');
+  document.getElementById('tab-mapel').innerHTML = `
+    <div class="card">
+      <h3>Daftar Mata Pelajaran</h3>
+      <p>Daftar ini muncul di dropdown Jadwal Mapel. Daftar awal mengikuti struktur Kurikulum Merdeka pendidikan kesetaraan (kelompok umum + pemberdayaan &amp; keterampilan) — sesuaikan dengan kurikulum operasional PKBM Anda. Menghapus/menyembunyikan mapel <b>tidak</b> mengubah jadwal yang sudah tersimpan.</p>
+      <div class="row" style="margin:12px 0;">
+        <div class="field" style="flex:1; min-width:220px;"><label>Nama mapel baru</label><input type="text" id="mp-nama" maxlength="80" placeholder="mis. Bahasa Arab"></div>
+        <div class="field"><label>Untuk program</label><select id="mp-program"><option value="SEMUA">Paket B &amp; C</option><option value="PAKET_B">Paket B</option><option value="PAKET_C">Paket C</option></select></div>
+        <div class="field"><label>Kelompok</label><input type="text" id="mp-kelompok" list="dl-kelompok" maxlength="60" value="Tambahan"><datalist id="dl-kelompok">${Object.keys(grup).map((k) => `<option value="${esc(k)}">`).join('')}</datalist></div>
+        <button class="btn btn-primary" id="btn-tambah-mapel" type="button" style="margin-bottom:2px;">+ Tambah</button>
+      </div>
+      <div class="table-wrap"><table class="slot-tbl" style="margin:0;">
+        <thead><tr><th>Mata Pelajaran</th><th>Program</th><th>Tampil</th><th></th></tr></thead>
+        <tbody>${body || '<tr><td colspan="4" class="muted">Belum ada mapel. Pastikan migration_05 sudah dijalankan.</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+}
+document.getElementById('tab-mapel').addEventListener('click', async (e) => {
+  if (e.target.id === 'btn-tambah-mapel') {
+    const nama = document.getElementById('mp-nama').value.trim();
+    if (!nama) { toast('Nama mapel wajib diisi.', 'error'); return; }
+    try {
+      await apiCall('/admin-mapel', { method: 'POST', body: { nama, program: document.getElementById('mp-program').value, kelompok: document.getElementById('mp-kelompok').value.trim() || 'Tambahan' } });
+      await muatMapel(); renderMapel(); renderJadwalPertahankan(); toast('Mapel ditambahkan.', 'success');
+    } catch (err) { handleErr(err); }
+    return;
+  }
+  const btn = e.target.closest('.m-hapus');
+  if (btn) {
+    const tr = btn.closest('tr'); const m = state.mapel.find((x) => x.id === tr.dataset.id);
+    if (!confirm(`Hapus "${m.nama}" dari daftar? Jadwal yang sudah memakainya tetap tersimpan.`)) return;
+    try { await apiCall(`/admin-mapel?id=${m.id}`, { method: 'DELETE' }); await muatMapel(); renderMapel(); renderJadwalPertahankan(); toast('Mapel dihapus.', 'success'); } catch (err) { handleErr(err); }
+  }
+});
+document.getElementById('tab-mapel').addEventListener('change', async (e) => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  const body = { id: tr.dataset.id };
+  if (e.target.classList.contains('m-aktif')) body.aktif = e.target.checked;
+  else if (e.target.classList.contains('m-program')) body.program = e.target.value;
+  else return;
+  try { await apiCall('/admin-mapel', { method: 'PUT', body }); await muatMapel(); renderJadwalPertahankan(); toast('Perubahan disimpan.', 'success'); } catch (err) { handleErr(err); }
+});
+function renderJadwalPertahankan() { if (state.kelasAktif) renderJadwal(bacaGrid()); }
+
+/* ============================================================
+   TAB 4 — GENERATE JADWAL OTOMATIS
+   ============================================================ */
+const J = window.JadwalGen;
+const byUrut = (a, b) => (a.urut ?? 0) - (b.urut ?? 0);
+function slotsObj() {
+  const o = { PAKET_B: { REGULER: [], JUMAT: [] }, PAKET_C: { REGULER: [], JUMAT: [] } };
+  state.slots.forEach((s) => { if (o[s.program]) o[s.program][s.tipe_hari].push(s); });
+  return o;
+}
+
+/** Tabel jadwal (jam x hari) satu kelas — dipakai untuk pratinjau generate DAN cetak PDF. */
+function tabelKelasHtml(program, jadwalArr) {
+  const sp = slotsObj()[program];
+  const reg = sp.REGULER.slice().sort(byUrut), jum = sp.JUMAT.slice().sort(byUrut);
+  const isi = new Map((jadwalArr || []).map((j) => [`${j.hari}-${j.jam_ke}`, j.mapel]));
+  const n = Math.max(reg.length, jum.length);
+  let body = '';
+  for (let i = 0; i < n; i++) {
+    const r = reg[i], j = jum[i];
+    const jam = r && r.jenis === 'PELAJARAN' ? r.jam_ke : (j && j.jenis === 'PELAJARAN' ? j.jam_ke : '');
+    let sel = `<td class="c">${jam}</td><td class="c w">${r ? titik(r.mulai) + '–' + titik(r.selesai) : ''}</td>`;
+    if (r && r.jenis !== 'PELAJARAN') sel += `<td class="ist" colspan="4">${esc(r.label || 'Istirahat')}</td>`;
+    else sel += [1, 2, 3, 4].map((h) => `<td>${esc(r ? (isi.get(`${h}-${r.jam_ke}`) || '') : '')}</td>`).join('');
+    sel += `<td class="c w">${j ? titik(j.mulai) + '–' + titik(j.selesai) : ''}</td>`;
+    if (j && j.jenis !== 'PELAJARAN') sel += `<td class="ist">${esc(j.label || 'Istirahat')}</td>`;
+    else sel += `<td>${esc(j ? (isi.get(`5-${j.jam_ke}`) || '') : '')}</td>`;
+    body += `<tr>${sel}</tr>`;
+  }
+  return `<table class="jt"><thead><tr><th>Jam</th><th>Waktu</th><th>Senin</th><th>Selasa</th><th>Rabu</th><th>Kamis</th><th>Waktu Jumat</th><th>Jumat</th></tr></thead><tbody>${body || '<tr><td colspan="8">Jam belajar belum diatur.</td></tr>'}</tbody></table>`;
+}
+function rekapJpHtml(program, jadwalArr) {
+  const sp = slotsObj()[program];
+  const ada = new Set();
+  [...sp.REGULER, ...sp.JUMAT].forEach((s) => { if (s.jenis === 'PELAJARAN') ada.add(`${s.tipe_hari === 'JUMAT' ? 5 : 0}-${s.jam_ke}`); });
+  const hit = new Map();
+  (jadwalArr || []).forEach((j) => { if (ada.has(`${j.hari === 5 ? 5 : 0}-${j.jam_ke}`)) hit.set(j.mapel, (hit.get(j.mapel) || 0) + 1); });
+  const arr = [...hit.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'id'));
+  const total = arr.reduce((a, [, v]) => a + v, 0);
+  return { total, html: arr.map(([m, v]) => `${esc(m)} <b>(${v})</b>`).join(' · ') };
+}
+
+state.muatan = {}; state.muatanError = '';
+state.gen = { draft: {}, buka: {}, scope: 'ALL', hindari: true, hasil: null, seed: 1 };
+async function muatMuatan() { const r = await apiCall('/admin-muatan-mapel'); state.muatan = r.data || {}; }
+
+function muatanKelas(k) {
+  if (!state.gen.draft[k.grup]) {
+    const db = state.muatan[k.grup];
+    state.gen.draft[k.grup] = (db && db.length ? db : J.muatanDefault(k.program, k.grup)).map((r) => ({ mapel: r.mapel, jp: r.jp }));
+  }
+  return state.gen.draft[k.grup];
+}
+const totalJp = (rows) => rows.reduce((a, r) => a + (Number(r.jp) || 0), 0);
+
+function htmlMuatan(k) {
+  const rows = muatanKelas(k);
+  const kap = J.kapasitasKelas(slotsObj()[k.program]);
+  const total = totalJp(rows);
+  const tersimpan = !!(state.muatan[k.grup] && state.muatan[k.grup].length);
+  const namaMapel = state.mapel.filter((m) => m.aktif && (m.program === 'SEMUA' || m.program === k.program)).map((m) => `<option value="${esc(m.nama)}">`).join('');
+  return `<details class="sub-card gen-kelas" data-grup="${esc(k.grup)}" ${state.gen.buka[k.grup] ? 'open' : ''}>
+    <summary><b>Kelas ${esc(k.grup)}</b> <span class="muted">· ${PROGRAM_LABEL[k.program]}</span>
+      <span class="pill ${total > kap ? 'pill-bad' : ''}" data-total>${total} / ${kap} JP</span>
+      <span class="muted">${tersimpan ? '(muatan tersimpan)' : '(muatan bawaan)'}</span></summary>
+    <datalist id="dl-${esc(k.grup)}">${namaMapel}</datalist>
+    <div class="table-wrap"><table class="slot-tbl">
+      <thead><tr><th>Mata pelajaran</th><th style="width:110px;">JP / minggu</th><th></th></tr></thead>
+      <tbody>${rows.map((r, i) => `<tr data-i="${i}">
+        <td><input type="text" class="mu-mapel" list="dl-${esc(k.grup)}" maxlength="80" value="${esc(r.mapel)}" style="width:100%;"></td>
+        <td><input type="number" class="mu-jp" min="1" max="20" value="${esc(r.jp)}" style="width:80px;"></td>
+        <td><button class="btn btn-ghost btn-sm mu-hapus" type="button" title="Hapus mapel">🗑</button></td></tr>`).join('')}</tbody>
+    </table></div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+      <button class="btn btn-outline btn-sm mu-tambah" type="button">+ Tambah mapel</button>
+      <button class="btn btn-outline btn-sm mu-reset" type="button">↺ Kembali ke bawaan</button>
+      <button class="btn btn-primary btn-sm mu-simpan" type="button" style="margin-left:auto;" ${state.muatanError ? 'disabled title="Jalankan migration_06 dulu"' : ''}>💾 Simpan muatan kelas ${esc(k.grup)}</button>
+    </div>
+  </details>`;
+}
+
+function peringatanDurasi() {
+  const out = [];
+  const so = slotsObj();
+  [['PAKET_B', 40, 'Paket B'], ['PAKET_C', 45, 'Paket C']].forEach(([p, std, nama]) => {
+    const s = so[p].REGULER.find((x) => x.jenis === 'PELAJARAN');
+    if (!s) return;
+    const dur = toMin(s.selesai.slice(0, 5)) - toMin(s.mulai.slice(0, 5));
+    if (dur !== std) out.push(`${nama}: 1 jam pelajaran di tab Jam Belajar berdurasi ${dur} menit, sedangkan ketentuan struktur kurikulum kesetaraan menetapkan 1 JP ${nama} = ${std} menit. Sesuaikan di tab Jam Belajar bila perlu (generator mengikuti jumlah jam yang ada di sana).`);
+  });
+  return out;
+}
+
+function renderGen() {
+  const el = document.getElementById('tab-gen');
+  if (!J) { el.innerHTML = '<div class="card"><div class="warn">Modul generator gagal dimuat. Muat ulang halaman.</div></div>'; return; }
+  if (!state.kelas.length) { el.innerHTML = '<div class="card"><h3>Generate Jadwal Otomatis</h3><p class="muted">Belum ada kelas Paket B/C dengan siswa aktif.</p></div>'; return; }
+  const g = state.gen;
+  const opsiScope = [`<option value="ALL">Semua kelas</option>`, `<option value="PAKET_B">Semua Paket B</option>`, `<option value="PAKET_C">Semua Paket C</option>`]
+    .concat(state.kelas.map((k) => `<option value="K:${esc(k.grup)}">Kelas ${esc(k.grup)} saja (${PROGRAM_LABEL[k.program]})</option>`))
+    .map((o) => o.replace(`value="${g.scope}"`, `value="${g.scope}" selected`)).join('');
+  const dur = peringatanDurasi();
+  el.innerHTML = `
+    <div class="card">
+      <h3>🪄 Generate Jadwal Otomatis</h3>
+      <p>Susun jadwal semua kelas sekaligus tanpa bentrok, mengikuti <b>jam belajar</b> dan <b>muatan mapel</b> tiap kelas di bawah ini. Hasilnya berupa pratinjau — baru tersimpan setelah Anda klik <b>Simpan ke Jadwal</b>.</p>
+      <div class="info-box">
+        <b>Yang dijaga generator:</b>
+        <ul>
+          <li>Satu kelas tidak punya dua mapel di jam yang sama; blok jam tidak melintasi istirahat.</li>
+          <li><b>Tanpa bentrok antar kelas:</b> mapel yang sama tidak diajarkan di dua kelas pada jam yang bertumpuk (aplikasi belum menyimpan data guru, jadi satu mapel dianggap satu guru/ruang). Berlaku juga lintas Paket B &amp; C pada hari Jumat pagi.</li>
+          <li>Muatan Lokal dibatasi maksimal <b>2 JP/minggu</b>; mapel yang sama maksimal satu blok per hari; mapel berat (Matematika, Bahasa, IPA) diutamakan di jam awal.</li>
+          <li>Struktur mapel mengikuti kurikulum pendidikan kesetaraan: Paket B Fase D (kelas 7–9); Paket C Fase E (kelas 10) dan Fase F (kelas 11–12, IPA/IPS digabung dengan mapel pilihan).</li>
+        </ul>
+        <p class="muted" style="margin:6px 0 0;"><b>Penting:</b> jumlah JP tiap mapel di bawah adalah <b>nilai bawaan yang dibagi proporsional</b> ke jam pelajaran yang tersedia di PKBM Anda, bukan angka resmi per mapel. Cocokkan dengan kurikulum operasional PKBM, lalu ubah seperlunya.</p>
+      </div>
+      ${state.muatanError ? `<div class="warn">Muatan tersimpan belum bisa dipakai (${esc(state.muatanError)}). Generator tetap jalan dengan muatan bawaan; tombol Simpan muatan aktif setelah <code>supabase/migration_06_muatan_mapel_dan_grup_paket_c.sql</code> dijalankan.</div>` : ''}
+      ${dur.map((d) => `<div class="warn">⚠ ${esc(d)}</div>`).join('')}
+      <div class="row" style="margin-top:14px;">
+        <div class="field" style="min-width:260px;"><label>Kelas yang dibuatkan jadwal</label><select id="gen-scope">${opsiScope}</select></div>
+        <label style="display:flex; gap:8px; align-items:center; font-size:.85rem; margin-bottom:6px;"><input type="checkbox" id="gen-hindari" ${g.hindari ? 'checked' : ''} style="width:auto;"> Hindari bentrok mapel antar kelas</label>
+        <button class="btn btn-primary" id="gen-buat" type="button" style="margin-left:auto;">🪄 Buat Jadwal</button>
+      </div>
+      <h4 style="margin:18px 0 4px;">Muatan mapel per kelas</h4>
+      <p class="muted" style="margin:0 0 8px;">Klik nama kelas untuk melihat/ubah JP per minggu. Total JP tidak boleh melebihi jumlah jam pelajaran yang tersedia (Senin–Jumat).</p>
+      <div id="gen-muatan">${state.kelas.map(htmlMuatan).join('')}</div>
+    </div>
+    <div id="gen-hasil"></div>`;
+  if (g.hasil) renderHasil();
+}
+
+function targetGen() {
+  const s = state.gen.scope;
+  if (s === 'ALL') return state.kelas;
+  if (s === 'PAKET_B' || s === 'PAKET_C') return state.kelas.filter((k) => k.program === s);
+  return state.kelas.filter((k) => `K:${k.grup}` === s);
+}
+
+async function jalankanGenerate(acakUlang) {
+  const g = state.gen;
+  if (acakUlang) g.seed += 1;
+  const target = targetGen();
+  if (!target.length) { toast('Pilih kelas terlebih dahulu.', 'error'); return; }
+  if (!state.slots.length) { toast('Jam belajar belum diatur. Atur dulu di tab Jam Belajar.', 'error'); return; }
+  const btn = document.getElementById('gen-buat'); if (btn) { btn.disabled = true; btn.textContent = 'Menyusun…'; }
+  try {
+    const semua = await apiCall('/admin-jadwal-pelajaran?kelas=SEMUA');
+    const hasil = J.generate({
+      target: target.map((k) => ({ grup: k.grup, program: k.program, muatan: muatanKelas(k) })),
+      tetap: state.kelas.map((k) => ({ grup: k.grup, program: k.program, jadwal: semua.jadwal[k.grup] || [] })),
+      slots: slotsObj(),
+      opsi: { hindariBentrok: g.hindari, seed: g.seed },
+    });
+    // verifikasi independen: gabungan hasil baru + kelas lain yang tidak diubah
+    const grupBaru = new Set(target.map((k) => k.grup));
+    const gabungan = state.kelas.map((k) => ({ grup: k.grup, program: k.program, jadwal: grupBaru.has(k.grup) ? hasil.jadwal[k.grup] : (semua.jadwal[k.grup] || []) }));
+    hasil.bentrokTerverifikasi = J.cekBentrok(gabungan, slotsObj()).length;
+    hasil.targetGrup = target.map((k) => k.grup);
+    hasil.jadwalLama = semua.jadwal;
+    g.hasil = hasil;
+    renderHasil();
+    document.getElementById('gen-hasil').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) { handleErr(err); }
+  finally { const b = document.getElementById('gen-buat'); if (b) { b.disabled = false; b.textContent = '🪄 Buat Jadwal'; } }
+}
+
+function renderHasil() {
+  const h = state.gen.hasil; if (!h) return;
+  const ok = h.bentrokTerverifikasi === 0 && !h.belumTertempatkan && !h.konflik;
+  const kartu = h.targetGrup.map((grup) => {
+    const k = state.kelas.find((x) => x.grup === grup);
+    const pk = h.perKelas[grup]; const rk = rekapJpHtml(k.program, h.jadwal[grup]);
+    return `<div class="sub-card"><h4 style="margin-bottom:6px;">Kelas ${esc(grup)} <span class="muted" style="font-weight:500;">· ${PROGRAM_LABEL[k.program]}</span></h4>
+      <p style="margin:0 0 8px;"><span class="pill">${pk.terisi} / ${pk.kapasitas} jam terisi</span> ${pk.kosong > 0 ? `<span class="pill pill-warn">${pk.kosong} jam masih kosong</span>` : ''}</p>
+      <div class="table-wrap">${tabelKelasHtml(k.program, h.jadwal[grup])}</div>
+      <p class="muted" style="margin-top:8px;">${rk.html}</p></div>`;
+  }).join('');
+  const adaLama = h.targetGrup.filter((grup) => (h.jadwalLama[grup] || []).length);
+  document.getElementById('gen-hasil').innerHTML = `
+    <div class="card" style="margin-top:14px;">
+      <h3>Pratinjau Hasil</h3>
+      <p style="margin:0 0 8px;">${ok ? '<span class="pill pill-ok">✅ Tidak ada bentrok</span>' : `<span class="pill pill-bad">⚠ ${h.bentrokTerverifikasi} bentrok terdeteksi</span>`}
+        <span class="muted">· ${h.targetGrup.length} kelas · percobaan ke-${h.percobaan}</span></p>
+      ${h.peringatan.map((w) => `<div class="warn">${esc(w)}</div>`).join('')}
+      ${adaLama.length ? `<div class="warn">Jadwal tersimpan untuk kelas ${esc(adaLama.join(', '))} akan <b>ditimpa</b> bila Anda menyimpan.</div>` : ''}
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin:12px 0;">
+        <button class="btn btn-outline" id="gen-acak" type="button">🔄 Acak Ulang</button>
+        <button class="btn btn-primary" id="gen-simpan" type="button" style="margin-left:auto;">💾 Simpan ke Jadwal</button>
+      </div>
+      ${kartu}
+    </div>`;
+}
+
+document.getElementById('tab-gen').addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'gen-scope') { state.gen.scope = t.value; return; }
+  if (t.id === 'gen-hindari') { state.gen.hindari = t.checked; return; }
+});
+document.getElementById('tab-gen').addEventListener('toggle', (e) => {
+  const d = e.target.closest && e.target.closest('details.gen-kelas'); if (d) state.gen.buka[d.dataset.grup] = d.open;
+}, true);
+document.getElementById('tab-gen').addEventListener('input', (e) => {
+  const tr = e.target.closest('tr[data-i]'); const det = e.target.closest('details.gen-kelas'); if (!tr || !det) return;
+  const k = state.kelas.find((x) => x.grup === det.dataset.grup); const row = muatanKelas(k)[Number(tr.dataset.i)];
+  if (e.target.classList.contains('mu-mapel')) row.mapel = e.target.value;
+  if (e.target.classList.contains('mu-jp')) row.jp = Number(e.target.value) || 0;
+  const kap = J.kapasitasKelas(slotsObj()[k.program]); const total = totalJp(muatanKelas(k));
+  const p = det.querySelector('[data-total]'); p.textContent = `${total} / ${kap} JP`; p.classList.toggle('pill-bad', total > kap);
+});
+document.getElementById('tab-gen').addEventListener('click', async (e) => {
+  const t = e.target;
+  if (t.id === 'gen-buat') { jalankanGenerate(false); return; }
+  if (t.id === 'gen-acak') { jalankanGenerate(true); return; }
+  if (t.id === 'gen-simpan') {
+    const h = state.gen.hasil; if (!h) return;
+    if (h.bentrokTerverifikasi && !confirm(`Masih ada ${h.bentrokTerverifikasi} bentrok. Tetap simpan?`)) return;
+    t.disabled = true;
+    try {
+      await apiCall('/admin-jadwal-pelajaran', { method: 'PUT', body: { semua: h.targetGrup.map((grup) => ({ kelas: grup, jadwal: h.jadwal[grup] })) } });
+      toast(`Jadwal ${h.targetGrup.length} kelas disimpan.`, 'success');
+      state.gen.hasil = null; document.getElementById('gen-hasil').innerHTML = '';
+      if (state.kelasAktif) pilihKelas(state.kelasAktif.grup);
+    } catch (err) { handleErr(err); } finally { t.disabled = false; }
+    return;
+  }
+  const det = t.closest('details.gen-kelas'); if (!det) return;
+  const k = state.kelas.find((x) => x.grup === det.dataset.grup);
+  const reRender = () => { state.gen.buka[k.grup] = true; document.getElementById('gen-muatan').innerHTML = state.kelas.map(htmlMuatan).join(''); };
+  if (t.classList.contains('mu-tambah')) { muatanKelas(k).push({ mapel: '', jp: 1 }); reRender(); return; }
+  if (t.closest('.mu-hapus')) { muatanKelas(k).splice(Number(t.closest('tr').dataset.i), 1); reRender(); return; }
+  if (t.classList.contains('mu-reset')) {
+    if (!confirm(`Kembalikan muatan kelas ${k.grup} ke bawaan?`)) return;
+    delete state.gen.draft[k.grup];
+    try { if (state.muatan[k.grup]) { await apiCall(`/admin-muatan-mapel?kelas=${encodeURIComponent(k.grup)}`, { method: 'DELETE' }); delete state.muatan[k.grup]; } } catch (err) { handleErr(err); }
+    reRender(); return;
+  }
+  if (t.classList.contains('mu-simpan')) {
+    const rows = muatanKelas(k).filter((r) => String(r.mapel).trim());
+    try {
+      await apiCall('/admin-muatan-mapel', { method: 'PUT', body: { kelas: k.grup, rows } });
+      state.muatan[k.grup] = rows.map((r) => ({ ...r })); reRender(); toast(`Muatan kelas ${k.grup} disimpan.`, 'success');
+    } catch (err) { handleErr(err); }
+  }
+});
+
+/* ============================================================
+   CETAK JADWAL — EXCEL & PDF
+   ============================================================ */
+function isiPilihanCetak() {
+  const sel = document.getElementById('cetak-kelas'); if (!sel) return;
+  const nilai = sel.value || 'SEMUA';
+  sel.innerHTML = `<option value="SEMUA">Semua kelas</option>` + state.kelas.map((k) => `<option value="${esc(k.grup)}">Kelas ${esc(k.grup)} (${k.program === 'PAKET_B' ? 'Paket B' : 'Paket C'})</option>`).join('');
+  sel.value = [...sel.options].some((o) => o.value === nilai) ? nilai : 'SEMUA';
+}
+
+async function unduhExcel() {
+  const kelas = document.getElementById('cetak-kelas').value || 'SEMUA';
+  const btn = document.getElementById('btn-cetak-xlsx'); btn.disabled = true; const awal = btn.textContent; btn.textContent = 'Menyiapkan…';
+  try {
+    const res = await fetch(`/api/admin-jadwal-export?kelas=${encodeURIComponent(kelas)}`, { headers: { Authorization: `Bearer ${adminToken()}` } });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); if (res.status === 401) { logoutAdmin(); return; } throw new Error(d.error || 'Gagal membuat berkas Excel.'); }
+    const blob = await res.blob(); const m = (res.headers.get('content-disposition') || '').match(/filename="([^"]+)"/);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = m ? m[1] : 'Jadwal-Pelajaran.xlsx';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Berkas Excel berhasil dibuat.', 'success');
+  } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; btn.textContent = awal; }
+}
+
+async function cetakPdf() {
+  const kelas = document.getElementById('cetak-kelas').value || 'SEMUA';
+  const w = window.open('', '_blank');
+  if (!w) { toast('Pop-up diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.', 'error'); return; }
+  w.document.write('<p style="font-family:sans-serif;padding:24px;">Menyiapkan jadwal…</p>');
+  try {
+    const [semua, ident] = await Promise.all([
+      apiCall('/admin-jadwal-pelajaran?kelas=SEMUA'),
+      apiCall('/admin-rapor-identitas').catch(() => ({ data: {} })),
+    ]);
+    const sekolah = (ident.data && ident.data.nama_sekolah) || 'PKBM Nurul Islam';
+    const alamat = (ident.data && ident.data.alamat) || '';
+    const daftar = kelas === 'SEMUA' ? state.kelas : state.kelas.filter((k) => k.grup === kelas);
+    const halaman = daftar.map((k) => {
+      const jd = semua.jadwal[k.grup] || []; const rk = rekapJpHtml(k.program, jd);
+      return `<section class="hal">
+        <div class="kop"><img src="${location.origin}/assets/img/logo-pkbm.png" alt=""><div><div class="s">${esc(sekolah)}</div><div class="a">${esc(alamat)}</div></div></div>
+        <h1>JADWAL PELAJARAN</h1><h2>Kelas ${esc(k.grup)} — ${PROGRAM_LABEL[k.program]}</h2>
+        ${tabelKelasHtml(k.program, jd)}
+        <p class="rk"><b>Rekap JP/minggu (${rk.total}):</b> ${rk.html || '-'}</p>
+      </section>`;
+    }).join('');
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Jadwal Pelajaran${kelas === 'SEMUA' ? '' : ' Kelas ' + esc(kelas)}</title>
+      <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        * { box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+        .hal { page-break-after: always; }
+        .hal:last-child { page-break-after: auto; }
+        .kop { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1f6f5c; padding-bottom: 8px; margin-bottom: 10px; }
+        .kop img { width: 48px; height: 48px; object-fit: contain; }
+        .kop .s { font-size: 16px; font-weight: 700; } .kop .a { font-size: 11px; color: #555; }
+        h1 { font-size: 16px; text-align: center; margin: 6px 0 0; } h2 { font-size: 13px; text-align: center; margin: 2px 0 10px; font-weight: 600; }
+        table.jt { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .jt th, .jt td { border: 1px solid #777; padding: 6px 6px; font-size: 11px; vertical-align: middle; word-wrap: break-word; }
+        .jt th { background: #1f6f5c; color: #fff; }
+        .jt td.c { text-align: center; } .jt td.w { white-space: nowrap; font-size: 10px; }
+        .jt th:nth-child(1) { width: 5%; } .jt th:nth-child(2), .jt th:nth-child(7) { width: 10%; }
+        .jt td.ist { background: #f1f0e8; color: #666; font-style: italic; text-align: center; }
+        .rk { font-size: 10.5px; margin-top: 10px; line-height: 1.5; }
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      </style></head><body>${halaman || '<p>Tidak ada kelas.</p>'}</body></html>`);
+    w.document.close();
+    w.onload = () => setTimeout(() => { w.focus(); w.print(); }, 300);
+    setTimeout(() => { try { w.focus(); } catch { /* abaikan */ } }, 600);
+  } catch (err) { w.close(); handleErr(err); }
+}
+document.getElementById('btn-cetak-xlsx').addEventListener('click', unduhExcel);
+document.getElementById('btn-cetak-pdf').addEventListener('click', cetakPdf);
+
+/* ============================================================
+   MUAT DATA AWAL
+   ============================================================ */
+async function muatMapel() { const r = await apiCall('/admin-mapel'); state.mapel = r.data; }
+async function muatJam() { const r = await apiCall('/admin-jam-belajar'); state.slots = r.slots; state.jumat = r.jumat; state.reguler = r.reguler; muatDraftDariServer(); }
+
+(async function init() {
+  renderJadwal();
+  try {
+    const kel = await apiCall('/admin-jadwal-pelajaran');
+    state.kelas = kel.kelas;
+  } catch (err) { handleErr(err); }
+  // Jam belajar & mapel butuh migration_05; jika belum, tampilkan pesan jelas.
+  try { await muatJam(); } catch (err) { if (err.status === 401) { logoutAdmin(); return; } state.slots = []; muatDraftDariServer(); toast(err.message, 'error'); }
+  try { await muatMapel(); } catch (err) { if (err.status === 401) { logoutAdmin(); return; } state.mapel = []; }
+  try { await muatMuatan(); } catch (err) { if (err.status === 401) { logoutAdmin(); return; } state.muatan = {}; state.muatanError = err.message; }
+  renderJadwal(); renderJam(); renderMapel(); renderGen(); isiPilihanCetak();
+})();
+</script>
+</body>
+</html>

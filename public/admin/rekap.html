@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rekap Absensi — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<style>.filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; } .filters > * { flex: 1 1 150px; }</style>
+</head>
+<body>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/admin-shell.js"></script>
+<script src="/assets/js/kelas-chips.js"></script>
+<script>
+const slot = renderAdminShell('/admin/rekap.html', 'Rekap Absensi');
+const today = new Date().toISOString().slice(0,10);
+const todayWib = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }); // YYYY-MM-DD (WIB)
+slot.innerHTML = `
+  <div class="card no-print" id="card-word">
+    <h3>📝 Rekap Word Harian — Daftar Hadir &amp; Tanda Tangan Siswa</h3>
+    <p>Satu berkas Word untuk setiap kelas (rombel digabung: 7 A + 7 B menjadi <b>Kelas 7</b>; Paket C digabung per tingkat tanpa memandang IPA/IPS: 10 IPA + 10 IPS 1 + 10 IPS 2 menjadi <b>Kelas 10</b>, begitu pula <b>Kelas 11</b> dan <b>Kelas 12</b>). Berisi siswa yang sudah scan masuk, dengan kolom tanda tangan per mapel sesuai <a href="/admin/jadwal.html" style="color:var(--primary); font-weight:600;">Jadwal Pelajaran</a> hari itu. Pilih "Semua kelas" untuk mengunduh semua berkas sekaligus dalam satu ZIP.</p>
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+      <div class="field" style="margin:0;"><label>Tanggal</label><input type="date" id="w-tanggal" value="${todayWib}"></div>
+      <div class="field" style="margin:0; min-width:280px;"><label>Kelas</label><select id="w-kelas"><option value="SEMUA">Memuat daftar kelas…</option></select></div>
+      <button class="btn btn-primary" id="btn-word" type="button">⬇ Cetak Word</button>
+    </div>
+    <p class="hint" id="w-info" style="margin:8px 0 0;"></p>
+  </div>
+  <div class="card no-print">
+    <div class="filters">
+      <div class="field" style="margin:0;"><label>Tanggal Mulai</label><input type="date" id="f-mulai" value="${today}"></div>
+      <div class="field" style="margin:0;"><label>Tanggal Akhir</label><input type="date" id="f-akhir" value="${today}"></div>
+      <div class="field" style="margin:0;"><label>Jenjang</label><select id="f-jenjang"><option value="">Semua</option><option>SD</option><option>SMP</option><option>SMA</option></select></div>
+      <div class="field" style="margin:0;"><label>Program</label><select id="f-program"><option value="">Semua</option><option value="PAKET_B">Paket B</option><option value="PAKET_C">Paket C</option></select></div>
+      <div class="field" style="margin:0;"><label>Status</label><select id="f-status"><option value="">Semua</option><option value="HADIR">Hadir</option><option value="TERLAMBAT">Terlambat</option><option value="IZIN">Izin</option><option value="SAKIT">Sakit</option><option value="TIDAK_HADIR">Tidak Hadir</option><option value="PERLU_VERIFIKASI">Perlu Verifikasi</option></select></div>
+      <div class="field" style="margin:0;"><label>Nama / NISN</label><input type="text" id="f-nama" placeholder="Cari..."></div>
+    </div>
+    <div id="kelas-chips"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <button class="btn btn-primary" id="btn-cari">Terapkan Filter</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="btn-csv">⬇ CSV</button>
+        <button class="btn btn-outline btn-sm" id="btn-xlsx">⬇ Excel</button>
+        <button class="btn btn-outline btn-sm" id="btn-print">⬇ PDF (Cetak)</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <p id="ringkasan" style="font-weight:600; color:var(--ink);"></p>
+    <div class="table-wrap">
+      <table id="tabel-rekap">
+        <thead><tr><th>NISN</th><th>Nama</th><th>Jenjang</th><th>Program</th><th>Kelas</th><th>Tanggal</th><th>Jam Datang</th><th>Status</th><th>Jam Pulang</th><th>Ket.</th></tr></thead>
+        <tbody id="tbody-rekap"><tr><td colspan="10">Gunakan filter lalu klik "Terapkan Filter".</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+`;
+
+const kc = KelasChips.pasang(document.getElementById('kelas-chips'), { onChange: () => cari() });
+['f-jenjang','f-program'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => kc.setFilter({
+    program: document.getElementById('f-program').value, jenjang: document.getElementById('f-jenjang').value,
+  }));
+});
+
+function buildQuery() {
+  const p = new URLSearchParams();
+  if (kc.get()) p.set('kelas', kc.get());
+  const map = { 'f-mulai':'tanggal_mulai', 'f-akhir':'tanggal_akhir', 'f-jenjang':'jenjang', 'f-program':'program', 'f-status':'status', 'f-nama':'nama' };
+  for (const [id, key] of Object.entries(map)) {
+    const v = document.getElementById(id).value.trim();
+    if (v) p.set(key, v);
+  }
+  return p.toString();
+}
+
+async function cari() {
+  try {
+    const data = await apiCall(`/admin-reports?${buildQuery()}`);
+    document.getElementById('ringkasan').textContent = `${data.total} baris ditemukan.`;
+    const tbody = document.getElementById('tbody-rekap');
+    if (!data.data.length) { tbody.innerHTML = '<tr><td colspan="10">Tidak ada data untuk filter ini.</td></tr>'; return; }
+    tbody.innerHTML = data.data.map((r) => `
+      <tr>
+        <td>${r.nisn||'-'}</td><td>${r.nama}</td><td>${r.jenjang}</td><td>${r.program.replace('_',' ')}</td><td>${r.kelas}</td>
+        <td>${r.tanggal}</td><td>${fmtJam(r.jam_datang)}</td>
+        <td><span class="${statusBadgeClass(r.status_datang)}">${statusLabel(r.status_datang)}</span></td>
+        <td>${fmtJam(r.jam_pulang)}</td><td>${r.keterangan||'-'}</td>
+      </tr>
+    `).join('');
+  } catch (err) { if (err.status === 401) { logoutAdmin(); return; } toast(err.message, 'error'); }
+}
+document.getElementById('btn-cari').onclick = cari;
+
+function unduh(format) {
+  const token = adminToken();
+  const url = `/api/admin-reports-export?${buildQuery()}&format=${format}`;
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(async (res) => {
+      if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.error || 'Gagal mengunduh.'); }
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="(.+)"/);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = match ? match[1] : `rekap.${format}`;
+      a.click();
+    })
+    .catch((err) => toast(err.message, 'error'));
+}
+document.getElementById('btn-csv').onclick = () => unduh('csv');
+document.getElementById('btn-xlsx').onclick = () => unduh('xlsx');
+document.getElementById('btn-print').onclick = () => window.print();
+
+cari();
+
+// ===== Rekap Word Harian =====
+const PROGRAM_PENDEK = { PAKET_B: 'Paket B', PAKET_C: 'Paket C' };
+async function muatKelasWord() {
+  const sel = document.getElementById('w-kelas');
+  const info = document.getElementById('w-info');
+  const tanggal = document.getElementById('w-tanggal').value;
+  if (!tanggal) return;
+  try {
+    const d = await apiCall(`/admin-rekap-word?tanggal=${tanggal}&format=info`);
+    const dipilih = sel.value;
+    const total = d.kelas.reduce((a, k) => a + k.jumlah_hadir, 0);
+    sel.innerHTML = `<option value="SEMUA">Semua kelas — ${d.kelas.length} berkas (ZIP)</option>` +
+      d.kelas.map((k) => `<option value="${k.grup.replace(/"/g, '&quot;')}">Kelas ${k.grup} · ${PROGRAM_PENDEK[k.program]} · ${k.jumlah_hadir} siswa scan${k.jumlah_mapel ? '' : ' · jadwal belum diisi'}</option>`).join('');
+    if ([...sel.options].some((o) => o.value === dipilih)) sel.value = dipilih;
+    const tanpaJadwal = d.kelas.filter((k) => !k.jumlah_mapel).length;
+    info.textContent = d.kelas.length
+      ? `${total} siswa sudah scan masuk di ${d.kelas.length} kelas.` + (tanpaJadwal && d.hari_iso <= 5 ? ` ${tanpaJadwal} kelas belum punya jadwal mapel hari ini — kolom mapel dibiarkan kosong untuk diisi tangan.` : '')
+      : 'Belum ada siswa Paket B/C yang scan masuk pada tanggal ini.';
+  } catch (err) {
+    if (err.status === 401) { logoutAdmin(); return; }
+    sel.innerHTML = '<option value="SEMUA">Semua kelas</option>';
+    info.textContent = err.message;
+  }
+}
+document.getElementById('w-tanggal').addEventListener('change', muatKelasWord);
+document.getElementById('btn-word').onclick = async () => {
+  const btn = document.getElementById('btn-word');
+  const tanggal = document.getElementById('w-tanggal').value;
+  const kelas = document.getElementById('w-kelas').value || 'SEMUA';
+  if (!tanggal) { toast('Pilih tanggal dulu.', 'error'); return; }
+  btn.disabled = true; btn.textContent = 'Menyiapkan…';
+  try {
+    const res = await fetch(`/api/admin-rekap-word?tanggal=${tanggal}&kelas=${encodeURIComponent(kelas)}`, { headers: { Authorization: `Bearer ${adminToken()}` } });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); if (res.status === 401) { logoutAdmin(); return; } throw new Error(d.error || 'Gagal membuat berkas Word.'); }
+    const blob = await res.blob();
+    const m = (res.headers.get('content-disposition') || '').match(/filename="(.+)"/);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = m ? m[1] : `Rekap-Absensi_${tanggal}.docx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Berkas Word berhasil dibuat.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = '⬇ Cetak Word'; }
+};
+muatKelasWord();
+</script>
+</body>
+</html>
