@@ -20,7 +20,6 @@ const TABEL = [
   { t: 'attendance_security_events', pk: 'id' }, { t: 'audit_logs', pk: 'id' },
   { t: 'pengaturan_sekolah', pk: 'id', u: 20 }, { t: 'pengaturan_nilai', pk: 'id' }, { t: 'pengaturan_ttd', pk: 'id', u: 20 },
   { t: 'mata_pelajaran', pk: 'id' }, { t: 'capaian_pembelajaran', pk: 'id' }, { t: 'tujuan_pembelajaran', pk: 'id' },
-  { t: 'pengaturan_perangkat', pk: 'id', u: 20 }, { t: 'perangkat_ajar', pk: 'id', u: 20 },
   { t: 'paket_ujian', pk: 'id' }, { t: 'bank_soal', pk: 'id' },
   { t: 'paket_soal', pk: 'id' }, { t: 'paket_jurusan', pk: 'id' }, { t: 'ujian_pengecualian', pk: 'id' },
   { t: 'sesi_ujian', pk: 'id', u: 200 }, { t: 'detail_jawaban', pk: 'id' },
