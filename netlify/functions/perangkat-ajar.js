@@ -93,7 +93,28 @@ function bentukModul(p) {
   return `{${f.join(',')}}`;
 }
 
+function susunPromptLkpd(b) {
+  const p = b.pengaturan || {};
+  const n = Math.min(Math.max(parseInt(b.kegiatan, 10) || 3, 1), 5);
+  const g = Math.min(Math.max(parseInt(b.gambar, 10) || 0, 0), 3);
+  const cp = b.cp && b.cp.deskripsi ? `\nCapaian Pembelajaran: ${String(b.cp.deskripsi).slice(0, 800)}` : '';
+  const tp = (b.tp || []).filter((t) => t && t.deskripsi).slice(0, 8).map((t) => `- ${String(t.deskripsi).slice(0, 250)}`).join('\n');
+  const gam = g
+    ? `Sertakan tepat ${g} gambar: isi objek "gambar" pada ${g} kegiatan yang paling terbantu visual, sisanya null. "deskripsi" gambar ditulis dalam BAHASA INGGRIS, konkret dan spesifik (objek, susunan, gaya ilustrasi edukasi sederhana), tanpa teks di dalam gambar. "keterangan" ditulis Indonesia, mis. "Gambar 1. Siklus air".`
+    : 'Jangan sertakan gambar: semua "gambar" bernilai null.';
+  const bentuk = `{"judul":"...","tujuan":["..."],"petunjuk":["..."],"alat_bahan":["..."],"bagian":[{"judul":"Kegiatan 1: ...","uraian":"stimulus/pengantar singkat","gambar":{"deskripsi":"...","keterangan":"..."},"tugas":["..."]}],"refleksi":["..."]${b.kunci ? ',"kunci":["jawaban ringkas tiap tugas, berurutan"]' : ''}}`;
+  return `Susun LKPD (Lembar Kerja Peserta Didik) untuk sekolah kesetaraan PKBM di Indonesia, Kurikulum Merdeka. Bahasa Indonesia sederhana, aktivitas konkret, bisa dikerjakan peserta didik secara mandiri atau berkelompok.
+Mata pelajaran: ${b.mapel}
+Program/Kelas: ${b.program || ''} Kelas ${b.kelas || ''}${b.fase ? ` (Fase ${b.fase})` : ''}, Semester ${b.semester || ''}
+Topik: ${b.topik}${cp}${tp ? `\nTujuan Pembelajaran:\n${tp}` : ''}
+Jumlah kegiatan: ${n}. Setiap kegiatan punya 2-4 tugas berjenjang (mengamati, menanya, mencoba, menalar/menyimpulkan); tugas harus berupa pertanyaan atau perintah yang dijawab di lembar.
+${gam}
+${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 400)}\n` : ''}Balas HANYA satu JSON object berbentuk persis:
+${bentuk}`;
+}
+
 function susunPrompt(b) {
+  if (b.jenis === 'lkpd') return susunPromptLkpd(b);
   const p = b.pengaturan || {};
   const jenis = b.jenis === 'modul' ? 'MODUL AJAR (Kurikulum Merdeka)' : 'RPP (Rencana Pelaksanaan Pembelajaran)';
   const pert = Math.min(Math.max(parseInt(b.pertemuan, 10) || 1, 1), 4);
@@ -114,8 +135,56 @@ ${b.jenis === 'modul' ? bentukModul(p) : bentukRpp(p)}`;
 }
 
 function valid(d, jenis) {
+  if (jenis === 'lkpd') return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.bagian) && d.bagian.length;
   return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.kegiatan) && d.kegiatan.length
     && (jenis !== 'modul' || d.asesmen);
+}
+
+// ---------- Pembuat gambar untuk LKPD ----------
+async function gambarGemini(deskripsi, ms) {
+  const e = process.env; if (!e.GEMINI_API_KEY) throw new ErrAI(0, 'Tanpa API key Gemini');
+  const model = e.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
+  const teks = `Create a clean, friendly educational illustration for a school worksheet. Flat vector style, white background, clear shapes, no text or letters inside the image. Subject: ${deskripsi}`;
+  const r = await ft(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': e.GEMINI_API_KEY },
+    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: teks }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } }),
+  }, ms);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ErrAI(r.status, d?.error?.message || `Gemini gambar error (${r.status})`);
+  const part = (d?.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData && x.inlineData.data);
+  if (!part) throw new ErrAI(0, 'Model tidak mengembalikan gambar');
+  return { tipe: 'png', mime: part.inlineData.mimeType || 'image/png', data: part.inlineData.data, model };
+}
+
+async function gambarSvg(deskripsi, mulai) {
+  const prompt = `Gambarkan sebagai SVG untuk lembar kerja sekolah: ${deskripsi}
+Aturan: satu elemen <svg> dengan viewBox="0 0 800 500", latar putih (rect penuh), gaya ilustrasi/diagram datar yang bersih dengan warna cerah, bentuk sederhana dan jelas, label singkat bahasa Indonesia bila perlu (font-family sans-serif, ukuran minimal 22). Tanpa script, tanpa gambar eksternal. Gunakan TANDA KUTIP TUNGGAL untuk semua atribut agar valid di dalam JSON.
+Balas HANYA JSON: {"svg":"<svg ...>...</svg>"}`;
+  const kand = kandidat(); const log = [];
+  for (const k of kand) {
+    const sisa = BUDGET_MS - (Date.now() - mulai);
+    if (sisa < 7000) break;
+    try {
+      const d = ambilJson(await panggil(k, prompt, Math.min(sisa - 500, 30000), 6000));
+      let svg = String(d.svg || '').trim();
+      if (!/^<svg[\s>]/i.test(svg) || svg.length > 90000) throw new Error('SVG tidak valid');
+      svg = svg.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, '');
+      return { tipe: 'svg', svg, model: `${k.provider}/${k.model}` };
+    } catch (er) { log.push(`${k.provider}: ${String(er.message).slice(0, 80)}`); if (er.status === 401 || er.status === 403) continue; }
+  }
+  throw new Error(`Gagal membuat ilustrasi. ${log.join('; ')}`);
+}
+
+async function aksiGambar(b) {
+  const desk = String(b.deskripsi || '').trim().slice(0, 600);
+  if (!desk) return json(400, { error: 'Deskripsi gambar kosong.' });
+  const mulai = Date.now(); let alasan = '';
+  if (b.gaya !== 'svg') {
+    try { return json(200, { ...(await gambarGemini(desk, 28000)), asli: true }); }
+    catch (er) { alasan = String(er.message || '').slice(0, 160); }
+  }
+  try { return json(200, { ...(await gambarSvg(desk, mulai)), asli: false, alasan }); }
+  catch (er) { return json(503, { error: er.message, alasan }); }
 }
 
 exports.handler = async (event) => {
@@ -125,14 +194,15 @@ exports.handler = async (event) => {
   if (g.error) return { ...g.error, headers: { 'Content-Type': 'application/json' } };
 
   let b; try { b = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Body tidak valid' }); }
-  if (!['rpp', 'modul'].includes(b.jenis)) return json(400, { error: 'Jenis harus rpp atau modul.' });
+  if (b.aksi === 'gambar') return aksiGambar(b);
+  if (!['rpp', 'modul', 'lkpd'].includes(b.jenis)) return json(400, { error: 'Jenis harus rpp, modul, atau lkpd.' });
   if (!String(b.mapel || '').trim() || !String(b.topik || '').trim()) return json(400, { error: 'Mapel dan topik wajib diisi.' });
 
   const kand = kandidat();
   if (!kand.length) return json(500, { error: 'Belum ada API key AI di Environment Variables (GEMINI_API_KEY / GROQ_API_KEY / dst).' });
 
   const prompt = susunPrompt(b);
-  const tokens = b.jenis === 'modul' ? 9000 : 6000;
+  const tokens = b.jenis === 'modul' ? 9000 : 6500;
   const mulai = Date.now(); const log = []; const bermasalah = new Set();
 
   for (const k of kand) {

@@ -4,7 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const L = (x) => (Array.isArray(x) ? x : (x ? [x] : [])).map(String).filter(Boolean);
-  const NAMA = { rpp: 'RPP', modul: 'Modul Ajar' };
+  const NAMA = { rpp: 'RPP', modul: 'Modul Ajar', lkpd: 'LKPD' };
   const MODEL = ['Problem Based Learning (PBL)', 'Project Based Learning (PjBL)', 'Discovery Learning', 'Inquiry Learning', 'Cooperative Learning', 'Pembelajaran Kontekstual', 'Direct Instruction (ceramah interaktif)'];
   const DEF = {
     tahun_ajaran: '', menit_per_jp: 45, model_default: MODEL[0], format_rpp: 'lengkap', profil_pancasila: true,
@@ -38,7 +38,9 @@
     const mapel = (currentMapelList || []).map((m) => `<option value="${m.id}">${esc(labelMapel(m))}</option>`).join('');
     return `
       <h2>Generate ${NAMA[j]} dengan AI</h2>
-      <p class="muted">${j === 'rpp'
+      <p class="muted">${j === 'lkpd'
+        ? 'LKPD berisi kegiatan, tugas berjenjang, kolom jawaban, dan <b>gambar hasil AI</b>. Gambar dibuat satu per satu setelah teks selesai.'
+        : j === 'rpp'
         ? 'RPP disusun otomatis mengikuti format & pengaturan di menu <b>Pengaturan RPP &amp; Modul</b>.'
         : 'Modul Ajar format Kurikulum Merdeka: informasi umum, komponen inti, asesmen, dan lampiran (LKPD, bahan bacaan, glosarium).'}
         Hasil bisa Anda <b>edit langsung</b> di layar, lalu simpan atau unduh ke Word.</p>
@@ -50,11 +52,19 @@
         </div>
         <div class="field"><label>Tujuan Pembelajaran (centang yang dipakai)</label><div id="pa-${j}-tp" class="muted" style="max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px;"></div></div>
         <div class="field"><label>Topik / Materi Pokok</label><input type="text" id="pa-${j}-topik" placeholder="mis. Persamaan Linear Satu Variabel" /></div>
+        ${j === 'lkpd' ? `<div class="grid3">
+          <div class="field"><label>Jumlah Kegiatan</label><select id="pa-${j}-pert"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+          <div class="field"><label>Jumlah Gambar</label><select id="pa-${j}-gbr"><option>0</option><option>1</option><option>2</option><option selected>3</option></select></div>
+          <div class="field"><label>Gaya Gambar</label><select id="pa-${j}-gaya"><option value="otomatis">Gambar AI (otomatis ilustrasi bila gagal)</option><option value="svg">Ilustrasi diagram saja (cepat)</option></select></div>
+        </div>
         <div class="grid3">
+          <div class="field"><label>Nama Guru</label><input type="text" id="pa-${j}-guru" /></div>
+          <div class="field" style="align-self:end;"><label><input type="checkbox" id="pa-${j}-kunci" checked> Sertakan kunci jawaban (halaman guru)</label></div>
+        </div>` : `<div class="grid3">
           <div class="field"><label>Jumlah Pertemuan</label><select id="pa-${j}-pert"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
           <div class="field"><label>JP per Pertemuan</label><select id="pa-${j}-jp"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
           <div class="field"><label>Nama Guru</label><input type="text" id="pa-${j}-guru" /></div>
-        </div>
+        </div>`}
         <div class="grid3">
           <div class="field"><label>NIP/NUPTK Guru (opsional)</label><input type="text" id="pa-${j}-nip" /></div>
         </div>
@@ -68,6 +78,7 @@
           <button class="btn" onclick="PA.simpan('${j}')">💾 Simpan ke Riwayat</button>
           <button class="btn outline" onclick="PA.unduh('${j}')">⬇ Unduh Word</button>
           <button class="btn outline" onclick="PA.cetak('${j}')">🖨 Cetak / PDF</button>
+          ${j === 'lkpd' ? `<button class="btn outline" onclick="PA.ulangGambar('lkpd')">🔄 Buat ulang gambar yang gagal</button>` : ''}
           <span class="muted">Dokumen di bawah bisa diedit langsung (klik teksnya).</span>
         </div>
         <div id="pa-${j}-hasil" contenteditable="true" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.4;overflow:auto;"></div>
@@ -137,18 +148,20 @@
     const fase = typeof faseMapel === 'function' ? faseMapel(m) : '';
     const ctx = {
       mapel: m.nama, program: m.program, kelas: m.kelas, fase, semester: $(`pa-${j}-sem`).value, topik,
-      pertemuan: +$(`pa-${j}-pert`).value, jp: +$(`pa-${j}-jp`).value, guru, nip, cp, tp, m,
+      pertemuan: +$(`pa-${j}-pert`).value, jp: $(`pa-${j}-jp`) ? +$(`pa-${j}-jp`).value : 2, guru, nip, cp, tp, m,
     };
     const btn = $(`pa-${j}-btn`); const st = $(`pa-${j}-status`);
     btn.disabled = true; st.style.color = ''; st.textContent = `Menyusun ${NAMA[j]}... (sekitar 15-40 detik)`;
     try {
       const r = await panggilAI({ jenis: j, mapel: m.nama, program: m.program, kelas: m.kelas, fase, semester: ctx.semester, topik, cp, tp,
-        pertemuan: ctx.pertemuan, jp: ctx.jp, pengaturan: PENG });
-      const html = j === 'rpp' ? renderRpp(r.data, ctx) : renderModul(r.data, ctx);
+        pertemuan: ctx.pertemuan, jp: ctx.jp, pengaturan: PENG,
+        ...(j === 'lkpd' ? { kegiatan: ctx.pertemuan, gambar: +$(`pa-${j}-gbr`).value, kunci: $(`pa-${j}-kunci`).checked } : {}) });
+      const html = j === 'rpp' ? renderRpp(r.data, ctx) : j === 'modul' ? renderModul(r.data, ctx) : renderLkpd(r.data, ctx);
       $(`pa-${j}-hasil`).innerHTML = html; $(`pa-${j}-hasilbox`).classList.remove('hidden');
       terakhir[j] = { judul: `${NAMA[j]} ${m.nama} Kelas ${m.kelas || ''} - ${topik}`.slice(0, 160), meta: { mapel: m.nama, kelas: m.kelas, semester: ctx.semester, topik, provider: r.provider }, mapel_id: m.id, semester: ctx.semester, kelas: m.kelas };
       st.textContent = `Selesai (${r.provider}). Periksa & edit bila perlu, lalu simpan/unduh.`;
       $(`pa-${j}-hasilbox`).scrollIntoView({ behavior: 'smooth' });
+      if (j === 'lkpd') { terakhir[j].gambar = r.data.bagian.map((b) => (b && b.gambar && b.gambar.deskripsi) || null); await buatGambar(j); }
     } catch (e) { st.style.color = '#B42318'; st.textContent = e.message; } finally { btn.disabled = false; }
   }
 
@@ -249,6 +262,79 @@
       ${ttd(c)}`;
   }
 
+  function renderLkpd(d, c) {
+    const garis = (n) => Array.from({ length: n }, () => '<tr><td style="border-bottom:1px solid #777;height:24px;">&nbsp;</td></tr>').join('');
+    const kotak = `<table style="${TB}margin:3px 0 8px;">${garis(3)}</table>`;
+    const bag = (d.bagian || []).map((b, i) => {
+      const g = b.gambar && b.gambar.deskripsi ? `<p data-gambar="${i}" style="text-align:center;margin:8px 0;"><span style="color:#888;">⏳ Gambar sedang dibuat...</span><br><i>${esc(b.gambar.keterangan || '')}</i></p>` : '';
+      const tugas = L(b.tugas).map((t, k) => `<tr><td style="width:4%;vertical-align:top;">${k + 1}.</td><td>${esc(t)}${kotak}</td></tr>`).join('');
+      return `${H(esc(b.judul || 'Kegiatan ' + (i + 1)))}${b.uraian ? `<p style="margin:0 0 4px;text-align:justify;">${esc(b.uraian)}</p>` : ''}${g}<table style="${TB}">${tugas}</table>`;
+    }).join('');
+    const kunci = L(d.kunci).length ? `<div style="page-break-before:always;"></div><p style="text-align:center;"><b>KUNCI JAWABAN (KHUSUS GURU)</b></p>${OL(d.kunci)}` : '';
+    return `${kop()}<p style="text-align:center;font-size:14pt;margin:0 0 8px;"><b>LEMBAR KERJA PESERTA DIDIK (LKPD)</b><br>${esc(d.judul || c.topik)}</p>
+      ${baris([['Mata Pelajaran', esc(c.mapel)], ['Kelas / Semester', esc(`${c.kelas || ''} / ${c.semester}`)], ['Nama', '.......................................................'], ['Kelompok / Tanggal', '.......................................................']])}
+      ${H('Tujuan Pembelajaran')}${OL(d.tujuan)}
+      ${L(d.petunjuk).length ? H('Petunjuk Pengerjaan') + OL(d.petunjuk) : ''}
+      ${L(d.alat_bahan).length ? H('Alat dan Bahan') + UL(d.alat_bahan) : ''}
+      ${bag}
+      ${L(d.refleksi).length ? H('Refleksi') + OL(d.refleksi) + kotak : ''}
+      ${kunci}`;
+  }
+
+  // ----- gambar AI untuk LKPD -----
+  function jadikanJpeg(src, lebarMax) {
+    return new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => {
+        const w0 = im.naturalWidth || 800, h0 = im.naturalHeight || 500, k = Math.min(1, lebarMax / w0);
+        const w = Math.round(w0 * k), h = Math.round(h0 * k);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h);
+        res({ uri: cv.toDataURL('image/jpeg', 0.86), w, h });
+      };
+      im.onerror = () => rej(new Error('Gambar tidak dapat dibaca'));
+      im.src = src;
+    });
+  }
+  async function satuGambar(deskripsi, gaya) {
+    const r = await panggilAI({ aksi: 'gambar', deskripsi, gaya });
+    let src;
+    if (r.tipe === 'svg') {
+      let svg = r.svg; if (!/<svg[^>]*\swidth=/i.test(svg)) svg = svg.replace(/<svg/i, '<svg width="800" height="500"');
+      src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+    } else src = `data:${r.mime || 'image/png'};base64,${r.data}`;
+    const j = await jadikanJpeg(src, 720);
+    return { ...j, asli: r.asli };
+  }
+  async function buatGambar(j) {
+    const daftar = (terakhir[j] && terakhir[j].gambar) || []; const st = $(`pa-${j}-status`);
+    const gaya = $(`pa-${j}-gaya`) ? $(`pa-${j}-gaya`).value : 'otomatis';
+    const total = daftar.filter(Boolean).length; let ok = 0, n = 0, salin = 0;
+    for (let i = 0; i < daftar.length; i++) {
+      if (!daftar[i]) continue;
+      const el = $(`pa-${j}-hasil`).querySelector(`[data-gambar="${i}"]`);
+      if (!el || el.querySelector('img')) { ok++; continue; }
+      n++; st.style.color = ''; st.textContent = `Membuat gambar ${n} dari ${total}... (10-40 detik per gambar)`;
+      try {
+        const g = await satuGambar(daftar[i], gaya);
+        const ket = (el.querySelector('i') || {}).textContent || '';
+        const lebar = Math.min(g.w, 420);
+        el.innerHTML = `<img src="${g.uri}" width="${lebar}" height="${Math.round(lebar * g.h / g.w)}" style="max-width:100%;border:1px solid #ccc;"><br><i>${esc(ket)}</i>`;
+        ok++; if (!g.asli) salin++;
+      } catch (e) {
+        el.innerHTML = `<span style="color:#B42318;">[Gambar gagal dibuat: ${esc(e.message).slice(0, 120)}]</span><br><i>${esc((el.querySelector('i') || {}).textContent || '')}</i>`;
+      }
+    }
+    st.style.color = ok < total ? '#B42318' : '';
+    st.textContent = ok < total ? `${ok} dari ${total} gambar berhasil. Klik "Buat ulang gambar yang gagal".` : `Selesai. ${total} gambar siap${salin ? ` (${salin} berupa ilustrasi diagram karena gambar AI tidak tersedia)` : ''}. Periksa & edit, lalu simpan/unduh.`;
+  }
+  async function ulangGambar(j) {
+    $(`pa-${j}-hasil`).querySelectorAll('[data-gambar]').forEach((el) => {
+      if (!el.querySelector('img')) { const ket = (el.querySelector('i') || {}).textContent || ''; el.innerHTML = `<span style="color:#888;">⏳ Gambar sedang dibuat...</span><br><i>${esc(ket)}</i>`; }
+    });
+    await buatGambar(j);
+  }
+
   // ---------------- Unduh / Cetak / Simpan ----------------
   function bungkusWord(html, judul) {
     return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(judul)}</title>
@@ -257,7 +343,23 @@
   }
   function namaFile(t) { return String(t || 'dokumen').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 80) || 'dokumen'; }
   function unduhHtml(html, judul) {
+    if (/<img[^>]+src="data:image/i.test(html)) return unduhMht(html, judul);
     const blob = new Blob(['\ufeff', bungkusWord(html, judul)], { type: 'application/msword' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = namaFile(judul) + '.doc';
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function unduhMht(html, judul) {
+    const bagian = []; let n = 0;
+    const isi = html.replace(/src="data:(image\/[a-z+]+);base64,([^"]+)"/gi, (m, mime, b64) => {
+      n++; const ext = mime.split('/')[1].replace('jpeg', 'jpg'); const lokasi = `file:///C:/gambar${n}.${ext}`;
+      bagian.push({ mime, b64, lokasi }); return `src="${lokasi}"`;
+    });
+    const b64 = (t) => btoa(unescape(encodeURIComponent(t))).replace(/.{1,76}/g, '$&\r\n');
+    const B = '----=_NextPart_' + Date.now().toString(16);
+    let out = `MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="${B}"; type="text/html"\r\n\r\n--${B}\r\nContent-Type: text/html; charset="utf-8"\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///C:/dokumen.htm\r\n\r\n${b64(bungkusWord(isi, judul))}\r\n`;
+    bagian.forEach((p) => { out += `--${B}\r\nContent-Type: ${p.mime}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: ${p.lokasi}\r\n\r\n${p.b64.replace(/.{1,76}/g, '$&\r\n')}\r\n`; });
+    out += `--${B}--`;
+    const blob = new Blob([out], { type: 'application/msword' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = namaFile(judul) + '.doc';
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
@@ -343,5 +445,5 @@
     PENG = { ...DEF, ...data }; st.style.color = ''; st.textContent = 'Pengaturan tersimpan.';
   }
 
-  window.PA = { buka, bukaPengaturan, mapelBerubah, cpBerubah, generate, simpan, unduh, cetak, bukaRiwayat, unduhRiwayat, hapusRiwayat, simpanPengaturan };
+  window.PA = { buka, bukaPengaturan, mapelBerubah, cpBerubah, generate, simpan, unduh, cetak, bukaRiwayat, unduhRiwayat, hapusRiwayat, simpanPengaturan, ulangGambar };
 })();

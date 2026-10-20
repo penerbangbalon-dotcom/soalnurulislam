@@ -334,6 +334,7 @@ tr:hover td{background:var(--primary-soft);}
       <div class="subs">
         <div class="item" data-tab="rpp" onclick="showTab('rpp')">Generate RPP</div>
         <div class="item" data-tab="modul" onclick="showTab('modul')">Modul Ajar</div>
+        <div class="item" data-tab="lkpd" onclick="showTab('lkpd')">LKPD + Gambar AI</div>
       </div>
     </div>
     <div class="group" data-group="tugasg">
@@ -473,6 +474,7 @@ tr:hover td{background:var(--primary-soft);}
     <!-- ===== TAB: CP & TP ===== -->
     <section id="tab-rpp" class="hidden"></section>
     <section id="tab-modul" class="hidden"></section>
+    <section id="tab-lkpd" class="hidden"></section>
     <section id="tab-pengpa" class="hidden"></section>
 
     <section id="tab-cptp" class="hidden">
@@ -2634,7 +2636,7 @@ function showTab(tab){
   if((tab==='user' || tab==='cadangan') && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['dashboard','bank','cptp','rpp','modul','pengpa','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
+  ['dashboard','bank','cptp','rpp','modul','lkpd','pengpa','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -2644,7 +2646,7 @@ function showTab(tab){
   });
   if(tab==='dashboard') loadDashboard();
   if(tab==='cptp') loadCpTp();
-  if(tab==='rpp' || tab==='modul') PA.buka(tab);
+  if(tab==='rpp' || tab==='modul' || tab==='lkpd') PA.buka(tab);
   if(tab==='pengpa') PA.bukaPengaturan();
   if(tab==='tugas') loadTugasGuru();
   if(tab==='nilaitugas') loadPenilaianTugas();
