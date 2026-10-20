@@ -182,7 +182,7 @@
       terakhir[j] = { judul: `${NAMA[j]} ${m.nama} Kelas ${m.kelas || ''} - ${topik}`.slice(0, 160), meta: { mapel: m.nama, kelas: m.kelas, semester: ctx.semester, topik, provider: r.provider }, mapel_id: m.id, semester: ctx.semester, kelas: m.kelas };
       st.textContent = `Selesai (${r.provider}). Periksa & edit bila perlu, lalu simpan/unduh.`;
       $(`pa-${j}-hasilbox`).scrollIntoView({ behavior: 'smooth' });
-      if (j === 'lkpd') { terakhir[j].gambar = r.data.bagian.map((b) => (b && b.gambar && b.gambar.deskripsi) || null); await buatGambar(j); }
+      if (j === 'lkpd') { terakhir[j].gambar = r.data.bagian.map((b) => (b && b.gambar && b.gambar.deskripsi) || null); pasangTombol(j); await buatGambar(j); }
     } catch (e) { st.style.color = '#B42318'; st.textContent = e.message; } finally { btn.disabled = false; }
   }
 
@@ -291,7 +291,7 @@
     const garis = (n) => Array.from({ length: n }, () => '<tr><td style="border-bottom:1px solid #777;height:24px;">&nbsp;</td></tr>').join('');
     const kotak = `<table style="${TB}margin:3px 0 8px;">${garis(3)}</table>`;
     const bag = (d.bagian || []).map((b, i) => {
-      const g = b.gambar && b.gambar.deskripsi ? `<p data-gambar="${i}" style="text-align:center;margin:8px 0;"><span style="color:#888;">⏳ Gambar sedang dibuat...</span><br><i>${esc(b.gambar.keterangan || '')}</i></p>` : '';
+      const g = b.gambar && b.gambar.deskripsi ? `<div data-gambar="${i}" style="text-align:center;margin:8px 0;"><div data-isi="1"><span style="color:#888;">⏳ Gambar sedang dibuat...</span></div><i data-ket="1">${esc(b.gambar.keterangan || '')}</i></div>` : '';
       const tugas = L(b.tugas).map((t, k) => `<tr><td style="width:4%;vertical-align:top;">${k + 1}.</td><td>${esc(t)}${kotak}</td></tr>`).join('');
       return `${H(esc(b.judul || 'Kegiatan ' + (i + 1)))}${b.uraian ? `<p style="margin:0 0 4px;text-align:justify;">${esc(b.uraian)}</p>` : ''}${g}<table style="${TB}">${tugas}</table>`;
     }).join('');
@@ -331,6 +331,46 @@
     const j = await jadikanJpeg(src, 720);
     return { ...j, asli: r.asli, alasan: r.alasan || '' };
   }
+  function isiGambar(el, g) {
+    rapikanFigure(el);
+    const lebar = Math.min(g.w, 420);
+    el.querySelector('[data-isi]').innerHTML = `<img src="${g.uri}" width="${lebar}" height="${Math.round(lebar * g.h / g.w)}" style="max-width:100%;border:1px solid #ccc;">`;
+  }
+  // pastikan figure punya struktur [data-isi] + keterangan (juga untuk dokumen lama di riwayat)
+  function rapikanFigure(el) {
+    if (el.querySelector('[data-isi]')) return;
+    const img = el.querySelector('img'); const ket = (el.querySelector('i') || {}).textContent || '';
+    el.innerHTML = `<div data-isi="1">${img ? img.outerHTML : ''}</div><i data-ket="1">${esc(ket)}</i>`;
+  }
+  function pasangTombol(j) {
+    $(`pa-${j}-hasil`).querySelectorAll('[data-gambar]').forEach((el) => {
+      rapikanFigure(el);
+      if (el.querySelector('[data-ui]')) return;
+      const i = el.getAttribute('data-gambar');
+      const ui = document.createElement('div'); ui.setAttribute('data-ui', '1'); ui.setAttribute('contenteditable', 'false'); ui.style.cssText = 'margin:4px 0 0;font-family:sans-serif;font-size:12px;';
+      ui.innerHTML = `<button class="btn outline" style="padding:3px 10px;font-size:12px;" onclick="PA.gantiGambar('${j}','${i}')">🖼 Ganti gambar</button> <button class="btn outline" style="padding:3px 10px;font-size:12px;" onclick="PA.hapusGambar('${j}','${i}')">🗑 Hapus</button>`;
+      el.appendChild(ui);
+    });
+  }
+  function gantiGambar(j, i) {
+    const el = $(`pa-${j}-hasil`).querySelector(`[data-gambar="${i}"]`); if (!el) return;
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp';
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      if (f.size > 15 * 1024 * 1024) { alert('Ukuran gambar maksimal 15 MB.'); return; }
+      const fr = new FileReader();
+      fr.onload = async () => {
+        try { isiGambar(el, await jadikanJpeg(fr.result, 720)); $(`pa-${j}-status`).textContent = 'Gambar diganti. Jangan lupa Simpan ke Riwayat.'; $(`pa-${j}-status`).style.color = ''; }
+        catch (e) { alert('Gambar tidak dapat dibaca. Gunakan file JPG, PNG, atau WEBP.'); }
+      };
+      fr.readAsDataURL(f);
+    };
+    inp.click();
+  }
+  function hapusGambar(j, i) {
+    const el = $(`pa-${j}-hasil`).querySelector(`[data-gambar="${i}"]`);
+    if (el && confirm('Hapus gambar ini dari dokumen?')) el.remove();
+  }
   async function buatGambar(j) {
     const daftar = (terakhir[j] && terakhir[j].gambar) || []; const st = $(`pa-${j}-status`);
     const gaya = $(`pa-${j}-gaya`) ? $(`pa-${j}-gaya`).value : 'otomatis';
@@ -338,16 +378,15 @@
     for (let i = 0; i < daftar.length; i++) {
       if (!daftar[i]) continue;
       const el = $(`pa-${j}-hasil`).querySelector(`[data-gambar="${i}"]`);
+      if (el) rapikanFigure(el);
       if (!el || el.querySelector('img')) { ok++; continue; }
       n++; st.style.color = ''; st.textContent = `Membuat gambar ${n} dari ${total}... (10-40 detik per gambar)`;
       try {
         const g = await satuGambar(daftar[i], gaya);
-        const ket = (el.querySelector('i') || {}).textContent || '';
-        const lebar = Math.min(g.w, 420);
-        el.innerHTML = `<img src="${g.uri}" width="${lebar}" height="${Math.round(lebar * g.h / g.w)}" style="max-width:100%;border:1px solid #ccc;"><br><i>${esc(ket)}</i>`;
+        isiGambar(el, g);
         ok++; if (!g.asli) { salin++; if (!alasanGambar) alasanGambar = g.alasan; }
       } catch (e) {
-        el.innerHTML = `<span style="color:#B42318;">[Gambar gagal dibuat: ${esc(e.message).slice(0, 120)}]</span><br><i>${esc((el.querySelector('i') || {}).textContent || '')}</i>`;
+        el.querySelector('[data-isi]').innerHTML = `<span style="color:#B42318;">[Gambar gagal dibuat: ${esc(e.message).slice(0, 120)}]</span>`;
       }
     }
     st.style.color = ok < total ? '#B42318' : '';
@@ -355,7 +394,8 @@
   }
   async function ulangGambar(j) {
     $(`pa-${j}-hasil`).querySelectorAll('[data-gambar]').forEach((el) => {
-      if (!el.querySelector('img')) { const ket = (el.querySelector('i') || {}).textContent || ''; el.innerHTML = `<span style="color:#888;">⏳ Gambar sedang dibuat...</span><br><i>${esc(ket)}</i>`; }
+      rapikanFigure(el);
+      if (!el.querySelector('img')) el.querySelector('[data-isi]').innerHTML = '<span style="color:#888;">⏳ Gambar sedang dibuat...</span>';
     });
     await buatGambar(j);
   }
@@ -392,7 +432,7 @@
     const w = window.open('', '_blank'); if (!w) { alert('Izinkan pop-up untuk mencetak.'); return; }
     w.document.write(bungkusWord(html, judul).replace('</style>', '@page{size:A4;margin:2cm}</style>')); w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
   }
-  const hasilHtml = (j) => $(`pa-${j}-hasil`).innerHTML;
+  const hasilHtml = (j) => { const c = $(`pa-${j}-hasil`).cloneNode(true); c.querySelectorAll('[data-ui]').forEach((x) => x.remove()); return c.innerHTML; };
   const unduh = (j) => unduhHtml(hasilHtml(j), (terakhir[j] || {}).judul || NAMA[j]);
   const cetak = (j) => cetakHtml(hasilHtml(j), (terakhir[j] || {}).judul || NAMA[j]);
 
@@ -419,7 +459,7 @@
   async function ambilRiwayat(id) { const { data, error } = await supa.from('perangkat_ajar').select('*').eq('id', id).single(); if (error) { alert(error.message); return null; } return data; }
   async function bukaRiwayat(j, id) {
     const r = await ambilRiwayat(id); if (!r) return;
-    $(`pa-${j}-hasil`).innerHTML = r.html; $(`pa-${j}-hasilbox`).classList.remove('hidden');
+    $(`pa-${j}-hasil`).innerHTML = r.html; $(`pa-${j}-hasilbox`).classList.remove('hidden'); if (j === 'lkpd') pasangTombol(j);
     terakhir[j] = { judul: r.judul, meta: r.meta, mapel_id: r.mapel_id, semester: r.semester, kelas: r.kelas };
     $(`pa-${j}-hasilbox`).scrollIntoView({ behavior: 'smooth' });
   }
@@ -470,5 +510,5 @@
     PENG = { ...DEF, ...data }; st.style.color = ''; st.textContent = 'Pengaturan tersimpan.';
   }
 
-  window.PA = { buka, bukaPengaturan, mapelBerubah, cpBerubah, generate, simpan, unduh, cetak, bukaRiwayat, unduhRiwayat, hapusRiwayat, simpanPengaturan, ulangGambar };
+  window.PA = { buka, bukaPengaturan, mapelBerubah, cpBerubah, generate, simpan, unduh, cetak, bukaRiwayat, unduhRiwayat, hapusRiwayat, simpanPengaturan, ulangGambar, gantiGambar, hapusGambar };
 })();
