@@ -1996,10 +1996,10 @@ CP-2: Pada akhir fase D, peserta didik mampu ...
 // ============================================================
 const SUPABASE_URL = 'https://oeweivdvovpcgolaxzuc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ld2VpdmR2b3ZwY2dvbGF4enVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NjY3MDgsImV4cCI6MjEwNTM0MjcwOH0.bJyrKD7pnCcVizWbsBD5e0LrFl_8LdwU_5JRmyqkfV0';
-// Sesi login disimpan di sessionStorage: ditutup saat tab/browser ditutup, jadi aplikasi yang dibuka baru selalu meminta login.
-// Sisa sesi lama (localStorage) dibersihkan supaya tidak ada login yang tertinggal di browser.
-try{ Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){}
-const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ storage: window.sessionStorage } });
+// Sesi login disimpan di localStorage: dipakai bersama semua tab dan tetap ada saat tab/browser ditutup,
+// jadi membuka tab baru tidak perlu login lagi. Keluar otomatis tetap berjalan bila lama tidak aktif (lihat BATAS_TIDAK_AKTIF_MS).
+// Untuk komputer bersama yang ingin selalu minta login ulang, ganti localStorage di baris bawah menjadi sessionStorage.
+const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ storage: window.localStorage } });
 
 let currentMapelList = [];
 
@@ -2017,11 +2017,13 @@ async function login(){
   const password = document.getElementById('login-pass').value;
   const { error } = await supa.auth.signInWithPassword({ email, password });
   if(error){ document.getElementById('login-error').textContent = error.message; return; }
+  try{ localStorage.removeItem('aktivitas_terakhir'); }catch(e){}
   await boot();
 }
 async function logout(){
   const btn = document.querySelector('.logout');
   if(btn) btn.textContent = 'Keluar...';
+  try{ localStorage.removeItem('aktivitas_terakhir'); }catch(e){}
   try{
     await Promise.race([
       supa.auth.signOut(),
@@ -2143,13 +2145,13 @@ async function tentukanPeranSaya(){
   document.querySelectorAll('.super-only').forEach(el=>el.classList.toggle('hidden', !ADALAH_SUPER));
 }
 // ---------- Keamanan sesi: keluar otomatis bila tidak ada aktivitas ----------
-const BATAS_TIDAK_AKTIF_MS = 3*60*60*1000; // 3 jam (ubah angka 3 untuk mengganti lamanya)
+const BATAS_TIDAK_AKTIF_MS = 12*60*60*1000; // 12 jam (ubah angka 12 untuk mengganti lamanya)
 function catatAktivitas(paksa){
-  const n = Date.now(), t = Number(sessionStorage.getItem('aktivitas_terakhir')||0);
-  if(paksa || n-t > 15000){ try{ sessionStorage.setItem('aktivitas_terakhir', String(n)); }catch(e){} }
+  const n = Date.now(), t = Number(localStorage.getItem('aktivitas_terakhir')||0);
+  if(paksa || n-t > 15000){ try{ localStorage.setItem('aktivitas_terakhir', String(n)); }catch(e){} }
 }
 function sesiTidakAktif(){
-  const t = Number(sessionStorage.getItem('aktivitas_terakhir')||0);
+  const t = Number(localStorage.getItem('aktivitas_terakhir')||0);
   return t>0 && Date.now()-t > BATAS_TIDAK_AKTIF_MS;
 }
 function tampilPesanLogin(){
