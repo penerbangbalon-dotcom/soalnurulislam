@@ -329,6 +329,13 @@ tr:hover td{background:var(--primary-soft);}
         <div class="item" data-tab="belumujian" onclick="showTab('belumujian')">Belum Mengikuti Ujian</div>
       </div>
     </div>
+    <div class="group" data-group="perangkat">
+      <div class="ghead" onclick="toggleGroup('perangkat')"><span>Perangkat Ajar</span><span class="chev">&#9656;</span></div>
+      <div class="subs">
+        <div class="item" data-tab="rpp" onclick="showTab('rpp')">Generate RPP</div>
+        <div class="item" data-tab="modul" onclick="showTab('modul')">Modul Ajar</div>
+      </div>
+    </div>
     <div class="group" data-group="tugasg">
       <div class="ghead" onclick="toggleGroup('tugasg')"><span>Tugas Siswa</span><span class="chev">&#9656;</span></div>
       <div class="subs">
@@ -358,6 +365,7 @@ tr:hover td{background:var(--primary-soft);}
       <div class="subs">
         <div class="item" data-tab="pengnilai" onclick="showTab('pengnilai')">Pengaturan Nilai</div>
         <div class="item" data-tab="mapel" onclick="showTab('mapel')">Mata Pelajaran</div>
+        <div class="item" data-tab="pengpa" onclick="showTab('pengpa')">Pengaturan RPP &amp; Modul</div>
         <div class="item" data-tab="ttd" onclick="showTab('ttd')">Tanda Tangan</div>
         <div class="item admin-only hidden" data-tab="siswa" onclick="showTab('siswa')">Data Siswa</div>
         <div class="item admin-only hidden" data-tab="sekolah" onclick="showTab('sekolah')">Identitas Sekolah</div>
@@ -463,6 +471,10 @@ tr:hover td{background:var(--primary-soft);}
     </section>
 
     <!-- ===== TAB: CP & TP ===== -->
+    <section id="tab-rpp" class="hidden"></section>
+    <section id="tab-modul" class="hidden"></section>
+    <section id="tab-pengpa" class="hidden"></section>
+
     <section id="tab-cptp" class="hidden">
       <h2>CP &amp; TP per Mata Pelajaran</h2>
       <p class="muted">Capaian Pembelajaran (CP) dan Tujuan Pembelajaran (TP) tiap mata pelajaran. CP/TP dipakai untuk
@@ -2620,7 +2632,7 @@ function showTab(tab){
   if((tab==='user' || tab==='cadangan') && !ADALAH_SUPER) return; // khusus Super Admin (server juga menolak)
   if((tab==='sekolah' || tab==='siswa' || tab==='monsiswa') && !(ADALAH_ADMIN || ADALAH_SUPER)) return; // khusus admin / super admin
   document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('active', i.dataset.tab===tab));
-  ['dashboard','bank','cptp','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
+  ['dashboard','bank','cptp','rpp','modul','pengpa','tugas','nilaitugas','syaratrapor','pelanggaran','suratpanggilan','kenaikan','paket','daftar','paketremedial','terlaksana','pending','manual','monitor','monsiswa','hasil','belumujian','mapel','laporan','rekapnilai','leger','remedial','transkrip','inputnilai','pengnilai','rekap','arsip','ttd','user','cadangan','sekolah','siswa'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('nav .group').forEach(g=>{
@@ -2630,6 +2642,8 @@ function showTab(tab){
   });
   if(tab==='dashboard') loadDashboard();
   if(tab==='cptp') loadCpTp();
+  if(tab==='rpp' || tab==='modul') PA.buka(tab);
+  if(tab==='pengpa') PA.bukaPengaturan();
   if(tab==='tugas') loadTugasGuru();
   if(tab==='nilaitugas') loadPenilaianTugas();
   if(tab==='syaratrapor') loadSyaratRapor();
@@ -10511,5 +10525,6 @@ async function cetakDaftarKenaikan(){
   win.document.close();
 }
 </script>
+<script src="perangkat-ajar.js"></script>
 </body>
 </html>

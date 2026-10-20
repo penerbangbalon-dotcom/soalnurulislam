@@ -375,3 +375,6 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 - Pengaturan Nilai > Poin Pelanggaran: tambah "Bonus tidak pernah alpa (pengurang poin)" (bawaan 3) dan opsi "Sikap A wajib tanpa alpa" (bawaan aktif).
 - Siswa dengan alpa 0 mendapat pengurang poin (total tidak kurang dari 0); siswa yang pernah alpa maksimal B bila opsi A-wajib aktif.
 - Tidak perlu migrasi SQL baru; pengaturan disimpan di kolom JSON pelanggaran yang sudah ada.
+
+## v23 — Perangkat Ajar (Generate RPP, Modul Ajar, Pengaturan)
+Jalankan `migrasi-v23-perangkat-ajar.sql` di Supabase SQL Editor (sekali). File baru: `perangkat-ajar.js`, `netlify/functions/perangkat-ajar.js`; berubah: `index.html`, `api/_adapter.js` (+1 baris). `api/gateway.js` dihapus (tidak terpakai) agar jumlah function Vercel = 12.
