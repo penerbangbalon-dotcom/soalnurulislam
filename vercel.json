@@ -1,10 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": ".",
   "functions": {
     "api/*.js": {
       "maxDuration": 60
     }
   },
+  "rewrites": [
+    { "source": "/admin/:path*", "destination": "/public/admin/:path*" },
+    { "source": "/siswa/:path*", "destination": "/public/siswa/:path*" },
+    { "source": "/assets/:path*", "destination": "/public/assets/:path*" },
+    { "source": "/absensi", "destination": "/public/index.html" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
