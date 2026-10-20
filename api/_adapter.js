@@ -40,6 +40,7 @@ const HANDLERS = {
   'siswa-ganti-password': () => require('../netlify/functions/siswa-ganti-password.js'),
   'siswa-laporan': () => require('../netlify/functions/siswa-laporan.js'),
   'siswa-me': () => require('../netlify/functions/siswa-me.js'),
+  'perangkat-ajar': () => require('../netlify/functions/perangkat-ajar.js'),
   'siswa-riwayat': () => require('../netlify/functions/siswa-riwayat.js'),
 };
 
