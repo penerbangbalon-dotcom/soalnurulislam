@@ -11,6 +11,7 @@
     sertakan_rubrik: true, sertakan_remedial: true, tampilkan_kop: true, nama_kepala: '', nip_kepala: '', kota_ttd: '', catatan_ai: '',
   };
   let PENG = { ...DEF }; let pengOk = false;
+  let LOGO = ''; let logoSumber = null;
   const terakhir = {}; // jenis -> { html, judul, meta }
 
   function tahunAjaranOtomatis() { const d = new Date(); const y = d.getFullYear(); return d.getMonth() >= 6 ? `${y}/${y + 1}` : `${y - 1}/${y}`; }
@@ -30,6 +31,25 @@
       } catch (e) { /* abaikan */ }
     }
     pengOk = true;
+  }
+
+  // Logo sekolah -> data URI kecil, supaya ikut tersimpan di dokumen dan terunduh ke Word
+  async function muatLogo() {
+    const src = ((typeof SEKOLAH !== 'undefined' && SEKOLAH && SEKOLAH.logo_url) || 'logo-pkbm.png');
+    if (logoSumber === src && LOGO) return;
+    logoSumber = src;
+    try {
+      LOGO = await new Promise((res, rej) => {
+        const im = new Image(); if (!/^data:/.test(src)) im.crossOrigin = 'anonymous';
+        im.onload = () => {
+          const k = Math.min(1, 180 / Math.max(im.naturalWidth, im.naturalHeight));
+          const cv = document.createElement('canvas'); cv.width = Math.round(im.naturalWidth * k); cv.height = Math.round(im.naturalHeight * k);
+          cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+          try { res(cv.toDataURL('image/png')); } catch (e) { rej(e); }
+        };
+        im.onerror = () => rej(new Error('logo tidak terbaca')); im.src = src;
+      });
+    } catch (e) { LOGO = ''; }
   }
 
   // ---------------- Halaman Generate (RPP / Modul) ----------------
@@ -88,7 +108,7 @@
   }
 
   async function buka(jenis) {
-    await muatPengaturan();
+    await muatPengaturan(); await muatLogo();
     const box = $('tab-' + jenis);
     if (!box.dataset.siap) {
       box.innerHTML = halaman(jenis); box.dataset.siap = '1';
@@ -151,6 +171,7 @@
       pertemuan: +$(`pa-${j}-pert`).value, jp: $(`pa-${j}-jp`) ? +$(`pa-${j}-jp`).value : 2, guru, nip, cp, tp, m,
     };
     const btn = $(`pa-${j}-btn`); const st = $(`pa-${j}-status`);
+    await muatLogo();
     btn.disabled = true; st.style.color = ''; st.textContent = `Menyusun ${NAMA[j]}... (sekitar 15-40 detik)`;
     try {
       const r = await panggilAI({ jenis: j, mapel: m.nama, program: m.program, kelas: m.kelas, fase, semester: ctx.semester, topik, cp, tp,
@@ -176,10 +197,14 @@
   function kop() {
     if (!PENG.tampilkan_kop) return '';
     const S = (typeof SEKOLAH !== 'undefined' && SEKOLAH) || {};
-    return `<div style="text-align:center;border-bottom:3px double #000;padding-bottom:6px;margin-bottom:12px;">
-      ${S.nama_yayasan ? `<div style="font-size:11pt;">${esc(S.nama_yayasan)}</div>` : ''}
-      <div style="font-size:14pt;font-weight:bold;">${esc(S.nama_lembaga || 'PKBM')}</div>
-      <div style="font-size:9pt;">${esc(S.alamat || '')}</div></div>`;
+    const logo = LOGO ? `<img src="${LOGO}" width="72" height="72" style="width:72px;height:72px;">` : '';
+    return `<table style="${TB}border-bottom:3px double #000;margin-bottom:12px;"><tr>
+      <td style="width:80px;vertical-align:middle;padding-bottom:6px;">${logo}</td>
+      <td style="text-align:center;vertical-align:middle;padding-bottom:6px;">
+        ${S.nama_yayasan ? `<div style="font-size:11pt;">${esc(S.nama_yayasan)}</div>` : ''}
+        <div style="font-size:14pt;font-weight:bold;">${esc(S.nama_lembaga || 'PKBM')}</div>
+        <div style="font-size:9pt;">${esc(S.alamat || '')}</div></td>
+      <td style="width:80px;"></td></tr></table>`;
   }
   function baris(rows) { return `<table style="${TB}">${rows.filter((r) => r[1]).map((r) => `<tr><td style="width:28%;padding:2px 4px;vertical-align:top;">${r[0]}</td><td style="width:2%;vertical-align:top;">:</td><td style="padding:2px 4px;">${r[1]}</td></tr>`).join('')}</table>`; }
 
@@ -304,12 +329,12 @@
       src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
     } else src = `data:${r.mime || 'image/png'};base64,${r.data}`;
     const j = await jadikanJpeg(src, 720);
-    return { ...j, asli: r.asli };
+    return { ...j, asli: r.asli, alasan: r.alasan || '' };
   }
   async function buatGambar(j) {
     const daftar = (terakhir[j] && terakhir[j].gambar) || []; const st = $(`pa-${j}-status`);
     const gaya = $(`pa-${j}-gaya`) ? $(`pa-${j}-gaya`).value : 'otomatis';
-    const total = daftar.filter(Boolean).length; let ok = 0, n = 0, salin = 0;
+    const total = daftar.filter(Boolean).length; let ok = 0, n = 0, salin = 0, alasanGambar = '';
     for (let i = 0; i < daftar.length; i++) {
       if (!daftar[i]) continue;
       const el = $(`pa-${j}-hasil`).querySelector(`[data-gambar="${i}"]`);
@@ -320,13 +345,13 @@
         const ket = (el.querySelector('i') || {}).textContent || '';
         const lebar = Math.min(g.w, 420);
         el.innerHTML = `<img src="${g.uri}" width="${lebar}" height="${Math.round(lebar * g.h / g.w)}" style="max-width:100%;border:1px solid #ccc;"><br><i>${esc(ket)}</i>`;
-        ok++; if (!g.asli) salin++;
+        ok++; if (!g.asli) { salin++; if (!alasanGambar) alasanGambar = g.alasan; }
       } catch (e) {
         el.innerHTML = `<span style="color:#B42318;">[Gambar gagal dibuat: ${esc(e.message).slice(0, 120)}]</span><br><i>${esc((el.querySelector('i') || {}).textContent || '')}</i>`;
       }
     }
     st.style.color = ok < total ? '#B42318' : '';
-    st.textContent = ok < total ? `${ok} dari ${total} gambar berhasil. Klik "Buat ulang gambar yang gagal".` : `Selesai. ${total} gambar siap${salin ? ` (${salin} berupa ilustrasi diagram karena gambar AI tidak tersedia)` : ''}. Periksa & edit, lalu simpan/unduh.`;
+    st.textContent = ok < total ? `${ok} dari ${total} gambar berhasil. Klik "Buat ulang gambar yang gagal".` : `Selesai. ${total} gambar siap${salin ? ` (${salin} berupa ilustrasi diagram karena gambar AI tidak tersedia${alasanGambar ? ': ' + alasanGambar : ''})` : ''}. Periksa & edit, lalu simpan/unduh.`;
   }
   async function ulangGambar(j) {
     $(`pa-${j}-hasil`).querySelectorAll('[data-gambar]').forEach((el) => {

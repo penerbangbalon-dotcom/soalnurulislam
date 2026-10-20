@@ -143,22 +143,29 @@ function valid(d, jenis) {
 // ---------- Pembuat gambar untuk LKPD ----------
 async function gambarGemini(deskripsi, ms) {
   const e = process.env; if (!e.GEMINI_API_KEY) throw new ErrAI(0, 'Tanpa API key Gemini');
-  const model = e.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
-  const teks = `Create a clean, friendly educational illustration for a school worksheet. Flat vector style, white background, clear shapes, no text or letters inside the image. Subject: ${deskripsi}`;
-  const r = await ft(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': e.GEMINI_API_KEY },
-    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: teks }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } }),
-  }, ms);
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new ErrAI(r.status, d?.error?.message || `Gemini gambar error (${r.status})`);
-  const part = (d?.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData && x.inlineData.data);
-  if (!part) throw new ErrAI(0, 'Model tidak mengembalikan gambar');
-  return { tipe: 'png', mime: part.inlineData.mimeType || 'image/png', data: part.inlineData.data, model };
+  const daftarModel = [...new Set([e.GEMINI_IMAGE_MODEL, 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'].filter(Boolean))];
+  const teks = `Create a colorful, attractive and friendly educational illustration for a school worksheet. Clean modern flat-vector style with soft shading, bright harmonious colors, clear shapes, centered composition, plain white background. Do not put any text, letters or numbers inside the image. Subject: ${deskripsi}`;
+  const mulai = Date.now(); const alasan = [];
+  for (const model of daftarModel) {
+    const sisa = ms - (Date.now() - mulai); if (sisa < 4000) break;
+    try {
+      const r = await ft(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': e.GEMINI_API_KEY },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: teks }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } }),
+      }, sisa);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new ErrAI(r.status, d?.error?.message || `error ${r.status}`);
+      const part = (d?.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData && x.inlineData.data);
+      if (!part) throw new ErrAI(0, 'tidak mengembalikan gambar');
+      return { tipe: 'png', mime: part.inlineData.mimeType || 'image/png', data: part.inlineData.data, model };
+    } catch (er) { alasan.push(`${model}: ${er.status || ''} ${String(er.message).slice(0, 110)}`); }
+  }
+  throw new ErrAI(0, alasan.join(' | '));
 }
 
 async function gambarSvg(deskripsi, mulai) {
   const prompt = `Gambarkan sebagai SVG untuk lembar kerja sekolah: ${deskripsi}
-Aturan: satu elemen <svg> dengan viewBox="0 0 800 500", latar putih (rect penuh), gaya ilustrasi/diagram datar yang bersih dengan warna cerah, bentuk sederhana dan jelas, label singkat bahasa Indonesia bila perlu (font-family sans-serif, ukuran minimal 22). Tanpa script, tanpa gambar eksternal. Gunakan TANDA KUTIP TUNGGAL untuk semua atribut agar valid di dalam JSON.
+Aturan: satu elemen <svg> dengan viewBox="0 0 800 500". Buat ilustrasi yang MENARIK dan penuh warna: latar lembut (gradien pastel via linearGradient), objek utama besar memenuhi kanvas dan di tengah, bentuk membulat dengan gradien dan bayangan halus, palet warna serasi, detail pendukung seperti awan/daun/ikon kecil bila relevan. Label maksimal 4, singkat, bahasa Indonesia, font-family sans-serif ukuran 24 atau lebih, diletakkan dalam kotak putih membulat dengan garis penunjuk ke objek. Jangan buat teks kecil. Tanpa script, tanpa gambar eksternal. Gunakan TANDA KUTIP TUNGGAL untuk semua atribut agar valid di dalam JSON.
 Balas HANYA JSON: {"svg":"<svg ...>...</svg>"}`;
   const kand = kandidat(); const log = [];
   for (const k of kand) {
@@ -180,8 +187,8 @@ async function aksiGambar(b) {
   if (!desk) return json(400, { error: 'Deskripsi gambar kosong.' });
   const mulai = Date.now(); let alasan = '';
   if (b.gaya !== 'svg') {
-    try { return json(200, { ...(await gambarGemini(desk, 28000)), asli: true }); }
-    catch (er) { alasan = String(er.message || '').slice(0, 160); }
+    try { return json(200, { ...(await gambarGemini(desk, 30000)), asli: true }); }
+    catch (er) { alasan = String(er.message || '').slice(0, 260); }
   }
   try { return json(200, { ...(await gambarSvg(desk, mulai)), asli: false, alasan }); }
   catch (er) { return json(503, { error: er.message, alasan }); }
