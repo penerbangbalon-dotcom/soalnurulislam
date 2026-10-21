@@ -78,20 +78,47 @@ function bentukRpp(p) {
   return `{${f.join(',')}}`;
 }
 
+// Struktur MODUL AJAR mengikuti template "Modul Ajar IPA SMA - Contoh Lengkap" (bagian A-K).
+// Kunci JSON dipetakan ke bagian dokumen oleh renderModul() di perangkat-ajar.js (sisi browser).
+const KEGIATAN_MODUL = '"kegiatan":[{"pertemuan":1,"langkah":[{"tahap":"Pendahuluan","menit":15,"guru":"...","siswa":"...","asesmen":"..."},{"tahap":"1. Mengamati ...","menit":20,"guru":"...","siswa":"...","asesmen":"..."}]}]';
+
 function bentukModul(p) {
   const f = [
-    '"kompetensi_awal":"..."', '"profil":["..."]', '"sarpras":["..."]', '"target_peserta":"..."', '"model":"..."',
-    '"tujuan":["... (ABCD)"]', '"pemahaman_bermakna":["..."]', '"pertanyaan_pemantik":["..."]', '"persiapan":["..."]',
-    KEGIATAN,
-    '"asesmen":{"diagnostik":"...","formatif":"...","sumatif":"..."}',
+    '"kompetensi_awal":"1-2 kalimat prasyarat"',
+    '"diagnostik":{"pertanyaan":["3 pertanyaan diagnostik"],"pemanfaatan":"cara guru memakai hasilnya (yang belum siap / yang sudah siap)"}',
+    '"karakteristik":"1-2 kalimat karakteristik peserta didik"',
+    '"sarpras":"sarana dan prasarana dalam satu kalimat, dipisah koma"',
+    '"model":"model pembelajaran, mis. Inkuiri terbimbing, diskusi kelompok, dan presentasi"',
+    '"tujuan":["3-5 tujuan, diawali kata kerja operasional"]',
+    '"kriteria":[{"bukti":"bukti yang diharapkan untuk TP ke-1","kriteria":"kriteria ketercapaian TP ke-1"}]',
+    '"pemahaman_bermakna":"1-2 kalimat"',
+    '"pertanyaan_pemantik":["3 pertanyaan"]',
+    '"materi_esensial":["4-5 butir"]',
+    '"media":["3-4 butir media dan sumber belajar"]',
+    '"materi":[{"judul":"subjudul materi","uraian":"paragraf singkat","tabel":null}]',
+    KEGIATAN_MODUL,
+    '"lkpd":{"judul":"...","kasus":"kasus/stimulus 2-3 kalimat","tugas":["4-6 tugas kelompok"],"kolom":["Temuan / fakta","...","...","..."],"panduan_guru":["3-5 butir contoh jawaban/panduan"]}',
+    '"asesmen":{"formatif":[{"aspek":"...","indikator":"...","teknik":"...","tindak_lanjut":"..."}],"sumatif":[{"soal":"...","kunci":"..."}],"penskoran":"1-2 kalimat pedoman penskoran"}',
   ];
-  if (p.sertakan_rubrik) f.push('"rubrik":[{"aspek":"...","sangat_baik":"...","baik":"...","cukup":"...","perlu_bimbingan":"..."}]');
-  if (p.sertakan_remedial) f.push('"pengayaan":"...","remedial":"..."');
-  f.push('"refleksi_guru":["..."]', '"refleksi_siswa":["..."]',
-    '"lkpd":{"judul":"...","petunjuk":"...","langkah":["..."],"soal":["..."]}',
-    '"bahan_bacaan":"2-4 paragraf, dipisah \\n\\n"', '"glosarium":[{"istilah":"...","arti":"..."}]', '"pustaka":["..."]');
+  if (p.sertakan_rubrik) f.push('"rubrik":[{"aspek":"...","sangat_baik":"...","baik":"...","berkembang":"...","perlu_bimbingan":"..."}]');
+  if (p.profil_pancasila) f.push('"dimensi":["Nama dimensi: penjelasan singkat (3-4 butir)"]');
+  f.push('"diferensiasi":[{"kebutuhan":"...","strategi":"..."}]');
+  if (p.sertakan_remedial) f.push('"tindak_lanjut":[{"hasil":"Tujuan tercapai","tindak_lanjut":"...","contoh":"..."}]');
+  f.push('"refleksi_siswa":["..."]', '"refleksi_guru":["..."]', '"pustaka":["..."]');
   return `{${f.join(',')}}`;
 }
+
+const PETUNJUK_MODUL = `Aturan isi MODUL AJAR (ikuti urutan bagian pada template modul ajar):
+- "kriteria": satu objek per tujuan pembelajaran, urutannya sama dengan "tujuan".
+- "materi": 3-4 subjudul (mis. pengertian, penyebab dan dampak, pentingnya bukti, menyusun solusi). Pada SATU subjudul yang cocok isi "tabel" berbentuk {"kolom":["...","...","..."],"baris":[["...","...","..."]]} dengan 3-4 baris; subjudul lain "tabel" = null.
+- "kegiatan": tiap pertemuan 4-6 "langkah" (tahap Pendahuluan, 2-3 tahap inti bernomor sesuai sintaks model, Penutup). "guru", "siswa", dan "asesmen" masing-masing satu kalimat padat. Beri "menit" tiap tahap.
+- "asesmen.formatif": 3-4 baris; "asesmen.sumatif": 5 soal uraian beserta kunci/unsur jawaban.
+- "rubrik" (bila diminta): 3-4 aspek untuk produk/presentasi.
+- "diferensiasi": 4 baris (peserta didik yang membutuhkan dukungan, yang siap tantangan, variasi minat/cara belajar, kebutuhan aksesibilitas).
+- "tindak_lanjut" (bila diminta): 3 baris (Tujuan tercapai, Sebagian tujuan tercapai, Masih memerlukan dukungan).
+- "refleksi_siswa" 4 kalimat awal yang diakhiri "..." (mis. "Hal baru yang saya pahami hari ini adalah ..."); "refleksi_guru" 4-5 pertanyaan.
+- "pustaka": rujukan nyata dan lazim (buku teks Kemendikdasmen, dokumen CP resmi); jangan mengarang judul, penulis, atau tautan.
+- Tulis ringkas dan padat agar seluruh dokumen muat; jangan menyalin tanda titik-titik.`;
 
 function susunPromptLkpd(b) {
   const p = b.pengaturan || {};
@@ -127,17 +154,20 @@ function susunPrompt(b) {
 Mata pelajaran: ${b.mapel}
 Program/Kelas: ${b.program || ''} Kelas ${b.kelas || ''}${b.fase ? ` (Fase ${b.fase})` : ''}, Semester ${b.semester || ''}
 Topik/materi pokok: ${b.topik}${cp}${tp ? `\nTujuan Pembelajaran (TP) yang dijadikan acuan, gunakan/rumuskan ulang sebagai tujuan:\n${tp}` : ''}
-Jumlah pertemuan: ${pert}; tiap pertemuan ${jp} JP x ${mjp} menit = ${menit} menit. Pada "kegiatan" buat tepat ${pert} objek pertemuan, dan jumlah "menit" pendahuluan+inti+penutup tiap pertemuan HARUS = ${menit}.
+Jumlah pertemuan: ${pert}; tiap pertemuan ${jp} JP x ${mjp} menit = ${menit} menit. Pada "kegiatan" buat tepat ${pert} objek pertemuan, dan jumlah "menit" seluruh tahap tiap pertemuan HARUS = ${menit}.
 Model pembelajaran: ${p.model_default || 'pilih yang paling sesuai'}. Peserta didik PKBM umumnya beragam usia dan latar belakang; kaitkan dengan konteks nyata/dunia kerja bila relevan.
-${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 600)}\n` : ''}Langkah kegiatan harus konkret (apa yang dilakukan guru dan peserta didik), 3-6 langkah per fase, ringkas.
+${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 600)}\n` : ''}${b.jenis === 'modul' ? PETUNJUK_MODUL : 'Langkah kegiatan harus konkret (apa yang dilakukan guru dan peserta didik), 3-6 langkah per fase, ringkas.'}
 Balas HANYA satu JSON object dengan bentuk persis berikut (isi "..." dengan konten nyata, jangan salin tanda titik-titik):
 ${b.jenis === 'modul' ? bentukModul(p) : bentukRpp(p)}`;
 }
 
 function valid(d, jenis) {
   if (jenis === 'lkpd') return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.bagian) && d.bagian.length;
-  return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.kegiatan) && d.kegiatan.length
-    && (jenis !== 'modul' || d.asesmen);
+  if (jenis === 'modul') {
+    return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.kegiatan) && d.kegiatan.length
+      && d.kegiatan.every((k) => k && Array.isArray(k.langkah) && k.langkah.length) && d.asesmen && typeof d.asesmen === 'object';
+  }
+  return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.kegiatan) && d.kegiatan.length;
 }
 
 // ---------- Pembuat gambar untuk LKPD ----------

@@ -378,3 +378,10 @@ Supabase hanya mengembalikan maksimal 1000 baris per permintaan; sisanya dipoton
 
 ## v23 — Perangkat Ajar (Generate RPP, Modul Ajar, Pengaturan)
 Jalankan `migrasi-v23-perangkat-ajar.sql` di Supabase SQL Editor (sekali). File baru: `perangkat-ajar.js`, `netlify/functions/perangkat-ajar.js`; berubah: `index.html`, `api/_adapter.js` (+1 baris). `api/gateway.js` dihapus (tidak terpakai) agar jumlah function Vercel = 12.
+
+## v25 — Modul Ajar mengikuti template "Modul Ajar IPA SMA (Contoh Lengkap)" (tanpa migrasi SQL baru)
+Modul Ajar yang dihasilkan menu **Generate Modul Ajar** kini memakai susunan dan tampilan template: sampul + tabel identitas, lalu bagian **A** Informasi Umum, **B** Kesiapan dan Karakteristik Peserta Didik, **C** Desain Pembelajaran (CP, tujuan, kriteria ketercapaian, pemahaman bermakna, pertanyaan pemantik, materi esensial, dimensi, media), **D** Materi, **E** Langkah-langkah (tabel tahap/waktu | guru | peserta didik | asesmen), **F** LKPD, **G** Asesmen (formatif, sumatif + kunci, penskoran, rubrik), **H** Diferensiasi, **I** Tindak Lanjut, **J** Refleksi, **K** Sumber Rujukan. Gaya: Arial, judul hijau `#548235`, tabel berheader hijau dengan baris selang-seling `#F4F8F1`, header/footer halaman pada berkas Word.
+- `netlify/functions/perangkat-ajar.js`: struktur JSON & prompt modul diganti (RPP dan LKPD tidak berubah). Hasil AI dengan format lama otomatis ditolak lalu diulang.
+- `perangkat-ajar.js`: `renderModul` ditulis ulang; unduhan Word memakai margin & font template (header/footer hanya pada unduhan Word, tidak pada Cetak/PDF dari browser).
+- Pengaturan yang tetap dihormati: "Sertakan Profil Pelajar Pancasila" (bagian Dimensi), "Sertakan Rubrik", "Sertakan Remedial & Pengayaan" (bagian Tindak Lanjut), kop sekolah, tanda tangan.
+- Riwayat lama tetap dapat dibuka/diunduh (disimpan sebagai HTML). Tidak ada perubahan database.

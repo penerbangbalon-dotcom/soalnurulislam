@@ -62,7 +62,7 @@
         ? 'LKPD berisi kegiatan, tugas berjenjang, kolom jawaban, dan <b>gambar hasil AI</b>. Gambar dibuat satu per satu setelah teks selesai.'
         : j === 'rpp'
         ? 'RPP disusun otomatis mengikuti format & pengaturan di menu <b>Pengaturan RPP &amp; Modul</b>.'
-        : 'Modul Ajar format Kurikulum Merdeka: informasi umum, komponen inti, asesmen, dan lampiran (LKPD, bahan bacaan, glosarium).'}
+        : 'Modul Ajar lengkap mengikuti template: informasi umum, kesiapan peserta didik, desain pembelajaran, materi, langkah pembelajaran, LKPD, asesmen, diferensiasi, tindak lanjut, refleksi, dan sumber rujukan.'}
         Hasil bisa Anda <b>edit langsung</b> di layar, lalu simpan atau unduh ke Word.</p>
       <div class="card">
         <div class="grid3">
@@ -255,36 +255,153 @@
       ${ttd(c)}`;
   }
 
+  // ---------------- Modul Ajar: mengikuti template "Modul Ajar ... (Contoh Lengkap)" ----------------
+  // Susunan: sampul + identitas, catatan, A Informasi Umum, B Kesiapan Peserta Didik, C Desain Pembelajaran,
+  // D Materi, E Langkah Pembelajaran, F LKPD, G Asesmen, H Diferensiasi, I Tindak Lanjut, J Refleksi, K Sumber Rujukan.
+  const M_FONT = 'Arial,Helvetica,sans-serif';
+  const M_HIJAU = '#548235', M_MUDA = '#F4F8F1';
+  const S_ = (x) => String(x == null ? '' : x);
+  const mh1 = (t, css = '') => `<h1 style="font-family:${M_FONT};font-size:16pt;font-weight:bold;color:${M_HIJAU};margin:14pt 0 4pt;${css}">${esc(t)}</h1>`;
+  const mh2 = (t) => `<h2 style="font-family:${M_FONT};font-size:13pt;font-weight:bold;color:${M_HIJAU};margin:12pt 0 4pt;">${esc(t)}</h2>`;
+  const mp = (t, css = '') => (S_(t).trim() ? S_(t).split(/\n+/).filter((x) => x.trim()).map((x) => `<p style="font-family:${M_FONT};font-size:10pt;margin:0 0 4pt;text-align:justify;${css}">${esc(x)}</p>`).join('') : '');
+  const mcatatan = (t) => `<p style="font-family:${M_FONT};font-size:10pt;margin:2pt 0 6pt 7pt;font-style:italic;color:#646464;">${esc(t)}</p>`;
+  const mul = (a) => (L(a).length ? `<ul style="font-family:${M_FONT};font-size:10pt;margin:0 0 6pt 18pt;padding-left:0;">${L(a).map((x) => `<li style="margin:0 0 2pt;">${esc(x)}</li>`).join('')}</ul>` : '');
+  const mol = (a) => (L(a).length ? `<ol style="font-family:${M_FONT};font-size:10pt;margin:0 0 6pt 18pt;padding-left:0;">${L(a).map((x) => `<li style="margin:0 0 2pt;">${esc(x)}</li>`).join('')}</ol>` : '');
+  const mcell = (x, o = {}) => {
+    let isi = x && typeof x === 'object' && x.h != null ? x.h : esc(S_(x)).replace(/\n/g, '<br>');
+    if (o.tebal && isi) isi = `<b>${isi}</b>`;
+    return `<td${o.bg ? ` bgcolor="${o.bg}"` : ''} style="border:0.5pt solid #7f7f7f;padding:3pt 5pt;vertical-align:${o.va || 'top'};font-family:${M_FONT};font-size:9pt;${o.bg ? `background:${o.bg};` : ''}${o.w ? `width:${o.w};` : ''}${o.css || ''}">${isi || '&nbsp;'}</td>`;
+  };
+  // tabel bergaya template: baris judul hijau berhuruf putih tebal, baris isi berselang-seling putih / hijau muda
+  function mtabel(kolom, baris, lebar, opsi = {}) {
+    const head = `<tr>${kolom.map((k, i) => mcell(k, { bg: M_HIJAU, w: lebar && lebar[i], tebal: true, css: 'color:#FFFFFF;font-weight:bold;' })).join('')}</tr>`;
+    const isi = baris.map((r, ri) => `<tr style="page-break-inside:avoid;">${r.map((x, i) => mcell(x, { bg: ri % 2 === 1 ? M_MUDA : '', w: lebar && lebar[i], va: opsi.va, css: i === 0 && opsi.tebalKolom1 ? 'font-weight:bold;' : (opsi.minTinggi ? `height:${opsi.minTinggi};` : '') })).join('')}</tr>`).join('');
+    return `<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;margin:2pt 0 8pt;">${head}${isi}</table>`;
+  }
+  const mjudulKolom = (k) => (Array.isArray(k) ? k : []).map(S_).filter(Boolean);
+
+  function mLangkah(kegiatan, jp, mjp) {
+    const arr = (Array.isArray(kegiatan) ? kegiatan : []).filter((p) => p && Array.isArray(p.langkah));
+    return arr.map((p, i) => {
+      const rows = p.langkah.map((l) => [{ h: `${esc(l.tahap)}${l.menit ? `<br>${esc(l.menit)} menit` : ''}` }, S_(l.guru), S_(l.siswa), S_(l.asesmen)]);
+      return (arr.length > 1 ? mh2(`Pertemuan ke-${p.pertemuan || i + 1}`) : '')
+        + mtabel(['Tahap / waktu', 'Aktivitas guru', 'Aktivitas peserta didik', 'Asesmen'], rows, ['17%', '33%', '33%', '17%'], { va: 'middle' })
+        + mp(`Total waktu${arr.length > 1 ? ' pertemuan ini' : ''}: ${jp * mjp} menit (${jp} JP × ${mjp} menit). Guru dapat menyesuaikan durasi dengan kondisi kelas.`, 'margin-top:4pt;');
+    }).join('');
+  }
+
   function renderModul(d, c) {
-    const mjp = +PENG.menit_per_jp || 45; const a = d.asesmen || {}; const lk = d.lkpd || {};
-    const rub = Array.isArray(d.rubrik) && d.rubrik.length
-      ? `<table style="${TB}"><tr style="background:#e8e8e8;">${['Aspek', 'Sangat Baik', 'Baik', 'Cukup', 'Perlu Bimbingan'].map((x) => `<td style="${TD}"><b>${x}</b></td>`).join('')}</tr>${d.rubrik.map((r) => `<tr>${[r.aspek, r.sangat_baik, r.baik, r.cukup, r.perlu_bimbingan].map((x) => `<td style="${TD}">${esc(x)}</td>`).join('')}</tr>`).join('')}</table>` : '';
-    return `${kop()}<p style="text-align:center;font-size:14pt;margin:0 0 10px;"><b>MODUL AJAR</b><br>${esc(c.mapel)}</p>
-      ${H('I. INFORMASI UMUM')}
-      ${baris([['Penyusun', esc(c.guru)], ['Satuan Pendidikan', esc(((typeof SEKOLAH !== 'undefined' && SEKOLAH.nama_lembaga) || 'PKBM'))], ['Tahun Pelajaran', esc(PENG.tahun_ajaran)],
-        ['Program / Kelas / Fase', esc(`${c.program || ''} / ${c.kelas || ''}${c.fase ? ' / Fase ' + c.fase : ''}`)], ['Semester', esc(c.semester)], ['Topik', esc(c.topik)],
-        ['Alokasi Waktu', `${c.pertemuan} pertemuan × ${c.jp} JP (${c.jp * mjp} menit/pertemuan)`], ['Kompetensi Awal', esc(d.kompetensi_awal)],
-        ['Model Pembelajaran', esc(d.model)], ['Target Peserta Didik', esc(d.target_peserta)]])}
-      ${L(d.profil).length ? H('Profil Pelajar Pancasila') + UL(d.profil) : ''}
-      ${L(d.sarpras).length ? H('Sarana dan Prasarana') + UL(d.sarpras) : ''}
-      ${H('II. KOMPONEN INTI')}
-      ${c.cp ? H('Capaian Pembelajaran') + `<p style="margin:0;text-align:justify;">${esc(c.cp.deskripsi)}</p>` : ''}
-      ${H('Tujuan Pembelajaran')}${OL(d.tujuan)}
-      ${L(d.pemahaman_bermakna).length ? H('Pemahaman Bermakna') + UL(d.pemahaman_bermakna) : ''}
-      ${L(d.pertanyaan_pemantik).length ? H('Pertanyaan Pemantik') + UL(d.pertanyaan_pemantik) : ''}
-      ${L(d.persiapan).length ? H('Persiapan Pembelajaran') + UL(d.persiapan) : ''}
-      ${H('Kegiatan Pembelajaran')}${tabelKegiatan(d.kegiatan, mjp, c.jp)}
-      ${H('Asesmen')}
-      <p style="margin:0;">${a.diagnostik ? '<b>Diagnostik:</b> ' + esc(a.diagnostik) + '<br>' : ''}${a.formatif ? '<b>Formatif:</b> ' + esc(a.formatif) + '<br>' : ''}${a.sumatif ? '<b>Sumatif:</b> ' + esc(a.sumatif) : ''}</p>
-      ${rub ? H('Rubrik Penilaian') + rub : ''}
-      ${(d.pengayaan || d.remedial) ? H('Pengayaan dan Remedial') + `<p style="margin:0;">${d.pengayaan ? '<b>Pengayaan:</b> ' + esc(d.pengayaan) + '<br>' : ''}${d.remedial ? '<b>Remedial:</b> ' + esc(d.remedial) : ''}</p>` : ''}
-      ${L(d.refleksi_guru).length || L(d.refleksi_siswa).length ? H('Refleksi') + (L(d.refleksi_guru).length ? '<p style="margin:0;"><i>Guru:</i></p>' + UL(d.refleksi_guru) : '') + (L(d.refleksi_siswa).length ? '<p style="margin:4px 0 0;"><i>Peserta didik:</i></p>' + UL(d.refleksi_siswa) : '') : ''}
-      ${H('III. LAMPIRAN')}
-      ${lk.judul ? H('A. Lembar Kerja Peserta Didik (LKPD): ' + esc(lk.judul)) + (lk.petunjuk ? `<p style="margin:0 0 4px;">${esc(lk.petunjuk)}</p>` : '') + (L(lk.langkah).length ? '<p style="margin:0;"><i>Langkah kerja:</i></p>' + OL(lk.langkah) : '') + (L(lk.soal).length ? '<p style="margin:4px 0 0;"><i>Soal/Tugas:</i></p>' + OL(lk.soal) : '') : ''}
-      ${d.bahan_bacaan ? H('B. Bahan Bacaan') + PARA(d.bahan_bacaan) : ''}
-      ${Array.isArray(d.glosarium) && d.glosarium.length ? H('C. Glosarium') + `<table style="${TB}">${d.glosarium.map((g) => `<tr><td style="${TD}width:28%;"><b>${esc(g.istilah)}</b></td><td style="${TD}">${esc(g.arti)}</td></tr>`).join('')}</table>` : ''}
-      ${L(d.pustaka).length ? H('D. Daftar Pustaka') + OL(d.pustaka) : ''}
-      ${ttd(c)}`;
+    const mjp = +PENG.menit_per_jp || 45; const jp = +c.jp || 2; const pert = +c.pertemuan || 1;
+    const S = (typeof SEKOLAH !== 'undefined' && SEKOLAH) || {};
+    const lembaga = S.nama_lembaga || 'PKBM';
+    const lk = d.lkpd || {}; const a = d.asesmen || {};
+    const waktu = `${pert} pertemuan × ${jp} JP × ${mjp} menit (${jp * mjp} menit per pertemuan)`;
+    const jenjang = [c.program, c.kelas ? `Kelas ${c.kelas}` : '', c.fase ? `Fase ${c.fase}` : ''].filter(Boolean).join(' / ');
+    const sub = [c.fase ? `Fase ${c.fase}` : '', c.kelas ? `Kelas ${c.kelas}` : '', c.program || '', c.semester ? `Semester ${c.semester}` : ''].filter(Boolean).join(' • ');
+    const hdr = `MODUL AJAR ${S_(c.mapel).toUpperCase()} | ${S_(c.topik)}`.slice(0, 120);
+    const ftr = `${lembaga} — Tahun Pelajaran ${PENG.tahun_ajaran || ''}`.trim();
+    let n = 0; const H1 = (t, css = '') => mh1(`${String.fromCharCode(65 + n++)}. ${t}`, css);
+    const out = [];
+
+    // --- sampul + identitas ---
+    out.push(kop().replace('<table style="', `<table style="font-family:${M_FONT};`));
+    out.push(`<p style="font-family:${M_FONT};text-align:center;font-size:26pt;font-weight:bold;color:${M_HIJAU};margin:50pt 0 6pt;">MODUL AJAR ${esc(S_(c.mapel).toUpperCase())}</p>
+      <p style="font-family:${M_FONT};text-align:center;font-size:17pt;font-weight:bold;margin:0 0 14pt;">${esc(S_(c.topik).toUpperCase())}</p>
+      <p style="font-family:${M_FONT};text-align:center;font-size:10pt;font-style:italic;margin:0 0 16pt;">${esc(sub)}</p>`);
+    out.push(mtabel(['IDENTITAS', 'KETERANGAN'], [
+      ['Satuan pendidikan', lembaga], ['Penyusun', c.guru || '..............................'], ['Tahun pelajaran', PENG.tahun_ajaran || ''],
+      ['Mata pelajaran', c.mapel], ['Alokasi waktu', waktu],
+    ], ['31%', '69%'], { va: 'middle' }));
+    out.push(`<p style="font-family:${M_FONT};text-align:center;font-size:9pt;font-style:italic;margin:6pt 0 0;">Dokumen Word ini dapat diedit dan dikembangkan sesuai kebutuhan kelas.</p>`);
+
+    // --- A. Informasi umum ---
+    out.push(H1('INFORMASI UMUM', 'page-break-before:always;'));
+    out.push(mtabel(['Komponen', 'Deskripsi'], [
+      ['Satuan pendidikan', lembaga], ['Penyusun', c.guru || '..............................'], ['Jenjang / kelas / fase', jenjang],
+      ['Mata pelajaran', c.mapel], ['Topik', c.topik], ['Alokasi waktu', waktu], ['Model pembelajaran', S_(d.model)],
+      ['Karakteristik peserta didik', S_(d.karakteristik)], ['Sarana dan prasarana', S_(d.sarpras)],
+    ].filter((r) => S_(r[1]).trim()), ['31%', '69%'], { va: 'middle' }));
+
+    // --- B. Kesiapan peserta didik ---
+    out.push(H1('KESIAPAN DAN KARAKTERISTIK PESERTA DIDIK'));
+    out.push(mh2('1. Kompetensi awal') + mp(d.kompetensi_awal));
+    const dg = d.diagnostik || {};
+    out.push(mh2('2. Asesmen diagnostik awal') + mp('Guru mengajukan pertanyaan lisan atau tertulis berikut untuk mengetahui pemahaman awal.') + mul(dg.pertanyaan)
+      + (S_(dg.pemanfaatan).trim() ? mp(`Pemanfaatan hasil: ${S_(dg.pemanfaatan)}`) : ''));
+
+    // --- C. Desain pembelajaran ---
+    out.push(H1('DESAIN PEMBELAJARAN'));
+    out.push(mh2('1. Capaian Pembelajaran (CP)') + (c.cp && c.cp.deskripsi
+      ? (c.cp.elemen ? mp(`Elemen: ${c.cp.elemen}`) : '') + mp(c.cp.deskripsi)
+      : mcatatan('Isikan kutipan CP resmi yang relevan dari dokumen CP terbaru untuk fase dan mata pelajaran yang digunakan satuan pendidikan.') + mp('[Tempelkan CP resmi di sini.]')));
+    out.push(mh2('2. Tujuan pembelajaran') + mp('Setelah mengikuti pembelajaran, peserta didik diharapkan mampu:') + mol(d.tujuan));
+    const kr = (Array.isArray(d.kriteria) ? d.kriteria : []).filter((k) => k && (k.bukti || k.kriteria));
+    if (kr.length) out.push(mh2('3. Kriteria ketercapaian tujuan pembelajaran')
+      + mtabel(['Tujuan', 'Bukti yang diharapkan', 'Kriteria ketercapaian'], kr.map((k, i) => [`TP ${i + 1}`, S_(k.bukti), S_(k.kriteria)]), ['14%', '36%', '50%'], { va: 'middle' })
+      + mcatatan('Kriteria di atas adalah contoh operasional. Guru dapat menyesuaikan tingkat kesulitan dan batas ketercapaian dengan CP, ATP, kebutuhan peserta didik, dan kebijakan satuan pendidikan.'));
+    let k = kr.length ? 4 : 3;
+    if (S_(d.pemahaman_bermakna).trim()) out.push(mh2(`${k++}. Pemahaman bermakna`) + mp(d.pemahaman_bermakna));
+    if (L(d.pertanyaan_pemantik).length) out.push(mh2(`${k++}. Pertanyaan pemantik`) + mul(d.pertanyaan_pemantik));
+    if (L(d.materi_esensial).length) out.push(mh2(`${k++}. Materi esensial`) + mul(d.materi_esensial));
+    if (L(d.dimensi).length) out.push(mh2(`${k++}. Dimensi/kompetensi yang dikembangkan`) + mul(d.dimensi));
+    if (L(d.media).length) out.push(mh2(`${k++}. Media dan sumber belajar`) + mul(d.media));
+
+    // --- D. Materi pembelajaran ---
+    const materi = (Array.isArray(d.materi) ? d.materi : []).filter((m) => m && (m.judul || m.uraian));
+    if (materi.length) {
+      out.push(H1('MATERI PEMBELAJARAN'));
+      materi.forEach((m, i) => {
+        const t = m.tabel && Array.isArray(m.tabel.kolom) && Array.isArray(m.tabel.baris) && m.tabel.baris.length ? m.tabel : null;
+        out.push(mh2(`${i + 1}. ${S_(m.judul)}`) + mp(m.uraian)
+          + (t ? mtabel(mjudulKolom(t.kolom), t.baris.map((r) => (Array.isArray(r) ? r : [r]).map(S_)), null, { va: 'middle' }) : ''));
+      });
+    }
+
+    // --- E. Langkah-langkah pembelajaran ---
+    out.push(H1('LANGKAH-LANGKAH PEMBELAJARAN') + mLangkah(d.kegiatan, jp, mjp));
+
+    // --- F. LKPD ---
+    if (lk.judul || L(lk.tugas).length) {
+      out.push(mh1(`${String.fromCharCode(65 + n++)}. LKPD — ${S_(lk.judul || c.topik).toUpperCase()}`));
+      if (S_(lk.kasus).trim()) out.push(mh2('Kasus') + mp(lk.kasus));
+      if (L(lk.tugas).length) out.push(mh2('Tugas kelompok') + mol(lk.tugas));
+      const kol = mjudulKolom(lk.kolom); const kolom = kol.length >= 2 ? kol.slice(0, 5) : ['Temuan / fakta', 'Dugaan / penjelasan', 'Dampak yang mungkin', 'Bukti tambahan yang diperlukan'];
+      out.push(mh2('Tabel kerja peserta didik') + mtabel(kolom, [0, 1, 2].map(() => kolom.map(() => '')), null, { minTinggi: '26pt' }));
+      if (L(lk.panduan_guru).length) out.push(mh2('Contoh jawaban/panduan guru') + mul(lk.panduan_guru));
+    }
+
+    // --- G. Asesmen ---
+    out.push(H1('ASESMEN PEMBELAJARAN'));
+    let g = 1;
+    const fm = (Array.isArray(a.formatif) ? a.formatif : []).filter((x) => x && typeof x === 'object');
+    if (fm.length) out.push(mh2(`${g++}. Asesmen formatif`) + mtabel(['Aspek', 'Indikator', 'Teknik', 'Tindak lanjut'], fm.map((x) => [S_(x.aspek), S_(x.indikator), S_(x.teknik), S_(x.tindak_lanjut)]), ['18%', '34%', '16%', '32%'], { va: 'middle' }));
+    else if (S_(a.formatif).trim()) out.push(mh2(`${g++}. Asesmen formatif`) + mp(a.formatif));
+    const sm = (Array.isArray(a.sumatif) ? a.sumatif : []).filter((x) => x && typeof x === 'object');
+    if (sm.length) out.push(mh2(`${g++}. Asesmen sumatif: pertanyaan evaluasi`) + mtabel(['No.', 'Soal', 'Kunci jawaban / unsur penting'], sm.map((x, i) => [String(i + 1), S_(x.soal), S_(x.kunci)]), ['7%', '48%', '45%'], { va: 'middle' }));
+    else if (S_(a.sumatif).trim()) out.push(mh2(`${g++}. Asesmen sumatif`) + mp(a.sumatif));
+    if (S_(a.penskoran).trim()) out.push(mh2(`${g++}. Pedoman penskoran evaluasi`) + mp(a.penskoran));
+    const rub = (Array.isArray(d.rubrik) ? d.rubrik : []).filter((x) => x && typeof x === 'object');
+    if (rub.length) out.push(mh2(`${g++}. Rubrik produk/presentasi kelompok`) + mtabel(['Aspek', '4 — Sangat baik', '3 — Baik', '2 — Berkembang', '1 — Perlu bimbingan'],
+      rub.map((x) => [S_(x.aspek), S_(x.sangat_baik), S_(x.baik), S_(x.berkembang || x.cukup), S_(x.perlu_bimbingan)]), ['16%', '21%', '21%', '21%', '21%'], { va: 'middle' }));
+
+    // --- H. Diferensiasi, I. Tindak lanjut ---
+    const df = (Array.isArray(d.diferensiasi) ? d.diferensiasi : []).filter((x) => x && typeof x === 'object');
+    if (df.length) out.push(H1('DIFERENSIASI DAN AKSESIBILITAS') + mtabel(['Kebutuhan peserta didik', 'Strategi yang dapat digunakan'], df.map((x) => [S_(x.kebutuhan), S_(x.strategi)]), ['30%', '70%'], { va: 'middle' }));
+    const tl = (Array.isArray(d.tindak_lanjut) ? d.tindak_lanjut : []).filter((x) => x && typeof x === 'object');
+    if (tl.length) out.push(H1('TINDAK LANJUT') + mtabel(['Hasil belajar', 'Tindak lanjut', 'Contoh aktivitas'], tl.map((x) => [S_(x.hasil), S_(x.tindak_lanjut), S_(x.contoh)]), ['24%', '34%', '42%'], { va: 'middle' }));
+
+    // --- J. Refleksi, K. Sumber rujukan ---
+    if (L(d.refleksi_siswa).length || L(d.refleksi_guru).length) {
+      out.push(H1('REFLEKSI'));
+      if (L(d.refleksi_siswa).length) out.push(mh2('1. Refleksi peserta didik') + mul(d.refleksi_siswa));
+      if (L(d.refleksi_guru).length) out.push(mh2('2. Refleksi guru') + mul(d.refleksi_guru));
+    }
+    out.push(H1('SUMBER RUJUKAN DAN PEMERIKSAAN REGULASI')
+      + mp('Gunakan sumber resmi dan tepercaya yang relevan dengan topik. Cantumkan penulis/lembaga, tahun, judul, dan tautan atau tanggal akses.')
+      + mul([...L(d.pustaka), 'Dokumen Capaian Pembelajaran (CP) resmi yang berlaku untuk fase dan mata pelajaran terkait.']));
+
+    out.push(ttd(c).replace('<table style="', `<table style="font-family:${M_FONT};font-size:10pt;`));
+    return `<div data-tpl="modul" data-tpl-hdr="${esc(hdr)}" data-tpl-ftr="${esc(ftr)}" style="font-family:${M_FONT};font-size:10pt;line-height:1.3;">${out.join('')}</div>`;
   }
 
   function renderLkpd(d, c) {
@@ -401,19 +518,31 @@
   }
 
   // ---------------- Unduh / Cetak / Simpan ----------------
-  function bungkusWord(html, judul) {
+  // Modul Ajar bertemplate menandai dokumennya dengan data-tpl="modul" (+ teks header/footer) -> Word memakai Arial, margin template, header & footer
+  function opsiTemplate(html) {
+    const m = /data-tpl="modul"\s+data-tpl-hdr="([^"]*)"\s+data-tpl-ftr="([^"]*)"/.exec(html || '');
+    return m ? { hdr: m[1], ftr: m[2] } : null;
+  }
+  function bungkusWord(html, judul, tpl) {
+    const hf = tpl ? `<div style='mso-element:header' id="h1"><p style="text-align:right;font-family:Arial,sans-serif;font-size:8pt;color:#6E6E6E;margin:0;">${tpl.hdr}</p></div>
+      <div style='mso-element:footer' id="f1"><p style="text-align:center;font-family:Arial,sans-serif;font-size:8pt;font-style:italic;color:#6E6E6E;margin:0;">${tpl.ftr}</p></div>` : '';
+    const halaman = tpl
+      ? '@page Section1{size:595.3pt 841.9pt;margin:65.2pt 65.2pt 65.2pt 76.6pt;mso-header-margin:36pt;mso-footer-margin:36pt;mso-header:h1;mso-footer:f1;}'
+      : '@page Section1{size:595.3pt 841.9pt;margin:56.7pt 56.7pt 56.7pt 70.9pt;}';
+    const huruf = tpl ? "font-family:Arial,Helvetica,sans-serif;font-size:10pt;" : "font-family:'Times New Roman',serif;font-size:12pt;";
     return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(judul)}</title>
-      <style>@page Section1{size:595.3pt 841.9pt;margin:56.7pt 56.7pt 56.7pt 70.9pt;} div.Section1{page:Section1;} body{font-family:'Times New Roman',serif;font-size:12pt;} table{border-collapse:collapse;} p{margin:0 0 4px;}</style></head>
-      <body><div class="Section1">${html}</div></body></html>`;
+      <style>${halaman} div.Section1{page:Section1;} body{${huruf}} table{border-collapse:collapse;} p{margin:0 0 4px;}</style></head>
+      <body><div class="Section1">${html}</div>${hf}</body></html>`;
   }
   function namaFile(t) { return String(t || 'dokumen').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 80) || 'dokumen'; }
   function unduhHtml(html, judul) {
-    if (/<img[^>]+src="data:image/i.test(html)) return unduhMht(html, judul);
-    const blob = new Blob(['\ufeff', bungkusWord(html, judul)], { type: 'application/msword' });
+    const tpl = opsiTemplate(html);
+    if (/<img[^>]+src="data:image/i.test(html)) return unduhMht(html, judul, tpl);
+    const blob = new Blob(['\ufeff', bungkusWord(html, judul, tpl)], { type: 'application/msword' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = namaFile(judul) + '.doc';
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
-  function unduhMht(html, judul) {
+  function unduhMht(html, judul, tpl) {
     const bagian = []; let n = 0;
     const isi = html.replace(/src="data:(image\/[a-z+]+);base64,([^"]+)"/gi, (m, mime, b64) => {
       n++; const ext = mime.split('/')[1].replace('jpeg', 'jpg'); const lokasi = `file:///C:/gambar${n}.${ext}`;
@@ -421,7 +550,7 @@
     });
     const b64 = (t) => btoa(unescape(encodeURIComponent(t))).replace(/.{1,76}/g, '$&\r\n');
     const B = '----=_NextPart_' + Date.now().toString(16);
-    let out = `MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="${B}"; type="text/html"\r\n\r\n--${B}\r\nContent-Type: text/html; charset="utf-8"\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///C:/dokumen.htm\r\n\r\n${b64(bungkusWord(isi, judul))}\r\n`;
+    let out = `MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="${B}"; type="text/html"\r\n\r\n--${B}\r\nContent-Type: text/html; charset="utf-8"\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///C:/dokumen.htm\r\n\r\n${b64(bungkusWord(isi, judul, tpl))}\r\n`;
     bagian.forEach((p) => { out += `--${B}\r\nContent-Type: ${p.mime}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: ${p.lokasi}\r\n\r\n${p.b64.replace(/.{1,76}/g, '$&\r\n')}\r\n`; });
     out += `--${B}--`;
     const blob = new Blob([out], { type: 'application/msword' });
@@ -430,6 +559,7 @@
   }
   function cetakHtml(html, judul) {
     const w = window.open('', '_blank'); if (!w) { alert('Izinkan pop-up untuk mencetak.'); return; }
+    // header/footer Word tidak ikut dicetak dari browser (tpl = null); gaya Arial tetap terbawa dari dokumennya
     w.document.write(bungkusWord(html, judul).replace('</style>', '@page{size:A4;margin:2cm}</style>')); w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
   }
   const hasilHtml = (j) => { const c = $(`pa-${j}-hasil`).cloneNode(true); c.querySelectorAll('[data-ui]').forEach((x) => x.remove()); return c.innerHTML; };
