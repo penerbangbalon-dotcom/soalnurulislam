@@ -978,19 +978,19 @@ tr:hover td{background:var(--primary-soft);}
     <!-- ===== TAB: LEGER NILAI (Excel) ===== -->
     <section id="tab-leger" class="hidden">
       <h2>Leger Nilai</h2>
-      <p class="muted">Tabel nilai seluruh siswa satu kelas (semua mata pelajaran: UH, UTS, UAS, Tugas/Praktik bila dipakai, Nilai Akhir, KKM, sikap, dan kehadiran)
+      <p class="muted">Tabel nilai seluruh siswa satu kelas (semua mata pelajaran, atau <b>satu mata pelajaran saja</b> lewat pilihan Mata Pelajaran: UH, UTS, UAS, Tugas/Praktik bila dipakai, Nilai Akhir, KKM, sikap, dan kehadiran)
         yang bisa diunduh ke Excel sebagai acuan pengisian rapor. Nilai di bawah KKM ditandai merah dan dirangkum di sheet "Di Bawah KKM".</p>
       <div class="card">
         <div class="grid3">
           <div class="field"><label>Jenjang</label>
             <select id="lg-program" onchange="isiKelasLeger()"><option value="">— pilih —</option><option>Paket B</option><option>Paket C</option></select></div>
-          <div class="field"><label>Kelas</label><select id="lg-kelas"><option value="">— pilih jenjang dulu —</option></select></div>
-          <div class="field"><label>Tahun Ajaran</label><select id="lg-ta"></select></div>
+          <div class="field"><label>Kelas</label><select id="lg-kelas" onchange="isiMapelLeger()"><option value="">— pilih jenjang dulu —</option></select></div>
+          <div class="field"><label>Tahun Ajaran</label><select id="lg-ta" onchange="isiMapelLeger()"></select></div>
         </div>
         <div class="grid3">
           <div class="field"><label>Semester</label>
-            <select id="lg-smt"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
-          <div></div><div></div>
+            <select id="lg-smt" onchange="isiMapelLeger()"><option value="Ganjil">Semester 1 (Ganjil)</option><option value="Genap">Semester 2 (Genap)</option></select></div>
+          <div class="field"><label>Mata Pelajaran</label><select id="lg-mapel"><option value="">Semua mata pelajaran</option></select></div><div></div>
         </div>
         <p class="muted" id="lg-bobot" style="margin:0 0 12px;"></p>
         <div class="toolbar" style="margin:0;">
@@ -8561,6 +8561,24 @@ function isiKelasLeger(){
   const sel = document.getElementById('lg-kelas');
   const opsi = pr ? (KELAS_PER_PROGRAM[pr]||[]) : [];
   sel.innerHTML = opsi.length ? opsi.map(k=>`<option value="${k}">Kelas ${k}</option>`).join('') : '<option value="">— pilih jenjang dulu —</option>';
+  isiMapelLeger();
+}
+// Daftar mata pelajaran satu kelas/periode (mapel terdaftar + yang sudah punya nilai/tugas), dipakai tabel Leger dan pilihan filter.
+function mapelLegerDaftar(program, kelas, ta, smt){
+  if(!program || !kelas) return [];
+  const namaTerdaftar = (currentMapelList||[]).filter(m=>m.program===program && m.kelas===kelas && !m.tidak_diujikan).map(m=>m.nama);
+  if(!dataNilaiSiap) return [...new Set(namaTerdaftar)].sort((a,c)=>a.localeCompare(c,'id'));
+  const rows = nilaiArsip.filter(r=>r.program===program && r.kelas===kelas && r.ta===ta && r.smt===smt);
+  const manualKelas = manualBaris.filter(r=>r.program===program && r.kelas===kelas && r.tahun_ajaran===ta && r.semester===smt);
+  const tugasKelas = daftarTugasNilai.filter(t=>t.program===program && t.kelas===kelas && t.tahun_ajaran===ta && t.semester===smt);
+  return [...new Set([...namaTerdaftar, ...rows.map(r=>r.mapel_nama).filter(Boolean), ...manualKelas.map(r=>r.mapel_nama), ...tugasKelas.map(t=>t.mapel_nama)])].sort((a,c)=>a.localeCompare(c,'id'));
+}
+function isiMapelLeger(){
+  const sel = document.getElementById('lg-mapel'); if(!sel) return;
+  const prev = sel.value;
+  const daftar = mapelLegerDaftar(document.getElementById('lg-program').value, document.getElementById('lg-kelas').value, document.getElementById('lg-ta').value, document.getElementById('lg-smt').value);
+  sel.innerHTML = '<option value="">Semua mata pelajaran</option>' + daftar.map(m=>`<option value="${esc2(m)}">${esc2(m)}</option>`).join('');
+  sel.value = daftar.includes(prev) ? prev : '';
 }
 async function loadLeger(){
   if(!await siapkanDataNilai()) return;
@@ -8570,6 +8588,7 @@ async function loadLeger(){
   selTa.value = opsi.includes(prevTa) ? prevTa : taBerjalan();
   if(!document.getElementById('lg-smt').dataset.diatur){ document.getElementById('lg-smt').value = semesterBerjalan(); document.getElementById('lg-smt').dataset.diatur = '1'; }
   document.getElementById('lg-bobot').textContent = teksBobotNilai() + ' — ubah di menu Pengaturan Nilai.';
+  isiMapelLeger();
 }
 function bangunLeger(){
   const program = document.getElementById('lg-program').value, kelas = document.getElementById('lg-kelas').value;
@@ -8578,9 +8597,11 @@ function bangunLeger(){
   if(!dataNilaiSiap){ alert('Data nilai belum termuat. Klik "Muat Ulang Data".'); return null; }
   const rows = nilaiArsip.filter(r=>r.program===program && r.kelas===kelas && r.ta===ta && r.smt===smt);
   const manualKelas = manualBaris.filter(r=>r.program===program && r.kelas===kelas && r.tahun_ajaran===ta && r.semester===smt);
-  const namaTerdaftar = currentMapelList.filter(m=>m.program===program && m.kelas===kelas && !m.tidak_diujikan).map(m=>m.nama);
   const tugasKelas = daftarTugasNilai.filter(t=>t.program===program && t.kelas===kelas && t.tahun_ajaran===ta && t.semester===smt);
-  const mapel = [...new Set([...namaTerdaftar, ...rows.map(r=>r.mapel_nama).filter(Boolean), ...manualKelas.map(r=>r.mapel_nama), ...tugasKelas.map(t=>t.mapel_nama)])].sort((a,c)=>a.localeCompare(c,'id'));
+  const semuaMapel = mapelLegerDaftar(program, kelas, ta, smt);
+  const mapelFilter = (document.getElementById('lg-mapel')||{}).value || '';
+  if(mapelFilter && !semuaMapel.includes(mapelFilter)){ alert('Mata pelajaran yang dipilih tidak ada pada kelas/periode ini. Pilih ulang Mata Pelajaran.'); isiMapelLeger(); return null; }
+  const mapel = mapelFilter ? [mapelFilter] : semuaMapel;
   const b = pengNilai.bobot;
   const kolom = ['uh','uts','uas'];
   if(b.tugas>0 || tugasKelas.length || manualKelas.some(r=>r.komponen==='tugas')) kolom.push('tugas');
@@ -8604,7 +8625,7 @@ function bangunLeger(){
   });
   const urut = baris.filter(x=>x.rata!=null).sort((x,y)=>y.rata-x.rata);
   urut.forEach((x,i)=>{ x.peringkat = (i>0 && Math.abs(urut[i-1].rata-x.rata)<1e-9) ? urut[i-1].peringkat : i+1; });
-  return { program, kelas, ta, smt, mapel, kkmMapel, kolom, baris, jumlahRows: rows.length + manualKelas.length };
+  return { program, kelas, ta, smt, mapel, mapelFilter, kkmMapel, kolom, baris, jumlahRows: rows.length + manualKelas.length };
 }
 let legerAktif = null;
 function tampilkanLeger(){
@@ -8615,7 +8636,7 @@ function tampilkanLeger(){
     info.textContent = ''; tabel.innerHTML = '<p class="muted">Belum ada mata pelajaran atau siswa/nilai untuk kelas dan periode ini.</p>'; return;
   }
   const totalBelum = L.baris.reduce((a,s)=>a+s.belumTuntas,0);
-  info.innerHTML = `<b>${L.baris.length}</b> siswa &bull; <b>${L.mapel.length}</b> mata pelajaran &bull; ${esc2(teksBobotNilai())}` +
+  info.innerHTML = `<b>${L.baris.length}</b> siswa &bull; ` + (L.mapelFilter ? `mata pelajaran: <b>${esc2(L.mapelFilter)}</b>` : `<b>${L.mapel.length}</b> mata pelajaran`) + ` &bull; ${esc2(teksBobotNilai())}` +
     (totalBelum ? ` &bull; <span style="color:#b3261e;">${totalBelum} nilai di bawah KKM (merah)</span>` : '') +
     (L.baris.some(s=>s.nilai.some(n=>n.rem)) ? ' &bull; <sup style="color:#b36b00;font-weight:700;">R</sup> = nilai setelah remedial' : '') +
     (L.jumlahRows===0 ? ' &bull; <span style="color:#b3261e;">belum ada nilai final untuk periode ini</span>' : '');
@@ -8645,6 +8666,7 @@ function unduhLeger(){
   const judul = [
     ['LEGER NILAI SISWA'], [String(SEKOLAH.nama_aplikasi||'').toUpperCase()],
     [`Jenjang: ${L.program}  |  Kelas: ${L.kelas}  |  ${labelSmt(L.smt)}  |  Tahun Ajaran ${L.ta}`],
+    ...(L.mapelFilter ? [[`Mata Pelajaran: ${L.mapelFilter}`]] : []),
     [teksBobotNilai()], []
   ];
   const h1 = ['No','Nama Siswa','NISN']; L.mapel.forEach(m=>{ h1.push(m); for(let i=1;i<nk;i++) h1.push(''); });
@@ -8693,7 +8715,7 @@ function unduhLeger(){
   ]);
   ket['!cols'] = [{wch:14},{wch:110}];
   XLSX.utils.book_append_sheet(wb, ket, 'Keterangan');
-  XLSX.writeFile(wb, `leger-nilai-${namaFileAman(L.program)}-kelas-${L.kelas}-${L.smt}-${namaFileAman(L.ta)}.xlsx`);
+  XLSX.writeFile(wb, `leger-nilai-${namaFileAman(L.program)}-kelas-${L.kelas}${L.mapelFilter ? '-'+namaFileAman(L.mapelFilter) : ''}-${L.smt}-${namaFileAman(L.ta)}.xlsx`);
 }
 
 // ============================================================

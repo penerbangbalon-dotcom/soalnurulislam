@@ -391,3 +391,6 @@ LKPD yang dihasilkan menu **Generate LKPD** kini memakai format lampiran: sampul
 - `netlify/functions/perangkat-ajar.js`: prompt & struktur JSON LKPD diganti (RPP dan Modul tidak berubah).
 - `perangkat-ajar.js`: `renderLkpd` ditulis ulang; form LKPD: "Jumlah Kegiatan" menjadi "Jumlah Pertanyaan Pemahaman" (2-5) dan ada pilihan "Alokasi Waktu (JP)". Gambar AI tetap dibuat per gambar (letak: bahan belajar Kegiatan 1 atau Kegiatan 2), tombol ganti/hapus/buat ulang tetap berfungsi.
 - Kop/logo tetap mengikuti pengaturan aplikasi. LKPD lama di riwayat tetap dapat dibuka dan diunduh.
+
+## v27 — Leger Nilai: filter Mata Pelajaran (tanpa migrasi SQL baru)
+Menu **Leger Nilai (Excel)** kini punya pilihan **Mata Pelajaran**: "Semua mata pelajaran" (seperti sebelumnya) atau satu mapel saja (mis. Ekonomi) untuk seluruh siswa satu kelas. Pilihan mapel terisi otomatis sesuai Jenjang/Kelas/Tahun Ajaran/Semester. Bila satu mapel dipilih, tabel di layar dan file Excel hanya memuat mapel itu (UH, UTS, UAS, Tugas/Praktik bila dipakai, Nilai Akhir, KKM, rata-rata kelas, peringkat, sheet "Di Bawah KKM"); nama file dan judul Excel memuat nama mapel. Hanya `index.html` yang berubah.
