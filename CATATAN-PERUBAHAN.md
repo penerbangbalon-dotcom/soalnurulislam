@@ -385,3 +385,9 @@ Modul Ajar yang dihasilkan menu **Generate Modul Ajar** kini memakai susunan dan
 - `perangkat-ajar.js`: `renderModul` ditulis ulang; unduhan Word memakai margin & font template (header/footer hanya pada unduhan Word, tidak pada Cetak/PDF dari browser).
 - Pengaturan yang tetap dihormati: "Sertakan Profil Pelajar Pancasila" (bagian Dimensi), "Sertakan Rubrik", "Sertakan Remedial & Pengayaan" (bagian Tindak Lanjut), kop sekolah, tanda tangan.
 - Riwayat lama tetap dapat dibuka/diunduh (disimpan sebagai HTML). Tidak ada perubahan database.
+
+## v26 — LKPD mengikuti "Format LKPD Permendikdasmen 1/2026" (tanpa migrasi SQL baru)
+LKPD yang dihasilkan menu **Generate LKPD** kini memakai format lampiran: sampul + tabel identitas (termasuk nama murid/kelompok dan hari/tanggal), **A** Tujuan Pembelajaran, **B** Petunjuk Belajar, **C** Kegiatan 1 — Memahami (kotak stimulus, tabel data, pertanyaan pemahaman dengan kolom jawaban), **D** Kegiatan 2 — Mengaplikasi (tugas, tabel kerja, kesimpulan kelompok), **E** Kegiatan 3 — Merefleksi (tabel refleksi + penilaian diri), **F** Penilaian oleh Guru (rubrik 4 aspek, capaian, umpan balik, tindak lanjut), **G** Dasar Acuan (untuk guru). Kunci jawaban (bila dicentang) berada di halaman guru sebelum bagian G. Header "LKPD • Mapel • Topik" dan footer dengan nomor halaman pada unduhan Word.
+- `netlify/functions/perangkat-ajar.js`: prompt & struktur JSON LKPD diganti (RPP dan Modul tidak berubah).
+- `perangkat-ajar.js`: `renderLkpd` ditulis ulang; form LKPD: "Jumlah Kegiatan" menjadi "Jumlah Pertanyaan Pemahaman" (2-5) dan ada pilihan "Alokasi Waktu (JP)". Gambar AI tetap dibuat per gambar (letak: bahan belajar Kegiatan 1 atau Kegiatan 2), tombol ganti/hapus/buat ulang tetap berfungsi.
+- Kop/logo tetap mengikuti pengaturan aplikasi. LKPD lama di riwayat tetap dapat dibuka dan diunduh.

@@ -59,7 +59,7 @@
     return `
       <h2>Generate ${NAMA[j]} dengan AI</h2>
       <p class="muted">${j === 'lkpd'
-        ? 'LKPD berisi kegiatan, tugas berjenjang, kolom jawaban, dan <b>gambar hasil AI</b>. Gambar dibuat satu per satu setelah teks selesai.'
+        ? 'LKPD mengikuti format Permendikdasmen 1/2026: tujuan, petunjuk, Kegiatan 1 Memahami, Kegiatan 2 Mengaplikasi, Kegiatan 3 Merefleksi, penilaian guru, dan <b>gambar hasil AI</b>. Gambar dibuat satu per satu setelah teks selesai.'
         : j === 'rpp'
         ? 'RPP disusun otomatis mengikuti format & pengaturan di menu <b>Pengaturan RPP &amp; Modul</b>.'
         : 'Modul Ajar lengkap mengikuti template: informasi umum, kesiapan peserta didik, desain pembelajaran, materi, langkah pembelajaran, LKPD, asesmen, diferensiasi, tindak lanjut, refleksi, dan sumber rujukan.'}
@@ -73,12 +73,13 @@
         <div class="field"><label>Tujuan Pembelajaran (centang yang dipakai)</label><div id="pa-${j}-tp" class="muted" style="max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px;"></div></div>
         <div class="field"><label>Topik / Materi Pokok</label><input type="text" id="pa-${j}-topik" placeholder="mis. Persamaan Linear Satu Variabel" /></div>
         ${j === 'lkpd' ? `<div class="grid3">
-          <div class="field"><label>Jumlah Kegiatan</label><select id="pa-${j}-pert"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+          <div class="field"><label>Jumlah Pertanyaan Pemahaman</label><select id="pa-${j}-pert"><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
           <div class="field"><label>Jumlah Gambar</label><select id="pa-${j}-gbr"><option>0</option><option>1</option><option>2</option><option selected>3</option></select></div>
           <div class="field"><label>Gaya Gambar</label><select id="pa-${j}-gaya"><option value="otomatis">Gambar AI (otomatis ilustrasi bila gagal)</option><option value="svg">Ilustrasi diagram saja (cepat)</option></select></div>
         </div>
         <div class="grid3">
           <div class="field"><label>Nama Guru</label><input type="text" id="pa-${j}-guru" /></div>
+          <div class="field"><label>Alokasi Waktu (JP)</label><select id="pa-${j}-jp"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
           <div class="field" style="align-self:end;"><label><input type="checkbox" id="pa-${j}-kunci" checked> Sertakan kunci jawaban (halaman guru)</label></div>
         </div>` : `<div class="grid3">
           <div class="field"><label>Jumlah Pertemuan</label><select id="pa-${j}-pert"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
@@ -182,7 +183,7 @@
       terakhir[j] = { judul: `${NAMA[j]} ${m.nama} Kelas ${m.kelas || ''} - ${topik}`.slice(0, 160), meta: { mapel: m.nama, kelas: m.kelas, semester: ctx.semester, topik, provider: r.provider }, mapel_id: m.id, semester: ctx.semester, kelas: m.kelas };
       st.textContent = `Selesai (${r.provider}). Periksa & edit bila perlu, lalu simpan/unduh.`;
       $(`pa-${j}-hasilbox`).scrollIntoView({ behavior: 'smooth' });
-      if (j === 'lkpd') { terakhir[j].gambar = r.data.bagian.map((b) => (b && b.gambar && b.gambar.deskripsi) || null); pasangTombol(j); await buatGambar(j); }
+      if (j === 'lkpd') { terakhir[j].gambar = (Array.isArray(r.data.gambar) ? r.data.gambar : []).slice(0, 3).map((g) => (g && g.deskripsi) || null); pasangTombol(j); await buatGambar(j); }
     } catch (e) { st.style.color = '#B42318'; st.textContent = e.message; } finally { btn.disabled = false; }
   }
 
@@ -274,8 +275,9 @@
   };
   // tabel bergaya template: baris judul hijau berhuruf putih tebal, baris isi berselang-seling putih / hijau muda
   function mtabel(kolom, baris, lebar, opsi = {}) {
-    const head = `<tr>${kolom.map((k, i) => mcell(k, { bg: M_HIJAU, w: lebar && lebar[i], tebal: true, css: 'color:#FFFFFF;font-weight:bold;' })).join('')}</tr>`;
-    const isi = baris.map((r, ri) => `<tr style="page-break-inside:avoid;">${r.map((x, i) => mcell(x, { bg: ri % 2 === 1 ? M_MUDA : '', w: lebar && lebar[i], va: opsi.va, css: i === 0 && opsi.tebalKolom1 ? 'font-weight:bold;' : (opsi.minTinggi ? `height:${opsi.minTinggi};` : '') })).join('')}</tr>`).join('');
+    const tgh = (i) => (opsi.tengah && opsi.tengah.includes(i) ? 'text-align:center;' : '');
+    const head = opsi.tanpaHeader ? '' : `<tr>${kolom.map((k, i) => mcell(k, { bg: M_HIJAU, w: lebar && lebar[i], tebal: true, css: `color:#FFFFFF;font-weight:bold;${tgh(i)}` })).join('')}</tr>`;
+    const isi = baris.map((r, ri) => `<tr style="page-break-inside:avoid;${opsi.minTinggi ? `height:${opsi.minTinggi};` : ''}">${r.map((x, i) => mcell(x, { bg: ri % 2 === 1 ? M_MUDA : '', w: lebar && lebar[i], va: opsi.va, tebal: opsi.tebalKolom1 && i === 0, css: `${i === 0 && opsi.tebalKolom1 ? 'font-weight:bold;' : (opsi.minTinggi ? `height:${opsi.minTinggi};` : '')}${tgh(i)}` })).join('')}</tr>`).join('');
     return `<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;margin:2pt 0 8pt;">${head}${isi}</table>`;
   }
   const mjudulKolom = (k) => (Array.isArray(k) ? k : []).map(S_).filter(Boolean);
@@ -404,23 +406,119 @@
     return `<div data-tpl="modul" data-tpl-hdr="${esc(hdr)}" data-tpl-ftr="${esc(ftr)}" style="font-family:${M_FONT};font-size:10pt;line-height:1.3;">${out.join('')}</div>`;
   }
 
+  // ---------------- LKPD: mengikuti "Format LKPD Permendikdasmen 1/2026" ----------------
+  // A Tujuan, B Petunjuk, C Kegiatan 1 Memahami, D Kegiatan 2 Mengaplikasi, E Kegiatan 3 Merefleksi, F Penilaian oleh guru, G Dasar acuan (guru)
   function renderLkpd(d, c) {
-    const garis = (n) => Array.from({ length: n }, () => '<tr><td style="border-bottom:1px solid #777;height:24px;">&nbsp;</td></tr>').join('');
-    const kotak = `<table style="${TB}margin:3px 0 8px;">${garis(3)}</table>`;
-    const bag = (d.bagian || []).map((b, i) => {
-      const g = b.gambar && b.gambar.deskripsi ? `<div data-gambar="${i}" style="text-align:center;margin:8px 0;"><div data-isi="1"><span style="color:#888;">⏳ Gambar sedang dibuat...</span></div><i data-ket="1">${esc(b.gambar.keterangan || '')}</i></div>` : '';
-      const tugas = L(b.tugas).map((t, k) => `<tr><td style="width:4%;vertical-align:top;">${k + 1}.</td><td>${esc(t)}${kotak}</td></tr>`).join('');
-      return `${H(esc(b.judul || 'Kegiatan ' + (i + 1)))}${b.uraian ? `<p style="margin:0 0 4px;text-align:justify;">${esc(b.uraian)}</p>` : ''}${g}<table style="${TB}">${tugas}</table>`;
+    const mjp = +PENG.menit_per_jp || 45; const jp = +c.jp || 2;
+    const S = (typeof SEKOLAH !== 'undefined' && SEKOLAH) || {};
+    const lembaga = S.nama_lembaga || 'PKBM';
+    const st = d.stimulus && typeof d.stimulus === 'object' ? d.stimulus : {};
+    const judul = S_(d.judul || c.topik);
+    const sub = [c.mapel, c.program, c.kelas ? `Kelas ${c.kelas}` : '', c.fase ? `Fase ${c.fase}` : ''].filter(Boolean).join(' • ');
+    const hdr = `LKPD • ${S_(c.mapel)} • ${S_(c.topik)}`.slice(0, 120);
+    const ftr = `${lembaga} — Tahun Pelajaran ${PENG.tahun_ajaran || ''}`.trim();
+    const ki = (t) => `<p style="font-family:${M_FONT};font-size:9pt;margin:0 0 5pt;font-style:italic;color:#646464;">${esc(t)}</p>`;
+    const lbl = (t) => `<p style="font-family:${M_FONT};font-size:10pt;font-weight:bold;margin:6pt 0 3pt;"><b>${esc(t)}</b></p>`;
+    const kotakKosong = (tinggi) => `<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;margin:2pt 0 8pt;"><tr>${mcell('', { css: `height:${tinggi};` })}</tr></table>`;
+    // gambar AI: indeks data-gambar = urutan pada d.gambar (dipakai buatGambar/pasangTombol)
+    const gbr = (Array.isArray(d.gambar) ? d.gambar : []).slice(0, 3);
+    const figur = (letak) => gbr.map((g, i) => {
+      if (!g || !g.deskripsi || (g.letak === 'tugas' ? 'tugas' : 'stimulus') !== letak) return '';
+      return `<div data-gambar="${i}" style="text-align:center;margin:8px 0;"><div data-isi="1"><span style="color:#888;">⏳ Gambar sedang dibuat...</span></div><i data-ket="1" style="font-family:${M_FONT};font-size:9pt;">${esc(g.keterangan || '')}</i></div>`;
     }).join('');
-    const kunci = L(d.kunci).length ? `<div style="page-break-before:always;"></div><p style="text-align:center;"><b>KUNCI JAWABAN (KHUSUS GURU)</b></p>${OL(d.kunci)}` : '';
-    return `${kop()}<p style="text-align:center;font-size:14pt;margin:0 0 8px;"><b>LEMBAR KERJA PESERTA DIDIK (LKPD)</b><br>${esc(d.judul || c.topik)}</p>
-      ${baris([['Mata Pelajaran', esc(c.mapel)], ['Kelas / Semester', esc(`${c.kelas || ''} / ${c.semester}`)], ['Nama', '.......................................................'], ['Kelompok / Tanggal', '.......................................................']])}
-      ${H('Tujuan Pembelajaran')}${OL(d.tujuan)}
-      ${L(d.petunjuk).length ? H('Petunjuk Pengerjaan') + OL(d.petunjuk) : ''}
-      ${L(d.alat_bahan).length ? H('Alat dan Bahan') + UL(d.alat_bahan) : ''}
-      ${bag}
-      ${L(d.refleksi).length ? H('Refleksi') + OL(d.refleksi) + kotak : ''}
-      ${kunci}`;
+    const out = [];
+
+    // --- sampul + identitas ---
+    out.push(kop().replace('<table style="', `<table style="font-family:${M_FONT};`));
+    out.push(`<p style="font-family:${M_FONT};text-align:center;font-size:22pt;font-weight:bold;color:${M_HIJAU};margin:14pt 0 4pt;">LEMBAR KERJA PESERTA DIDIK (LKPD)</p>
+      <p style="font-family:${M_FONT};text-align:center;font-size:14pt;font-weight:bold;margin:0 0 4pt;">${esc(judul.toUpperCase())}</p>
+      <p style="font-family:${M_FONT};text-align:center;font-size:10pt;font-style:italic;margin:0 0 10pt;">${esc(sub)}</p>`);
+    out.push(mtabel(['IDENTITAS', 'KETERANGAN'], [
+      ['Satuan pendidikan', lembaga], ['Mata pelajaran', c.mapel],
+      ['Program / kelas / fase', [c.program, c.kelas, c.fase].filter(Boolean).join(' / ')], ['Topik', c.topik],
+      ['Alokasi waktu', `${jp} JP × ${mjp} menit`],
+      ['Nama murid / kelompok', '...............................................................'], ['Hari / tanggal', '...............................................................'],
+    ], ['31%', '69%'], { va: 'middle', tebalKolom1: true }));
+
+    // --- A. Tujuan, B. Petunjuk ---
+    out.push(mh1('A. TUJUAN PEMBELAJARAN'));
+    out.push(ki('Bacakan bersama murid agar murid tahu apa yang akan dicapai.'));
+    out.push(mp('Setelah mengerjakan LKPD ini, saya diharapkan mampu:') + mol(d.tujuan));
+    out.push(mh1('B. PETUNJUK BELAJAR'));
+    out.push(mul([
+      'Baca tujuan pembelajaran dan seluruh kegiatan sebelum mulai mengerjakan.',
+      'Kerjakan kegiatan secara berurutan: Memahami, Mengaplikasi, lalu Merefleksi.',
+      'Gunakan berbagai sumber belajar (buku, lingkungan sekitar, data, atau media digital/nondigital) dan tuliskan sumbernya.',
+      'Berdiskusilah dengan sopan, saling menghargai pendapat, dan bertanya kepada guru bila belum paham.',
+    ]));
+
+    // --- C. Kegiatan 1 - Memahami ---
+    out.push(mh1('C. KEGIATAN 1 — MEMAHAMI', 'page-break-before:always;'));
+    out.push(ki('Murid membangun pengetahuan dari berbagai sumber dan konteks.'));
+    out.push(mh2('Stimulus / bahan belajar'));
+    out.push(`<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;margin:2pt 0 8pt;"><tr><td bgcolor="${M_MUDA}" style="border:0.5pt solid #7f7f7f;background:${M_MUDA};padding:5pt 7pt;font-family:${M_FONT};font-size:10pt;">`
+      + (S_(st.judul).trim() ? `<p style="margin:0 0 3pt;font-family:${M_FONT};font-size:10pt;font-weight:bold;"><b>${esc(st.judul)}</b></p>` : '')
+      + mp(st.uraian)
+      + (S_(st.catatan).trim() ? `<p style="margin:2pt 0 0;font-family:${M_FONT};font-size:9pt;font-style:italic;color:#646464;">${esc(st.catatan)}</p>` : '')
+      + '</td></tr></table>');
+    const dt = st.data && Array.isArray(st.data.kolom) && Array.isArray(st.data.baris) && st.data.baris.length ? st.data : null;
+    if (dt) out.push(lbl(dt.judul || 'Data pengamatan:') + mtabel(mjudulKolom(dt.kolom), dt.baris.map((r) => (Array.isArray(r) ? r : [r]).map(S_)), null, { va: 'middle' }));
+    out.push(figur('stimulus'));
+    out.push(mh2('Pertanyaan pemahaman'));
+    out.push(mtabel(['No.', 'Pertanyaan', 'Jawaban saya'], L(d.pertanyaan).map((q, i) => [String(i + 1), q, '']), ['8%', '46%', '46%'], { va: 'middle', minTinggi: '38pt', tengah: [0] }));
+    out.push(mp('Sumber yang saya gunakan: ..............................................................................................'));
+
+    // --- D. Kegiatan 2 - Mengaplikasi ---
+    out.push(mh1('D. KEGIATAN 2 — MENGAPLIKASI'));
+    out.push(ki('Murid menggunakan pengetahuan dalam situasi kehidupan nyata dan kontekstual.'));
+    out.push(mh2('Tugas') + (L(d.tugas).length > 1 ? mol(d.tugas) : mp(L(d.tugas)[0] || '')));
+    out.push(figur('tugas'));
+    const kol = mjudulKolom(d.kolom); const kolom = kol.length >= 2 ? kol.slice(0, 5) : ['Temuan / fakta', 'Dugaan / penjelasan', 'Dampak yang mungkin', 'Bukti tambahan'];
+    out.push(mh2('Tabel kerja') + mtabel(kolom, [0, 1, 2].map(() => kolom.map(() => '')), null, { minTinggi: '34pt' }));
+    out.push(lbl('Kesimpulan kelompok:') + kotakKosong('48pt'));
+
+    // --- E. Kegiatan 3 - Merefleksi ---
+    out.push(mh1('E. KEGIATAN 3 — MEREFLEKSI'));
+    out.push(ki('Murid mengevaluasi dan memaknai proses serta hasil belajarnya, lalu mengatur diri agar dapat belajar mandiri.'));
+    const rf = L(d.refleksi).length >= 2 ? L(d.refleksi) : [
+      'Hal baru yang saya pahami hari ini adalah ...', 'Bagian yang paling mudah / paling sulit bagi saya adalah ...',
+      'Cara belajar yang paling membantu saya adalah ...', 'Satu hal yang akan saya lakukan agar belajar saya lebih baik adalah ...'];
+    out.push(mtabel(['Pertanyaan refleksi', 'Jawaban saya'], rf.map((x) => [x, '']), ['50%', '50%'], { va: 'middle', minTinggi: '30pt' }));
+    out.push(mh2('Penilaian diri'));
+    out.push(mtabel(['Pernyataan', 'Ya', 'Sebagian', 'Belum'], [
+      'Saya memahami tujuan pembelajaran hari ini.', 'Saya dapat menjelaskan materi dengan kata-kata sendiri.',
+      'Saya dapat menerapkan materi pada contoh kehidupan nyata.', 'Saya bekerja sama dan menghargai pendapat teman.',
+    ].map((x) => [x, '☐', '☐', '☐']), ['58%', '14%', '14%', '14%'], { va: 'middle', tengah: [1, 2, 3] }));
+
+    // --- F. Penilaian oleh guru ---
+    out.push(mh1('F. PENILAIAN OLEH GURU', 'page-break-before:always;'));
+    out.push(ki('Gunakan teknik/instrumen yang sesuai tujuan pembelajaran. Rubrik di bawah adalah contoh; sesuaikan aspek dan deskriptornya.'));
+    const aspekDef = ['Pemahaman konsep', 'Penerapan pada konteks nyata', 'Refleksi diri', 'Kolaborasi dan komunikasi'];
+    const rb = (Array.isArray(d.rubrik) ? d.rubrik : []).filter((x) => x && typeof x === 'object');
+    const rubrik = aspekDef.map((a, i) => { const x = rb[i] || {}; return [S_(x.aspek || a), S_(x.sangat_baik), S_(x.baik), S_(x.berkembang || x.cukup), S_(x.perlu_bimbingan)]; });
+    out.push(mtabel(['Aspek', '4 — Sangat baik', '3 — Baik', '2 — Berkembang', '1 — Perlu bimbingan'], rubrik, ['20%', '20%', '20%', '20%', '20%'], { va: 'middle', tebalKolom1: true }));
+    out.push(mtabel(['', ''], [
+      ['Capaian / nilai', '..............................'], ['Umpan balik guru', ''],
+      ['Tindak lanjut', '☐ Pengayaan     ☐ Latihan terarah     ☐ Pendampingan dan asesmen ulang'],
+    ], ['28%', '72%'], { va: 'middle', tebalKolom1: true, tanpaHeader: true, minTinggi: '40pt' }));
+
+    // --- halaman guru: kunci jawaban + G. Dasar acuan ---
+    let pb = 'page-break-before:always;';
+    if (L(d.kunci).length) {
+      out.push(mh1('KUNCI JAWABAN (KHUSUS GURU)', pb)); pb = '';
+      out.push(mol(d.kunci));
+    }
+    out.push(mh1('G. DASAR ACUAN (UNTUK GURU)', pb));
+    out.push(ki('Bagian ini catatan penyusun; boleh dihapus sebelum dibagikan kepada murid.'));
+    out.push(mtabel(['Ketentuan', 'Penerapan dalam LKPD ini'], [
+      ['Permendikdasmen No. 1 Tahun 2026 tentang Standar Proses (Pasal 5): perencanaan pembelajaran paling sedikit memuat tujuan, langkah, dan penilaian/asesmen pembelajaran.', 'Bagian A (tujuan), C–E (langkah pembelajaran), dan E–F (asesmen).'],
+      ['Pasal 10 ayat (1): pengalaman belajar memahami, mengaplikasi, dan merefleksi.', 'Kegiatan 1, 2, dan 3.'],
+      ['Pasal 3 ayat (1): prinsip berkesadaran, bermakna, dan menggembirakan.', 'Tujuan dibacakan di awal (berkesadaran); tugas kontekstual (bermakna); kegiatan bervariasi dan menantang (menggembirakan).'],
+      ['Pasal 20: mencabut Permendiknas No. 3 Tahun 2008 (Standar Proses Kesetaraan) dan Permendikbudristek No. 16 Tahun 2022.', 'Format LKPD tidak lagi mengacu pada dua peraturan tersebut.'],
+    ], ['50%', '50%'], { va: 'middle' }));
+    out.push(ki('Catatan: peraturan tersebut tidak menetapkan format baku LKPD. Dokumen ini adalah rancangan yang selaras dengan isi Permendikdasmen 1/2026; satuan pendidikan boleh menyesuaikannya. Periksa naskah resmi di peraturan.go.id dan ketentuan terbaru dari satuan pendidikan atau dinas sebelum digunakan.'));
+
+    return `<div data-tpl="lkpd" data-tpl-hdr="${esc(hdr)}" data-tpl-ftr="${esc(ftr)}" data-tpl-hal="1" style="font-family:${M_FONT};font-size:10pt;line-height:1.3;">${out.join('')}</div>`;
   }
 
   // ----- gambar AI untuk LKPD -----
@@ -520,12 +618,12 @@
   // ---------------- Unduh / Cetak / Simpan ----------------
   // Modul Ajar bertemplate menandai dokumennya dengan data-tpl="modul" (+ teks header/footer) -> Word memakai Arial, margin template, header & footer
   function opsiTemplate(html) {
-    const m = /data-tpl="modul"\s+data-tpl-hdr="([^"]*)"\s+data-tpl-ftr="([^"]*)"/.exec(html || '');
-    return m ? { hdr: m[1], ftr: m[2] } : null;
+    const m = /data-tpl="(?:modul|lkpd)"\s+data-tpl-hdr="([^"]*)"\s+data-tpl-ftr="([^"]*)"(\s+data-tpl-hal="1")?/.exec(html || '');
+    return m ? { hdr: m[1], ftr: m[2], hal: !!m[3] } : null;
   }
   function bungkusWord(html, judul, tpl) {
     const hf = tpl ? `<div style='mso-element:header' id="h1"><p style="text-align:right;font-family:Arial,sans-serif;font-size:8pt;color:#6E6E6E;margin:0;">${tpl.hdr}</p></div>
-      <div style='mso-element:footer' id="f1"><p style="text-align:center;font-family:Arial,sans-serif;font-size:8pt;font-style:italic;color:#6E6E6E;margin:0;">${tpl.ftr}</p></div>` : '';
+      <div style='mso-element:footer' id="f1"><p style="text-align:center;font-family:Arial,sans-serif;font-size:8pt;font-style:italic;color:#6E6E6E;margin:0;">${tpl.ftr}${tpl.hal ? ` • Halaman <span style='mso-field-code:" PAGE "'><span style='mso-no-proof:yes'>1</span></span>` : ''}</p></div>` : '';
     const halaman = tpl
       ? '@page Section1{size:595.3pt 841.9pt;margin:65.2pt 65.2pt 65.2pt 76.6pt;mso-header-margin:36pt;mso-footer-margin:36pt;mso-header:h1;mso-footer:f1;}'
       : '@page Section1{size:595.3pt 841.9pt;margin:56.7pt 56.7pt 56.7pt 70.9pt;}';

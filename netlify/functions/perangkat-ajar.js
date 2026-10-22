@@ -120,23 +120,29 @@ const PETUNJUK_MODUL = `Aturan isi MODUL AJAR (ikuti urutan bagian pada template
 - "pustaka": rujukan nyata dan lazim (buku teks Kemendikdasmen, dokumen CP resmi); jangan mengarang judul, penulis, atau tautan.
 - Tulis ringkas dan padat agar seluruh dokumen muat; jangan menyalin tanda titik-titik.`;
 
+// LKPD mengikuti format "Format LKPD Permendikdasmen 1/2026": Tujuan, Petunjuk, Kegiatan 1 Memahami (stimulus + pertanyaan),
+// Kegiatan 2 Mengaplikasi (tugas + tabel kerja), Kegiatan 3 Merefleksi, Penilaian oleh guru (rubrik). Dirakit oleh renderLkpd() di browser.
 function susunPromptLkpd(b) {
   const p = b.pengaturan || {};
-  const n = Math.min(Math.max(parseInt(b.kegiatan, 10) || 3, 1), 5);
+  const n = Math.min(Math.max(parseInt(b.kegiatan, 10) || 3, 2), 5); // jumlah pertanyaan pemahaman
   const g = Math.min(Math.max(parseInt(b.gambar, 10) || 0, 0), 3);
   const cp = b.cp && b.cp.deskripsi ? `\nCapaian Pembelajaran: ${String(b.cp.deskripsi).slice(0, 800)}` : '';
   const tp = (b.tp || []).filter((t) => t && t.deskripsi).slice(0, 8).map((t) => `- ${String(t.deskripsi).slice(0, 250)}`).join('\n');
   const gam = g
-    ? `Sertakan tepat ${g} gambar: isi objek "gambar" pada ${g} kegiatan yang paling terbantu visual, sisanya null. "deskripsi" gambar ditulis dalam BAHASA INGGRIS, konkret dan spesifik (objek, susunan, gaya ilustrasi edukasi sederhana), tanpa teks di dalam gambar. "keterangan" ditulis Indonesia, mis. "Gambar 1. Siklus air".`
-    : 'Jangan sertakan gambar: semua "gambar" bernilai null.';
-  const bentuk = `{"judul":"...","tujuan":["..."],"petunjuk":["..."],"alat_bahan":["..."],"bagian":[{"judul":"Kegiatan 1: ...","uraian":"stimulus/pengantar singkat","gambar":{"deskripsi":"...","keterangan":"..."},"tugas":["..."]}],"refleksi":["..."]${b.kunci ? ',"kunci":["jawaban ringkas tiap tugas, berurutan"]' : ''}}`;
-  return `Susun LKPD (Lembar Kerja Peserta Didik) untuk sekolah kesetaraan PKBM di Indonesia, Kurikulum Merdeka. Bahasa Indonesia sederhana, aktivitas konkret, bisa dikerjakan peserta didik secara mandiri atau berkelompok.
+    ? `Sertakan tepat ${g} gambar pada array "gambar". Tiap gambar: "letak" bernilai "stimulus" (ditaruh di bahan belajar Kegiatan 1) atau "tugas" (ditaruh di Kegiatan 2); utamakan "stimulus" lebih dulu. "deskripsi" ditulis dalam BAHASA INGGRIS, konkret dan spesifik (objek, susunan, gaya ilustrasi edukasi sederhana), tanpa teks di dalam gambar. "keterangan" ditulis Indonesia, mis. "Gambar 1. Siklus air".`
+    : 'Jangan sertakan gambar: "gambar" berupa array kosong [].';
+  const bentuk = `{"judul":"judul kegiatan/topik","tujuan":["3 tujuan, diawali kata kerja yang dapat diamati"],"stimulus":{"judul":"Kasus: ...","uraian":"kasus kontekstual 3-4 kalimat","catatan":"catatan singkat bahwa kasus/data ilustratif dan perlu pembuktian (boleh kosong)","data":{"judul":"Data pengamatan (contoh ilustrasi):","kolom":["...","...","..."],"baris":[["...","...","..."]]}},"pertanyaan":["${n} pertanyaan pemahaman berjenjang"],"tugas":["1-2 tugas kontekstual untuk Kegiatan 2"],"kolom":["4 judul kolom tabel kerja"],"refleksi":["4 kalimat awal refleksi yang diakhiri ..."],"rubrik":[{"aspek":"Pemahaman konsep","sangat_baik":"...","baik":"...","berkembang":"...","perlu_bimbingan":"..."}],"gambar":[{"letak":"stimulus","deskripsi":"...","keterangan":"..."}]${b.kunci ? ',"kunci":["jawaban ringkas tiap pertanyaan lalu tiap tugas, berurutan"]' : ''}}`;
+  return `Susun LKPD (Lembar Kerja Peserta Didik) untuk sekolah kesetaraan PKBM di Indonesia mengikuti Permendikdasmen No. 1 Tahun 2026 tentang Standar Proses. Pengalaman belajar berurutan: Kegiatan 1 MEMAHAMI, Kegiatan 2 MENGAPLIKASI, Kegiatan 3 MEREFLEKSI. Bahasa Indonesia sederhana, menyebut peserta didik sebagai "murid", aktivitas konkret, bisa dikerjakan secara mandiri atau berkelompok.
 Mata pelajaran: ${b.mapel}
 Program/Kelas: ${b.program || ''} Kelas ${b.kelas || ''}${b.fase ? ` (Fase ${b.fase})` : ''}, Semester ${b.semester || ''}
 Topik: ${b.topik}${cp}${tp ? `\nTujuan Pembelajaran:\n${tp}` : ''}
-Jumlah kegiatan: ${n}. Setiap kegiatan punya 2-4 tugas berjenjang (mengamati, menanya, mencoba, menalar/menyimpulkan); tugas harus berupa pertanyaan atau perintah yang dijawab di lembar.
-${gam}
-${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 400)}\n` : ''}Balas HANYA satu JSON object berbentuk persis:
+Aturan isi:
+- "stimulus": kasus/bahan belajar yang kontekstual; "data" berupa tabel kecil 3 kolom dan 3-4 baris (isi "data" null bila topik tidak cocok bertabel). Bila kasus atau data bersifat rekaan, tulis ilustratif pada "catatan" dan "judul" data.
+- "pertanyaan": tepat ${n} butir, dari mengamati, membedakan fakta dan dugaan, sampai menalar; dijawab murid di kolom jawaban.
+- "tugas": tugas kontekstual (memecahkan masalah, mengamati dengan aman, membuat produk, atau menyusun usulan solusi); "kolom": 4 judul kolom tabel kerja yang sesuai tugas.
+- "rubrik": 4 aspek berurutan (Pemahaman konsep; Penerapan pada konteks nyata; Refleksi diri; Kolaborasi dan komunikasi) dengan deskriptor khas topik ini, satu kalimat pendek tiap sel.
+- ${gam}
+${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 400)}\n` : ''}Tulis ringkas dan padat; jangan menyalin tanda titik-titik. Balas HANYA satu JSON object berbentuk persis:
 ${bentuk}`;
 }
 
@@ -162,7 +168,7 @@ ${b.jenis === 'modul' ? bentukModul(p) : bentukRpp(p)}`;
 }
 
 function valid(d, jenis) {
-  if (jenis === 'lkpd') return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.bagian) && d.bagian.length;
+  if (jenis === 'lkpd') return d && Array.isArray(d.tujuan) && d.tujuan.length && d.stimulus && typeof d.stimulus === 'object' && Array.isArray(d.pertanyaan) && d.pertanyaan.length;
   if (jenis === 'modul') {
     return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.kegiatan) && d.kegiatan.length
       && d.kegiatan.every((k) => k && Array.isArray(k.langkah) && k.langkah.length) && d.asesmen && typeof d.asesmen === 'object';
