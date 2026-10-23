@@ -120,6 +120,39 @@ const PETUNJUK_MODUL = `Aturan isi MODUL AJAR (ikuti urutan bagian pada template
 - "pustaka": rujukan nyata dan lazim (buku teks Kemendikdasmen, dokumen CP resmi); jangan mengarang judul, penulis, atau tautan.
 - Tulis ringkas dan padat agar seluruh dokumen muat; jangan menyalin tanda titik-titik.`;
 
+// ---------- MODUL AJAR TEMPLATE 2: "Template Modul Ajar - Pendidikan Kesetaraan (Paket A/B/C)" ----------
+// Bagian: A Informasi Umum, B Dimensi Profil Lulusan, C Desain Pembelajaran, D Pengalaman Belajar
+// (Pendahuluan -> Memahami -> Mengaplikasi -> Merefleksi -> Penutup), E Asesmen, F Lampiran. Dirakit oleh renderModul2() di browser.
+const DIMENSI_LULUSAN = ['Keimanan dan Ketakwaan terhadap Tuhan YME', 'Kewargaan', 'Penalaran Kritis', 'Kreativitas', 'Kolaborasi', 'Kemandirian', 'Kesehatan (jiwa & raga)', 'Komunikasi'];
+const KEGIATAN_MODUL2 = '"kegiatan":[{"pertemuan":1,"pendahuluan":[{"aktivitas":"...","menit":10}],"memahami":[{"aktivitas":"...","menit":20}],"mengaplikasi":[{"aktivitas":"...","menit":35}],"merefleksi":[{"aktivitas":"...","menit":15}],"penutup":[{"aktivitas":"...","menit":10}]}]';
+
+function bentukModul2(p) {
+  const f = [
+    '"moda":"salah satu: Tatap Muka | Tutorial | Mandiri | Kombinasi"',
+    `"dimensi":["2-4 nama dimensi, ditulis PERSIS seperti salah satu dari: ${DIMENSI_LULUSAN.join(' | ')}"]`,
+    '"tujuan":["3-4 tujuan: kompetensi + lingkup materi, diawali kata kerja operasional"]',
+    '"pemahaman_bermakna":"2-3 kalimat manfaat/relevansi materi bagi kehidupan sehari-hari atau dunia kerja peserta didik"',
+    '"pertanyaan_pemantik":["3-4 pertanyaan terbuka"]',
+    '"target_peserta":"2-3 kalimat target peserta didik dan karakteristiknya (usia dewasa/putus sekolah, bekerja paruh waktu, kemampuan awal beragam, dsb.)"',
+    '"sarpras":["4-6 butir sarana, prasarana, dan sumber belajar"]',
+    KEGIATAN_MODUL2,
+    '"asesmen":{"awal":"asesmen diagnostik: teknik + 2 contoh pertanyaan","formatif":"asesmen proses: teknik, bentuk umpan balik","sumatif":"bentuk asesmen akhir + 3 contoh soal/tugas beserta kunci singkat, dipisah baris baru (\\n)","instrumen":["pilih dari: Tes tulis | Lisan | Produk | Portofolio | Praktik | Observasi"]}',
+  ];
+  const lamp = ['"lkpd":{"judul":"...","petunjuk":"1-2 kalimat","tugas":["3-4 tugas/pertanyaan bertahap"]}', '"bahan_bacaan":"ringkasan materi 1-2 paragraf (dipisah baris baru) yang benar secara substansi"'];
+  if (p.sertakan_rubrik) lamp.push('"rubrik":[{"aspek":"...","sangat_baik":"...","baik":"...","berkembang":"...","perlu_bimbingan":"..."}]');
+  lamp.push('"glosarium":[{"istilah":"...","arti":"..."}]');
+  f.push(`"lampiran":{${lamp.join(',')}}`);
+  return `{${f.join(',')}}`;
+}
+
+const PETUNJUK_MODUL2 = `Aturan isi MODUL AJAR Template 2 (Pendidikan Kesetaraan, pendekatan Pembelajaran Mendalam):
+- Alur pengalaman belajar mengikuti tiga tahap Pembelajaran Mendalam: Memahami -> Mengaplikasi -> Merefleksi, dengan prinsip berkesadaran, bermakna, dan menggembirakan; diawali Pendahuluan dan diakhiri Penutup.
+- "kegiatan": tiap pertemuan memuat lima kelompok: "pendahuluan" (2-3 aktivitas), "memahami" (2-3: peserta didik membangun pengetahuan awal dari berbagai sumber), "mengaplikasi" (2-3: menerapkan pada situasi nyata/kontekstual, memecahkan masalah, membuat produk, berlatih keterampilan), "merefleksi" (1-2: meninjau proses dan hasil belajar, menetapkan langkah selanjutnya), "penutup" (1-2). Tiap aktivitas satu kalimat padat yang menyebut apa yang dilakukan pendidik dan peserta didik, beserta "menit".
+- "dimensi": nama dimensi harus persis sama dengan daftar yang diberikan.
+- "asesmen.instrumen": pilih 2-4 bentuk dari daftar yang diberikan, tulis persis.
+- "lampiran.glosarium": 5-6 istilah penting beserta arti singkat. "lampiran.bahan_bacaan": jangan mengarang data, kutipan, atau tautan.
+- Tulis ringkas dan padat agar seluruh dokumen muat; jangan menyalin tanda titik-titik.`;
+
 // LKPD mengikuti format "Format LKPD Permendikdasmen 1/2026": Tujuan, Petunjuk, Kegiatan 1 Memahami (stimulus + pertanyaan),
 // Kegiatan 2 Mengaplikasi (tugas + tabel kerja), Kegiatan 3 Merefleksi, Penilaian oleh guru (rubrik). Dirakit oleh renderLkpd() di browser.
 function susunPromptLkpd(b) {
@@ -149,7 +182,8 @@ ${bentuk}`;
 function susunPrompt(b) {
   if (b.jenis === 'lkpd') return susunPromptLkpd(b);
   const p = b.pengaturan || {};
-  const jenis = b.jenis === 'modul' ? 'MODUL AJAR (Kurikulum Merdeka)' : 'RPP (Rencana Pelaksanaan Pembelajaran)';
+  const tpl2 = b.jenis === 'modul' && parseInt(b.template, 10) === 2;
+  const jenis = b.jenis === 'modul' ? (tpl2 ? 'MODUL AJAR Pendidikan Kesetaraan (Paket A/B/C) dengan pendekatan Pembelajaran Mendalam' : 'MODUL AJAR (Kurikulum Merdeka)') : 'RPP (Rencana Pelaksanaan Pembelajaran)';
   const pert = Math.min(Math.max(parseInt(b.pertemuan, 10) || 1, 1), 4);
   const jp = Math.min(Math.max(parseInt(b.jp, 10) || 2, 1), 6);
   const mjp = Math.min(Math.max(parseInt(p.menit_per_jp, 10) || 45, 30), 60);
@@ -162,12 +196,20 @@ Program/Kelas: ${b.program || ''} Kelas ${b.kelas || ''}${b.fase ? ` (Fase ${b.f
 Topik/materi pokok: ${b.topik}${cp}${tp ? `\nTujuan Pembelajaran (TP) yang dijadikan acuan, gunakan/rumuskan ulang sebagai tujuan:\n${tp}` : ''}
 Jumlah pertemuan: ${pert}; tiap pertemuan ${jp} JP x ${mjp} menit = ${menit} menit. Pada "kegiatan" buat tepat ${pert} objek pertemuan, dan jumlah "menit" seluruh tahap tiap pertemuan HARUS = ${menit}.
 Model pembelajaran: ${p.model_default || 'pilih yang paling sesuai'}. Peserta didik PKBM umumnya beragam usia dan latar belakang; kaitkan dengan konteks nyata/dunia kerja bila relevan.
-${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 600)}\n` : ''}${b.jenis === 'modul' ? PETUNJUK_MODUL : 'Langkah kegiatan harus konkret (apa yang dilakukan guru dan peserta didik), 3-6 langkah per fase, ringkas.'}
+${p.catatan_ai ? `Catatan khusus dari sekolah: ${String(p.catatan_ai).slice(0, 600)}\n` : ''}${b.jenis === 'modul' ? (tpl2 ? PETUNJUK_MODUL2 : PETUNJUK_MODUL) : 'Langkah kegiatan harus konkret (apa yang dilakukan guru dan peserta didik), 3-6 langkah per fase, ringkas.'}
 Balas HANYA satu JSON object dengan bentuk persis berikut (isi "..." dengan konten nyata, jangan salin tanda titik-titik):
-${b.jenis === 'modul' ? bentukModul(p) : bentukRpp(p)}`;
+${b.jenis === 'modul' ? (tpl2 ? bentukModul2(p) : bentukModul(p)) : bentukRpp(p)}`;
 }
 
-function valid(d, jenis) {
+function validModul2(d) {
+  const ada = (a) => Array.isArray(a) && a.length;
+  return d && ada(d.tujuan) && ada(d.dimensi) && ada(d.kegiatan)
+    && d.kegiatan.every((k) => k && ada(k.memahami) && ada(k.mengaplikasi) && ada(k.merefleksi))
+    && d.asesmen && typeof d.asesmen === 'object';
+}
+
+function valid(d, jenis, template) {
+  if (jenis === 'modul' && parseInt(template, 10) === 2) return validModul2(d);
   if (jenis === 'lkpd') return d && Array.isArray(d.tujuan) && d.tujuan.length && d.stimulus && typeof d.stimulus === 'object' && Array.isArray(d.pertanyaan) && d.pertanyaan.length;
   if (jenis === 'modul') {
     return d && Array.isArray(d.tujuan) && d.tujuan.length && Array.isArray(d.kegiatan) && d.kegiatan.length
@@ -256,7 +298,7 @@ exports.handler = async (event) => {
       try {
         const raw = await panggil(k, prompt, Math.min(sisa - 500, 32000), tokens);
         const d = ambilJson(raw);
-        if (!valid(d, b.jenis)) throw new Error('Struktur hasil AI tidak lengkap');
+        if (!valid(d, b.jenis, b.template)) throw new Error('Struktur hasil AI tidak lengkap');
         return json(200, { data: d, provider: k.provider, model: k.model });
       } catch (er) {
         const s = er.status || 0; const m = String(er.message || '');
