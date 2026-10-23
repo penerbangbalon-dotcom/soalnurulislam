@@ -7,7 +7,7 @@
 <script>try{var t=localStorage.getItem('tema_sekolah');if(t)document.documentElement.setAttribute('data-tema',t)}catch(e){}</script>
 <title>Aplikasi Ujian — PKBM Nurul Islam</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -268,6 +268,101 @@ tr:hover td{background:var(--primary-soft);}
 /* ===== v15.14: mapel tidak diujikan ===== */
 .baris-tdk td{background:#FAFAF8;color:var(--ink-soft);}
 .badge-tdk{display:inline-block;padding:2px 10px;border-radius:999px;background:#F3F4F6;color:#4B5563;font-size:12px;font-weight:600;}
+
+/* ===== v16: tampilan baru mengikuti Aplikasi_Ujian_PKBM.html (hanya tampilan; menu & logika tidak berubah) ===== */
+:root{--paper:#F1F5FB;--surface:#fff;--surface-2:#F6F9FD;--ink:#0F1E3D;--ink-soft:#5B6B8A;--line:#DCE5F2;
+--green:#1B4FBF;--green-dark:#143C93;--primary-soft:#E1EAFB;--primary-ink:#1B4FBF;--on-primary:#fff;
+--sidebar-bg:#0C2A66;--side-active-bg:#F7C21B;--side-active-ink:#2B2000;
+--accent:#F7C21B;--accent-ink:#2B2000;--accent-soft:#FFF4CC;--good:#1E8A5A;--good-soft:#DFF4E9;--warn:#C2650A;--bad:#C23B2E;--bad-soft:#FBE6E3;--info:#0E7490;--info-soft:#DDF3F8;--track:#E6EDF8;--orange:#F28A1E;
+--f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--f-body:"Figtree","Segoe UI",system-ui,sans-serif;
+--shadow:0 1px 2px rgba(15,36,32,.06),0 8px 24px -12px rgba(15,36,32,.12);--radius:12px}
+body{background:var(--paper);font-family:var(--f-body);font-size:14.5px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-display);letter-spacing:-.015em}
+svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums}
+.card{border:0;border-radius:18px;padding:22px;box-shadow:var(--shadow);margin-bottom:16px}
+.btn{border-radius:10px}.btn.outline{border-color:var(--line);background:var(--surface);color:var(--ink)}
+.btn.outline:hover{border-color:var(--green);color:var(--primary-ink);background:var(--surface)}
+th{background:var(--surface-2);color:var(--ink-soft);font-size:12px;font-weight:700;border-bottom:0}
+td{border-bottom:1px solid var(--line)}tr:hover td{background:var(--surface-2)}
+input[type=text],input[type=number],input[type=email],input[type=password],select,textarea{background:var(--surface-2);border-color:var(--line)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* sidebar */
+#app{display:flex;min-height:100vh;align-items:flex-start}
+nav.sidebar{width:272px;position:sticky;top:0;height:100vh;overflow-y:auto;padding:18px 14px 0;gap:2px;z-index:30;
+background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.07)),var(--sidebar-bg);transition:width .2s;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+nav.sidebar .brand{border:0;margin:0;padding:2px 6px 10px;gap:12px!important}
+nav.sidebar .brand img{width:44px!important;height:44px!important;border-radius:50%;background:#fff;padding:2px}
+nav.sidebar .brand h1{font:700 15.5px/1.15 var(--f-display)!important;margin:0}
+nav.sidebar .brand small{color:#9DB6E3}
+.collapse{margin-left:auto;background:transparent;border:0;color:#9DB6E3;padding:6px;border-radius:8px}
+.collapse:hover{background:rgba(255,255,255,.08);color:#fff}
+.menu-cari{display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:0 10px;height:40px;color:#9DB6E3;margin:0 0 8px}
+.menu-cari input{flex:1;min-width:0;background:transparent!important;border:0!important;box-shadow:none!important;color:#fff;font:inherit;outline:0;padding:0!important}
+.menu-cari input::placeholder{color:#9DB6E3}
+.menu-cari kbd{font:600 12px var(--f-body);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:1px 7px}
+nav.sidebar .item,nav.sidebar .ghead{display:flex;align-items:center;gap:12px;margin:2px 0;padding:10px 12px;border-radius:12px;font-weight:600;font-size:14px;color:#EAF1FF}
+nav.sidebar .ghead>span:first-of-type,nav.sidebar .item.top>span:first-of-type{flex:1}
+nav.sidebar .item:hover,nav.sidebar .ghead:hover{background:rgba(255,255,255,.07)}
+nav.sidebar .group.has-active .ghead{background:transparent;color:#fff}
+nav.sidebar .item.active{background:var(--side-active-bg);color:var(--side-active-ink)}
+nav.sidebar .ghead .chev{margin-left:auto;opacity:.7;font-size:13px}
+nav.sidebar .subs{background:transparent;margin:2px 0 6px 21px;padding-left:12px;border-left:1px solid rgba(255,255,255,.16)}
+nav.sidebar .subs .item{margin:1px 0;padding:8px 10px;font-weight:500;font-size:13.5px;color:#D5E2FA}
+nav.sidebar .subs .item.active{color:var(--side-active-ink)}
+nav.sidebar .nbadge{margin-left:auto;background:var(--accent);color:var(--accent-ink);font-size:11.5px;font-weight:700;border-radius:99px;padding:1px 8px}
+nav.sidebar .logout{order:99;position:sticky;bottom:0;margin:auto 0 0;padding:12px 12px 14px;display:flex;align-items:center;gap:12px;
+background:var(--sidebar-bg);border:0;border-top:1px solid rgba(255,255,255,.12);border-radius:0;box-shadow:none;color:#FFB9B0;font-size:14px;text-align:left}
+nav.sidebar .logout:hover{background:var(--sidebar-bg);color:#fff}
+.cari-tdk{display:none!important}
+#app.mini nav.sidebar{width:76px}
+#app.mini nav.sidebar .brand>div,#app.mini .menu-cari input,#app.mini .menu-cari kbd,#app.mini nav.sidebar .ghead>span,#app.mini nav.sidebar .item.top>span,#app.mini nav.sidebar .item>.t,#app.mini nav.sidebar .logout>.t,#app.mini nav.sidebar .subs,#app.mini nav.sidebar .nbadge{display:none}
+#app.mini .collapse{margin:0 auto;transform:rotate(180deg)}#app.mini nav.sidebar .brand{flex-direction:column}
+#app.mini .menu-cari,#app.mini nav.sidebar .item,#app.mini nav.sidebar .ghead,#app.mini nav.sidebar .logout{justify-content:center;padding-left:0;padding-right:0}
+nav.sidebar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:200px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.09'%3E%3Cpath d='M18 18H42V42H18Z'/%3E%3Cpath d='M30 10 50 30 30 50 10 30Z'/%3E%3C/g%3E%3C/svg%3E");-webkit-mask:linear-gradient(to top,#000,transparent);mask:linear-gradient(to top,#000,transparent);pointer-events:none}
+
+/* konten */
+main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
+.topbar{display:none;align-items:center;gap:10px;margin-bottom:12px}
+.burger{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px;color:var(--ink)}
+.scrim{display:none}
+#tab-dashboard{display:grid;gap:16px;min-width:0}
+#tab-dashboard .card,#tab-dashboard .dash-dua{margin:0}#tab-dashboard .dash-dua{gap:16px}#tab-dashboard .dash-grid{margin:0}
+#tab-dashboard .card h3{font-size:18px;margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+#tab-dashboard .card h3::before{content:"";display:inline-block;width:15px;height:15px;margin-right:9px;vertical-align:-1px;background:var(--accent);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 7H17V17H7Z'/%3E%3Cpath d='M12 2 22 12 12 22 2 12Z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 7H17V17H7Z'/%3E%3Cpath d='M12 2 22 12 12 22 2 12Z'/%3E%3C/svg%3E") center/contain no-repeat}
+.hero{position:relative;overflow:hidden;border-radius:20px;background:linear-gradient(120deg,var(--sidebar-bg),var(--green));color:#fff;padding:26px 28px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px}
+.hero::before{content:"";position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.11'%3E%3Cpath d='M18 18H42V42H18Z'/%3E%3Cpath d='M30 10 50 30 30 50 10 30Z'/%3E%3C/g%3E%3C/svg%3E");-webkit-mask:linear-gradient(100deg,transparent 25%,#000 85%);mask:linear-gradient(100deg,transparent 25%,#000 85%);pointer-events:none}
+.hero>*{position:relative}
+.hero h1{font-size:clamp(26px,3.4vw,38px);font-weight:800;margin:0;color:#fff}.hero h1 em{font-style:normal;color:#FFD23F}
+.hero p{margin:6px 0 16px;color:#E3ECFF;max-width:52ch}
+.quick{display:flex;flex-wrap:wrap;gap:10px}
+.qb{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:10px;padding:10px 15px;font-weight:700;font-size:13.5px;transition:transform .12s}.qb:hover{transform:translateY(-2px)}
+.qb.a{background:#fff;color:#0C2A66}.qb.b{background:var(--accent);color:var(--accent-ink)}.qb.c{background:rgba(255,255,255,.16);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.hero svg.art{width:min(300px,28vw);height:auto;display:block}
+.dash-row{display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.inst{display:flex;gap:16px;align-items:center;margin-bottom:16px}
+.inst img{width:76px;height:76px;border-radius:50%;flex:none;background:#fff;object-fit:contain;box-shadow:0 0 0 3px var(--primary-soft)}
+.inst b{font-family:var(--f-display);font-size:20px;display:block;line-height:1.2}.inst span{color:var(--primary-ink);font-size:13.5px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-bottom:14px}.kv small{display:block;color:var(--ink-soft);font-size:12.5px}.kv b{font-weight:600;font-size:15px}
+.ok{display:inline-flex;align-items:center;gap:6px;background:var(--good-soft);color:var(--good);font-weight:700;border-radius:99px;padding:4px 12px;font-size:13px}.ok.no{background:var(--accent-soft);color:var(--warn)}
+.cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;border:0;border-radius:12px;padding:12px;background:var(--green);color:var(--on-primary);font-weight:700}.cta:hover{filter:brightness(1.08)}
+.gauge{position:relative;width:100%;max-width:300px;margin:8px auto 0}.gauge svg{width:100%;display:block}
+.gauge .mid{position:absolute;inset:auto 0 24px;text-align:center}.gauge .mid small{display:block;color:var(--ink-soft);font-size:12px}.gauge .mid b{font-family:var(--f-display);font-size:34px;line-height:1.1}
+.gcap{text-align:center;color:var(--ink-soft);font-size:13px;margin-top:2px}
+.dash-kartu{background:var(--surface-2);border:1px solid transparent;border-radius:14px;box-shadow:none;padding:13px 14px}
+.dash-kartu:hover{border-color:var(--green)}.dash-kartu small{font-size:12.5px;margin-bottom:0}
+.dash-kartu b{font-family:var(--f-display);font-size:30px;line-height:1.15;display:block;margin-top:4px}
+.dash-kartu.sorot{background:var(--accent-soft)}.dash-kartu.sorot b{color:var(--warn)}
+.dash-info{background:var(--accent-soft);border-color:transparent;border-radius:14px}
+.dash-bar-track{background:var(--track)}
+@media (max-width:1080px){.dash-row{grid-template-columns:minmax(0,1fr)}.hero svg.art{display:none}.hero{grid-template-columns:1fr}}
+@media (max-width:860px){
+#app{display:block}nav.sidebar{position:fixed;inset:0 auto 0 0;width:288px;transform:translateX(-100%);transition:transform .2s}
+#app.openm nav.sidebar{transform:none}#app.openm .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20}
+.topbar{display:flex}.collapse{display:none}main{padding:14px 12px 40px}}
+@media (max-width:560px){.kv{grid-template-columns:1fr}.hero{padding:22px 20px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -299,11 +394,12 @@ tr:hover td{background:var(--primary-soft);}
         <h1 style="font-size:17px;">Aplikasi Ujian</h1>
         <small id="brand-side-nama">PKBM Nurul Islam</small>
       </div>
+      <button type="button" class="collapse" id="btn-collapse" aria-label="Ciutkan menu"><svg class="i" viewBox="0 0 24 24"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/></svg></button>
     </div>
-    <div class="logout" onclick="logout()" role="button" tabindex="0">&#x21AA; Keluar</div>
-    <div class="item" data-tab="dashboard" onclick="showTab('dashboard')" style="margin-top:6px;">Dashboard</div>
+    <label class="menu-cari"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="menu-cari" placeholder="Cari menu…" autocomplete="off"><kbd>/</kbd></label>
+    <div class="item" data-tab="dashboard" onclick="showTab('dashboard')"><svg class="i" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span class="t">Dashboard</span></div>
     <div class="group open has-active" data-group="soal">
-      <div class="ghead" onclick="toggleGroup('soal')"><span>Bank Soal</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('soal')"><svg class="i" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span>Bank Soal</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item active" data-tab="bank" onclick="showTab('bank')">Bank Soal</div>
         <div class="item" data-tab="rekap" onclick="showTab('rekap')">Rekap Bank Soal</div>
@@ -311,7 +407,7 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </div>
     <div class="group" data-group="paketg">
-      <div class="ghead" onclick="toggleGroup('paketg')"><span>Paket Ujian</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('paketg')"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Paket Ujian</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="paket" onclick="showTab('paket')">Buat Paket Ujian</div>
         <div class="item" data-tab="daftar" onclick="showTab('daftar')">Daftar &amp; Cetak</div>
@@ -320,7 +416,7 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </div>
     <div class="group" data-group="laksana">
-      <div class="ghead" onclick="toggleGroup('laksana')"><span>Pelaksanaan Ujian</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('laksana')"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Pelaksanaan Ujian</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="monitor" onclick="showTab('monitor')">Monitoring Ujian</div>
         <div class="item admin-only hidden" data-tab="monsiswa" onclick="showTab('monsiswa')">Monitoring per Siswa</div>
@@ -330,7 +426,7 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </div>
     <div class="group" data-group="perangkat">
-      <div class="ghead" onclick="toggleGroup('perangkat')"><span>Perangkat Ajar</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('perangkat')"><svg class="i" viewBox="0 0 24 24"><path d="M4 4h10a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4Z"/><path d="M8 8h6"/></svg><span>Perangkat Ajar</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="rpp" onclick="showTab('rpp')">Generate RPP</div>
         <div class="item" data-tab="modul" onclick="showTab('modul')">Modul Ajar</div>
@@ -338,15 +434,15 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </div>
     <div class="group" data-group="tugasg">
-      <div class="ghead" onclick="toggleGroup('tugasg')"><span>Tugas Siswa</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('tugasg')"><svg class="i" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg><span>Tugas Siswa</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="tugas" onclick="showTab('tugas')">Kelola Tugas</div>
         <div class="item" data-tab="nilaitugas" onclick="showTab('nilaitugas')">Penilaian Tugas</div>
       </div>
     </div>
-    <div class="item top" data-tab="pending" onclick="showTab('pending')"><span>Perlu Dinilai</span><span class="nbadge hidden" id="badge-pending">0</span></div>
+    <div class="item top" data-tab="pending" onclick="showTab('pending')"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>Perlu Dinilai</span><span class="nbadge hidden" id="badge-pending">0</span></div>
     <div class="group" data-group="nilai">
-      <div class="ghead" onclick="toggleGroup('nilai')"><span>Laporan Nilai</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('nilai')"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Laporan Nilai</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="syaratrapor" onclick="showTab('syaratrapor')">Syarat Rapor</div>
         <div class="item" data-tab="pelanggaran" onclick="showTab('pelanggaran')">Catatan Pelanggaran</div>
@@ -362,7 +458,7 @@ tr:hover td{background:var(--primary-soft);}
       </div>
     </div>
     <div class="group" data-group="atur">
-      <div class="ghead" onclick="toggleGroup('atur')"><span>Pengaturan</span><span class="chev">&#9656;</span></div>
+      <div class="ghead" onclick="toggleGroup('atur')"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>Pengaturan</span><span class="chev">&#9656;</span></div>
       <div class="subs">
         <div class="item" data-tab="pengnilai" onclick="showTab('pengnilai')">Pengaturan Nilai</div>
         <div class="item" data-tab="mapel" onclick="showTab('mapel')">Mata Pelajaran</div>
@@ -375,14 +471,54 @@ tr:hover td{background:var(--primary-soft);}
         <div class="item super-only hidden" onclick="bukaPilihTema()">Warna Aplikasi</div>
       </div>
     </div>
+    <div class="logout" onclick="logout()" role="button" tabindex="0"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="t">Keluar</span></div>
   </nav>
+  <div class="scrim" id="scrim"></div>
 
   <main>
+    <div class="topbar"><button type="button" class="burger" id="btn-burger" aria-label="Buka menu"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><b style="font-family:var(--f-display)">Aplikasi Ujian</b></div>
     <!-- ===== TAB: DASHBOARD ===== -->
     <section id="tab-dashboard" class="hidden">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
-        <div><h2 style="margin-bottom:4px;">Dashboard</h2><p class="muted" id="dash-sub" style="margin:0;"></p></div>
-        <button type="button" class="btn outline" onclick="loadDashboard()">&#x21BB; Segarkan</button>
+      <section class="hero">
+        <div>
+          <h1>Halo, <em id="dash-sapa">Admin</em></h1>
+          <p id="dash-sub"></p>
+          <div class="quick">
+            <button type="button" class="qb a" onclick="showTab('bank')"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Tambah Soal</button>
+            <button type="button" class="qb b" onclick="showTab('paket')"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Buat Paket Ujian</button>
+            <button type="button" class="qb c" onclick="showTab('monitor')"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Monitoring</button>
+            <button type="button" class="qb c admin-only hidden" onclick="showTab('sekolah')">Identitas Lembaga</button>
+            <button type="button" class="qb c" onclick="loadDashboard()">&#x21BB; Segarkan</button>
+          </div>
+        </div>
+        <svg class="art" viewBox="0 0 300 170" aria-hidden="true">
+          <circle cx="170" cy="96" r="78" fill="#fff" opacity=".07"/><circle cx="170" cy="96" r="52" fill="#fff" opacity=".07"/>
+          <g transform="rotate(-8 70 110)"><rect x="10" y="40" width="104" height="122" rx="10" fill="#fff"/><rect x="24" y="56" width="52" height="7" rx="3.5" fill="#1B4FBF" opacity=".9"/><rect x="24" y="73" width="76" height="5" rx="2.5" fill="#CFDDF5"/><rect x="24" y="86" width="68" height="5" rx="2.5" fill="#CFDDF5"/>
+            <circle cx="30" cy="110" r="6" fill="none" stroke="#1B4FBF" stroke-width="2"/><rect x="44" y="107" width="52" height="5" rx="2.5" fill="#CFDDF5"/>
+            <circle cx="30" cy="130" r="6" fill="#F7C21B"/><path d="m27 130 2 2.2 4-4.4" stroke="#2E1A00" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="44" y="127" width="42" height="5" rx="2.5" fill="#CFDDF5"/></g>
+          <g><path d="M170 0v26" stroke="#F7C21B" stroke-width="2"/><path d="M158 26h24l-4 10h-16Z" fill="#F7C21B"/>
+            <path d="M156 36h28l8 20v44l-8 18h-28l-8-18V56Z" fill="#FFF3D6" opacity=".16" stroke="#F7C21B" stroke-width="2.4" stroke-linejoin="round"/>
+            <path d="M170 40v76M152 62h36M152 98h36" stroke="#F7C21B" stroke-width="1.4" opacity=".7"/>
+            <circle cx="170" cy="80" r="14" fill="#FFE57A" opacity=".9"/><circle cx="170" cy="80" r="26" fill="#FFE57A" opacity=".18"/>
+            <path d="M154 118h32l-6 12h-20Z" fill="#F7C21B"/><path d="M170 130v10" stroke="#F7C21B" stroke-width="2"/><circle cx="170" cy="144" r="3.5" fill="#F7C21B"/></g>
+          <path d="M262 30a30 30 0 1 0 14 52a24 24 0 1 1 -14 -52Z" fill="#F28A1E"/><path d="M262 92l2.6 5.8 6.2.6-4.7 4.1 1.4 6.1-5.5-3.2-5.5 3.2 1.4-6.1-4.7-4.1 6.2-.6Z" fill="#fff" opacity=".9"/>
+          <path d="M120 20l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#F7C21B"/><path d="M285 130l2 4.5 4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2Z" fill="#fff" opacity=".7"/>
+        </svg>
+      </section>
+      <div class="dash-row">
+        <section class="card">
+          <h3>Data Lembaga</h3>
+          <div class="inst"><img class="brand-logo" src="logo-pkbm.png" alt="Logo"><div><b id="dl-nama">-</b><span id="dl-yay"></span></div></div>
+          <div class="kv"><div><small>Kota</small><b id="dl-kota">-</b></div><div><small>Kode Satuan Pendidikan (NPSN)</small><b class="num" id="dl-npsn">-</b></div><div style="grid-column:1/-1"><small>Alamat</small><b id="dl-alamat">-</b></div></div>
+          <span class="ok" id="dl-ok">Identitas lengkap</span>
+          <button type="button" class="cta admin-only hidden" onclick="showTab('sekolah')"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Lihat Detail</button>
+        </section>
+        <section class="card">
+          <h3>Perkembangan Ujian</h3>
+          <div class="gauge"><svg viewBox="0 0 220 125"><path d="M20 112A90 90 0 0 1 200 112" fill="none" stroke="var(--track)" stroke-width="16" stroke-linecap="round"/><path id="dash-arc" d="M20 112A90 90 0 0 1 200 112" fill="none" stroke="var(--green)" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/></svg><div class="mid"><small>Sudah dinilai</small><b class="num" id="dash-pct">0%</b></div></div>
+          <div class="gcap num" id="dash-gcap">-</div>
+          <button type="button" class="cta" onclick="showTab('laporan')"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Lihat Laporan</button>
+        </section>
       </div>
       <div id="dash-perhatian"></div>
       <div class="dash-grid" id="dash-kartu"></div>
@@ -2259,6 +2395,7 @@ async function loadDashboard(){
   const aktifSiswa = siswa.filter(x=>!/lulus|keluar|pindah|nonaktif|mutasi|alumni/i.test(x.status||''));
   const n = v=>v==null ? '-' : Number(v).toLocaleString('id-ID');
 
+  if(typeof dashHero==='function') dashHero({ jalan:jalan.length, tunggu:tunggu.length, dinilai:dinilai.length });
   // perhatian
   const info = [];
   if(tunggu.length) info.push([`${tunggu.length} lembar jawaban menunggu dinilai`, 'pending', 'Nilai sekarang']);
@@ -10549,6 +10686,44 @@ async function cetakDaftarKenaikan(){
     </tbody></table>
     <div class="ttd"><div class="kolom">${tglTtd()}<br>${blokTtd('Wali Kelas', ttdWali, true)}</div><div class="kolom">&nbsp;<br>${blokTtd(esc2(SEKOLAH.jabatan_kepala||'Kepala'), ttdKepala, true)}</div></div></body></html>`);
   win.document.close();
+}
+</script>
+<script>
+// ===== v16: perilaku tampilan baru (ciutkan menu, cari menu, menu ponsel, ringkasan dashboard) =====
+(function(){
+  const app=document.getElementById('app'), nav=document.querySelector('nav.sidebar'), q=document.getElementById('menu-cari');
+  document.getElementById('btn-collapse').onclick=()=>app.classList.toggle('mini');
+  document.getElementById('btn-burger').onclick=()=>app.classList.add('openm');
+  document.getElementById('scrim').onclick=()=>app.classList.remove('openm');
+  nav.addEventListener('click',e=>{ if(e.target.closest('.item[data-tab]')) app.classList.remove('openm'); });
+  const teks=el=>el.textContent.toLowerCase();
+  q.addEventListener('input',()=>{
+    const k=q.value.trim().toLowerCase();
+    nav.querySelectorAll('.item').forEach(i=>i.classList.toggle('cari-tdk',!!k&&!teks(i).includes(k)));
+    nav.querySelectorAll('.group').forEach(g=>{
+      const cocokGrup=!k||teks(g.querySelector('.ghead')).includes(k);
+      if(cocokGrup) g.querySelectorAll('.item').forEach(i=>i.classList.remove('cari-tdk'));
+      const ada=cocokGrup||[...g.querySelectorAll('.item')].some(i=>!i.classList.contains('cari-tdk'));
+      g.classList.toggle('cari-tdk',!ada); if(k&&ada) g.classList.add('open');
+    });
+  });
+  document.addEventListener('keydown',e=>{ if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!app.classList.contains('hidden')){ e.preventDefault(); q.focus(); } });
+})();
+function dashHero(d){
+  const $=id=>document.getElementById(id), j=new Date().getHours();
+  const w=j<11?'Selamat pagi':j<15?'Selamat siang':j<18?'Selamat sore':'Selamat malam';
+  const hari=new Date().toLocaleDateString('id-ID',{weekday:'long'});
+  $('dash-sapa').textContent = ADALAH_SUPER?'Super Admin':ADALAH_ADMIN?'Admin':'Guru';
+  const s=[]; if(d.jalan) s.push(d.jalan+' siswa sedang ujian'); if(d.tunggu) s.push(d.tunggu+' jawaban menunggu dinilai');
+  $('dash-sub').textContent=`${w}! Semoga hari ${hari} Anda menyenangkan.`+(s.length?' Ada '+s.join(' dan ')+'.':'');
+  const total=d.dinilai+d.tunggu, p=total?Math.round(d.dinilai/total*100):0;
+  $('dash-arc').setAttribute('stroke-dasharray',p+' 100'); $('dash-pct').textContent=p+'%';
+  $('dash-gcap').textContent=d.dinilai.toLocaleString('id-ID')+' dari '+total.toLocaleString('id-ID')+' hasil ujian';
+  const S=SEKOLAH||{};
+  $('dl-nama').textContent=S.nama_lembaga||S.nama_aplikasi||'-'; $('dl-yay').textContent=S.nama_yayasan||'';
+  $('dl-kota').textContent=S.kota_ttd||'-'; $('dl-npsn').textContent=S.npsn||'-'; $('dl-alamat').textContent=S.alamat||'-';
+  const lengkap=!!(S.nama_lembaga&&S.npsn&&S.alamat&&S.kota_ttd), ok=$('dl-ok');
+  ok.textContent=lengkap?'Identitas lengkap':'Identitas belum lengkap'; ok.classList.toggle('no',!lengkap);
 }
 </script>
 <script src="perangkat-ajar.js"></script>
