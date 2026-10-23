@@ -65,6 +65,10 @@
         : 'Modul Ajar lengkap mengikuti template: informasi umum, kesiapan peserta didik, desain pembelajaran, materi, langkah pembelajaran, LKPD, asesmen, diferensiasi, tindak lanjut, refleksi, dan sumber rujukan.'}
         Hasil bisa Anda <b>edit langsung</b> di layar, lalu simpan atau unduh ke Word.</p>
       <div class="card">
+        ${j === 'modul' ? `<div class="field" style="background:#F4F8F1;border:2px solid #548235;border-radius:10px;padding:10px 12px;margin-bottom:14px;"><label><b>Pilih Template Modul Ajar</b></label><select id="pa-modul-tpl" onchange="localStorage.setItem('pa_tpl_modul', this.value)">
+          <option value="1">Template 1 — Modul Ajar Lengkap (informasi umum, desain, materi, langkah bertabel, LKPD, asesmen, diferensiasi, refleksi)</option>
+          <option value="2">Template 2 — Pendidikan Kesetaraan / Pembelajaran Mendalam (Informasi Umum, Dimensi Profil Lulusan, Desain, Memahami-Mengaplikasi-Merefleksi, Asesmen, Lampiran)</option>
+        </select></div>` : ''}
         <div class="grid3">
           <div class="field"><label>Mata Pelajaran</label><select id="pa-${j}-mapel" onchange="PA.mapelBerubah('${j}')">${mapel}</select></div>
           <div class="field"><label>Semester</label><select id="pa-${j}-sem"><option>Ganjil</option><option>Genap</option></select></div>
@@ -88,10 +92,6 @@
         </div>`}
         <div class="grid3">
           <div class="field"><label>NIP/NUPTK Guru (opsional)</label><input type="text" id="pa-${j}-nip" /></div>
-          ${j === 'modul' ? `<div class="field" style="grid-column:span 2;"><label>Template Modul Ajar</label><select id="pa-modul-tpl" onchange="localStorage.setItem('pa_tpl_modul', this.value)">
-            <option value="1">Template 1 — Modul Ajar Lengkap (informasi umum, desain, materi, langkah bertabel, LKPD, asesmen, diferensiasi, refleksi)</option>
-            <option value="2">Template 2 — Pendidikan Kesetaraan / Pembelajaran Mendalam (Informasi Umum, Dimensi Profil Lulusan, Desain, Memahami-Mengaplikasi-Merefleksi, Asesmen, Lampiran)</option>
-          </select></div>` : ''}
         </div>
         <div class="toolbar">
           <button class="btn gold" id="pa-${j}-btn" onclick="PA.generate('${j}')">✦ Generate ${NAMA[j]}</button>
