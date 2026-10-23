@@ -363,6 +363,25 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
 .topbar{display:flex}.collapse{display:none}main{padding:14px 12px 40px}}
 @media (max-width:560px){.kv{grid-template-columns:1fr}.hero{padding:22px 20px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== v16.1: dashboard lebih ringkas ===== */
+#tab-dashboard{gap:12px}
+#tab-dashboard .card{padding:16px 18px;border-radius:16px}
+#tab-dashboard .card h3{font-size:16px;margin-bottom:10px;padding-bottom:9px}
+.hero{padding:18px 22px}.hero h1{font-size:clamp(22px,2.6vw,30px)}.hero p{margin:4px 0 12px;font-size:13.5px}.qb{padding:8px 13px;font-size:13px}.hero svg.art{width:min(220px,22vw)}
+.dash-row{gap:12px;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)}
+.inst{gap:12px;margin-bottom:10px}.inst img{width:52px;height:52px}.inst b{font-size:15px}.inst span{font-size:12px}
+.kv{gap:8px 14px;margin-bottom:10px}.kv small{font-size:11.5px}.kv b{font-size:13.5px}
+.ok{padding:3px 10px;font-size:12px}.cta{margin-top:10px;padding:9px;font-size:13px;border-radius:10px}
+.prog{display:grid;grid-template-columns:190px minmax(0,1fr);gap:8px 16px;align-items:center}
+.gauge{max-width:190px;margin:0 auto}.gauge .mid{inset:auto 0 14px}.gauge .mid b{font-size:24px}.gauge .mid small{font-size:11px}.gcap{font-size:12px}
+#dash-perhatian{display:grid;gap:8px;align-content:center}
+#dash-perhatian:empty::before{content:"Tidak ada yang perlu ditindaklanjuti.";color:var(--ink-soft);font-size:13px}
+#dash-perhatian .dash-info{margin:0;padding:8px 12px;gap:8px;font-size:13px;border-radius:12px}
+#dash-perhatian .dash-info .btn{padding:5px 11px;font-size:12px}
+#dash-pintasan .dash-grup h4{margin:10px 0 6px}
+@media (max-width:1080px){.dash-row{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.prog{grid-template-columns:1fr}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -505,6 +524,13 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
           <path d="M120 20l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#F7C21B"/><path d="M285 130l2 4.5 4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2Z" fill="#fff" opacity=".7"/>
         </svg>
       </section>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0;">Pintasan</h3>
+          <input type="text" id="dash-cari" placeholder="Cari menu..." oninput="saringPintasan()" style="max-width:240px;" />
+        </div>
+        <div id="dash-pintasan"></div>
+      </div>
       <div class="dash-row">
         <section class="card">
           <h3>Data Lembaga</h3>
@@ -515,12 +541,16 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
         </section>
         <section class="card">
           <h3>Perkembangan Ujian</h3>
+          <div class="prog">
+            <div>
           <div class="gauge"><svg viewBox="0 0 220 125"><path d="M20 112A90 90 0 0 1 200 112" fill="none" stroke="var(--track)" stroke-width="16" stroke-linecap="round"/><path id="dash-arc" d="M20 112A90 90 0 0 1 200 112" fill="none" stroke="var(--green)" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/></svg><div class="mid"><small>Sudah dinilai</small><b class="num" id="dash-pct">0%</b></div></div>
           <div class="gcap num" id="dash-gcap">-</div>
+            </div>
+            <div id="dash-perhatian"></div>
+          </div>
           <button type="button" class="cta" onclick="showTab('laporan')"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Lihat Laporan</button>
         </section>
       </div>
-      <div id="dash-perhatian"></div>
       <div class="dash-grid" id="dash-kartu"></div>
       <div class="dash-dua">
         <div class="card"><h3>Sedang ujian sekarang</h3><div id="dash-jalan" class="dash-kosong">Memuat...</div></div>
@@ -533,13 +563,6 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
       <div class="dash-dua">
         <div class="card"><h3>Paket ujian yang dibuka</h3><div id="dash-paket" class="dash-kosong">Memuat...</div></div>
         <div class="card"><h3>Siswa per kelas</h3><div id="dash-kelas"></div></div>
-      </div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <h3 style="margin:0;">Pintasan</h3>
-          <input type="text" id="dash-cari" placeholder="Cari menu..." oninput="saringPintasan()" style="max-width:240px;" />
-        </div>
-        <div id="dash-pintasan"></div>
       </div>
       <div class="card">
         <h3>Aktivitas ujian terbaru</h3>
