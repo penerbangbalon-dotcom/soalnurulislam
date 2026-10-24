@@ -381,6 +381,43 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
 #dash-perhatian .dash-info .btn{padding:5px 11px;font-size:12px}
 #dash-pintasan .dash-grup h4{margin:10px 0 6px}
 @media (max-width:1080px){.dash-row{grid-template-columns:minmax(0,1fr)}}
+
+/* ===== v16.3: agenda ujian, kalender, rata-rata nilai per mapel ===== */
+.dash-row.agenda{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+#tab-dashboard .cardhead h3{margin:0;padding:0;border:0}
+#tab-dashboard .cardhead h3::before{content:"";display:inline-block;width:15px;height:15px;margin-right:9px;vertical-align:-1px;background:var(--accent);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 7H17V17H7Z'/%3E%3Cpath d='M12 2 22 12 12 22 2 12Z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 7H17V17H7Z'/%3E%3Cpath d='M12 2 22 12 12 22 2 12Z'/%3E%3C/svg%3E") center/contain no-repeat}
+.ghost{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 13px;font-weight:600;font-size:13px;cursor:pointer;color:inherit;font-family:inherit}
+.ghost:hover{border-color:var(--green);color:var(--green)}
+.ag-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ag-item{display:flex;align-items:center;gap:14px}
+.ag-tgl{flex:none;width:58px;border-radius:14px;background:var(--primary-soft);color:var(--primary-ink);text-align:center;padding:7px 0;line-height:1.05}
+.ag-tgl b{display:block;font-family:var(--f-display);font-size:22px}
+.ag-tgl small{font-size:11px;font-weight:800;letter-spacing:.04em}
+.ag-item.dekat .ag-tgl{background:var(--green);color:var(--on-primary)}
+.ag-info{flex:1;min-width:0}
+.ag-info b{display:block;font-weight:700;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-info small{color:var(--ink-soft);font-size:12.5px}
+.ag-tag{flex:none;border-radius:99px;padding:3px 11px;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--warn);white-space:nowrap}
+.ag-tag.b{background:var(--good-soft);color:var(--good)}
+.kal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.kal-head b{font-family:var(--f-display);font-size:16px}
+.kal-chip{background:var(--accent-soft);color:var(--warn);font-weight:700;font-size:12px;border-radius:99px;padding:3px 11px;white-space:nowrap}
+.kal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.kal-grid .h{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:6px 0}
+.kal-grid .d{position:relative;font-size:13.5px;padding:8px 0;border-radius:10px}
+.kal-grid .d.u::after{content:"";position:absolute;left:50%;bottom:3px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--orange,#F28A1E)}
+.kal-grid .d.h-ini{background:var(--green);color:var(--on-primary);font-weight:700}
+.kal-leg{display:flex;gap:16px;margin-top:10px;font-size:12.5px;color:var(--ink-soft)}
+.kal-leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.mp-kartu{background:var(--surface-2);border-radius:14px;padding:14px 8px;text-align:center}
+.mp-ring{position:relative;width:84px;height:84px;margin:0 auto 8px}
+.mp-ring svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
+.mp-ring b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-display);font-size:19px}
+.mp-kartu .nm{font-weight:700;font-size:13px;line-height:1.25}
+.mp-kartu small{display:block;color:var(--ink-soft);font-size:12px;margin-top:2px}
+@media (max-width:1080px){.dash-row.agenda{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:560px){.prog{grid-template-columns:1fr}}
 
 /* ===== v16.2: diagram pie ===== */
@@ -553,6 +590,22 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
           <button type="button" class="cta" onclick="showTab('laporan')"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Lihat Laporan</button>
         </section>
       </div>
+      <div class="dash-row agenda">
+        <section class="card">
+          <div class="cardhead"><h3>Agenda ujian</h3><button type="button" class="ghost" onclick="showTab('daftar')">Lihat semua</button></div>
+          <ul class="ag-list" id="dash-agenda"><li class="dash-kosong">Memuat...</li></ul>
+        </section>
+        <section class="card">
+          <div class="kal-head"><b id="kal-judul">-</b><span class="kal-chip" id="kal-chip"></span></div>
+          <div class="kal-grid" id="kal-grid"></div>
+          <div class="kal-leg"><span><i style="background:var(--orange,#F28A1E)"></i>Hari ujian</span><span><i style="background:var(--green)"></i>Hari ini</span></div>
+        </section>
+      </div>
+      <section class="card">
+        <div class="cardhead"><h3>Rata-rata nilai per mapel</h3>
+          <select id="mp-kelas" onchange="gambarRataMapel()"><option value="">Semua kelas</option></select></div>
+        <div class="mp-grid" id="dash-mapel"><p class="dash-kosong">Memuat...</p></div>
+      </section>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <h3 style="margin:0;">Pintasan</h3>
@@ -695,6 +748,11 @@ main{flex:1;min-width:0;max-width:1240px;margin:0 auto;padding:16px 20px 40px}
           <div class="field"><label>Durasi (menit)</label><input type="number" id="pk-durasi" value="90" /></div>
           <div class="field"><label>Acak urutan soal?</label><select id="pk-acak"><option value="false">Tidak</option><option value="true">Ya</option></select></div>
           <div class="field"><label>Tahun Ajaran</label><select id="pk-tahun"></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Tanggal Ujian (untuk Agenda Dashboard)</label><input type="date" id="pk-tanggal" /></div>
+          <div class="field"><label>Jam Mulai</label><input type="time" id="pk-jam" /></div>
+          <div class="field"></div>
         </div>
 
         <h3 style="margin-top:18px;">Pilih Soal dari Bank</h3>
@@ -2486,6 +2544,86 @@ async function loadDashboard(){
   const terbaru = sesi.slice(-10).reverse();
   $('dash-riwayat').innerHTML = terbaru.length ? terbaru.map(x=>`<tr><td>${escapeHtml(x.siswa_nama||'-')}</td><td>${escapeHtml(judul(x.paket_ujian_id))}</td><td>${escapeHtml(NAMA_STATUS[x.status]||x.status||'-')}</td><td>${x.total_skor==null?'-':escapeHtml(String(x.total_skor))}</td><td>${fmt(waktu(x),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('') : '<tr><td colspan="5" class="muted">Belum ada ujian yang dikerjakan.</td></tr>';
   if(rp.error || rs.error) $('dash-riwayat').innerHTML = `<tr><td colspan="5">${escapeHtml((rp.error||rs.error).message)}</td></tr>`;
+  dashPaketCache = paket; dashNilaiCache = dinilai;
+  muatAgendaUjian();
+  try{ await pastikanPengNilaiTermuat(); }catch(e){}
+  isiPilihanKelasMapel(); gambarRataMapel();
+}
+
+// ---------- v16.3: agenda ujian, kalender, rata-rata nilai per mapel ----------
+let dashPaketCache = [], dashNilaiCache = [];
+const NAMA_BULAN_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const kunciTgl = d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+async function muatAgendaUjian(){
+  const ul = document.getElementById('dash-agenda');
+  const { data, error } = await supa.from('paket_ujian')
+    .select('id, judul, jenis_ujian, kelas, program, durasi_menit, tanggal_ujian, jam_ujian, status, diarsipkan, mata_pelajaran(nama)')
+    .not('tanggal_ujian','is',null).order('tanggal_ujian');
+  let jadwal = [];
+  if(error){
+    ul.innerHTML = `<li class="dash-kosong">Jadwal belum bisa dimuat. Jalankan <b>migrasi-v25-jadwal-ujian.sql</b> di Supabase SQL Editor, lalu muat ulang.</li>`;
+  } else {
+    jadwal = (data||[]).filter(p=>!p.diarsipkan);
+    const hariIni = kunciTgl(new Date());
+    const mendatang = jadwal.filter(p=>p.tanggal_ujian>=hariIni).slice(0,5);
+    ul.innerHTML = mendatang.length ? mendatang.map((p,i)=>{
+      const [y,m,d] = p.tanggal_ujian.split('-').map(Number);
+      const mapel = p.mata_pelajaran?.nama || p.judul || '-';
+      const ket = [p.kelas?('Kelas '+p.kelas):'', p.jam_ujian?String(p.jam_ujian).slice(0,5).replace(':','.'):'', p.durasi_menit?(p.durasi_menit+' mnt'):''].filter(Boolean).join(' · ');
+      return `<li class="ag-item ${i===0?'dekat':''}"><div class="ag-tgl"><b>${d}</b><small>${NAMA_BULAN_ID[m-1].slice(0,3).toUpperCase()}</small></div><div class="ag-info"><b>${escapeHtml((p.jenis_ujian||'')+' '+mapel)}</b><small>${escapeHtml(ket)}</small></div><span class="ag-tag ${p.program==='Paket B'?'b':''}">${escapeHtml(p.program||'Umum')}</span></li>`;
+    }).join('') : '<li class="dash-kosong">Belum ada ujian terjadwal. Isi Tanggal Ujian di menu Buat Paket Ujian.</li>';
+  }
+  gambarKalender(jadwal);
+}
+function gambarKalender(jadwal){
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  const hariUjian = new Set((jadwal||[]).map(p=>p.tanggal_ujian));
+  const awal = new Date(y,m,1), jmlHari = new Date(y,m+1,0).getDate();
+  const offset = (awal.getDay()+6)%7; // Senin = 0
+  let h = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(x=>`<div class="h">${x}</div>`).join('') + '<div></div>'.repeat(offset);
+  let n = 0;
+  for(let d=1; d<=jmlHari; d++){
+    const k = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const u = hariUjian.has(k); if(u) n++;
+    h += `<div class="d ${u?'u':''} ${d===now.getDate()?'h-ini':''}">${d}</div>`;
+  }
+  document.getElementById('kal-grid').innerHTML = h;
+  document.getElementById('kal-judul').textContent = NAMA_BULAN_ID[m]+' '+y;
+  document.getElementById('kal-chip').textContent = n ? `${n} jadwal bulan ini` : 'Tidak ada jadwal';
+}
+function isiPilihanKelasMapel(){
+  const sel = document.getElementById('mp-kelas'), lama = sel.value;
+  const set = new Set(dashPaketCache.filter(p=>p.kelas).map(p=>p.kelas));
+  const urut = [...set].sort((a,b)=>String(a).localeCompare(String(b),'id',{numeric:true}));
+  sel.innerHTML = '<option value="">Semua kelas</option>' + urut.map(k=>`<option value="${escapeHtml(k)}">Kelas ${escapeHtml(k)}</option>`).join('');
+  if(urut.includes(lama)) sel.value = lama;
+}
+function gambarRataMapel(){
+  const wadah = document.getElementById('dash-mapel');
+  const kelas = document.getElementById('mp-kelas').value;
+  const pmap = new Map(dashPaketCache.map(p=>[p.id,p]));
+  const per = new Map(); // mapel -> { jml, total, kkm[] }
+  dashNilaiCache.forEach(x=>{
+    const p = pmap.get(x.paket_ujian_id); if(!p) return;
+    if(p.jenis_ujian==='Remedial') return;
+    if(kelas && p.kelas!==kelas) return;
+    const nm = p.mata_pelajaran?.nama; if(!nm) return;
+    const r = per.get(nm) || { jml:0, total:0, kkm:[] };
+    r.jml++; r.total += Number(x.total_skor);
+    let k = 70; try{ k = ambilKKM(p.program, p.kelas, nm); }catch(e){}
+    r.kkm.push(k); per.set(nm, r);
+  });
+  const daftar = [...per.entries()].sort((a,b)=>a[0].localeCompare(b[0],'id'));
+  if(!daftar.length){ wadah.innerHTML = '<p class="dash-kosong">Belum ada nilai ujian'+(kelas?' untuk kelas ini':'')+'.</p>'; return; }
+  const K = 2*Math.PI*36;
+  wadah.innerHTML = daftar.map(([nm,r])=>{
+    const rata = r.total/r.jml;
+    const hit = {}; r.kkm.forEach(k=>hit[k]=(hit[k]||0)+1);
+    const kkm = Number(Object.entries(hit).sort((a,b)=>b[1]-a[1])[0][0]);
+    const warna = rata>=kkm ? 'var(--green)' : 'var(--orange,#F28A1E)';
+    const isi = Math.max(0,Math.min(100,rata))/100*K;
+    return `<div class="mp-kartu"><div class="mp-ring"><svg viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="36" fill="none" stroke="var(--track)" stroke-width="7"/><circle cx="42" cy="42" r="36" fill="none" stroke="${warna}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${isi.toFixed(1)} ${K.toFixed(1)}"/></svg><b class="num">${Math.round(rata)}</b></div><div class="nm">${escapeHtml(nm)}</div><small>KKM ${kkm} · ${r.jml} nilai</small></div>`;
+  }).join('');
 }
 
 async function boot(){
@@ -4907,6 +5045,10 @@ async function simpanPaketUjian(){
     acak_soal: document.getElementById('pk-acak').value === 'true',
   };
   if(dataPaket.jenis_ujian==='Remedial') dataPaket.remedial_komponen = document.getElementById('pk-rem-komp').value;
+  { // jadwal ujian (kolom dari migrasi-v25); hanya dikirim bila diisi atau sedang edit, agar aman sebelum migrasi dijalankan
+    const tgl = document.getElementById('pk-tanggal').value, jam = document.getElementById('pk-jam').value;
+    if(tgl || jam || editingPaketId){ dataPaket.tanggal_ujian = tgl || null; dataPaket.jam_ujian = jam || null; }
+  }
 
   // Paket yang sudah dikerjakan siswa: susunan soal & bobot dikunci supaya nilai tersimpan tidak berubah.
   let kunciSoalPaket = false;
@@ -4975,6 +5117,8 @@ async function editPaket(id){
   document.getElementById('pk-b-isian').value = paket.bobot_isian ?? '';
   document.getElementById('pk-b-essay').value = paket.bobot_essay ?? '';
   isiOpsiTahunAjaran(paket.tahun_ajaran || '');
+  document.getElementById('pk-tanggal').value = paket.tanggal_ujian || '';
+  document.getElementById('pk-jam').value = paket.jam_ujian ? String(paket.jam_ujian).slice(0,5) : '';
 
   document.getElementById('paket-form-title').textContent = 'Edit Paket Ujian: ' + paket.judul;
   document.getElementById('pk-simpan-btn').textContent = 'Simpan Perubahan';
@@ -4996,6 +5140,7 @@ function batalEditPaket(){
   isiOpsiSemesterPaket();
   isiOpsiTahunAjaran();
   document.getElementById('pk-durasi').value = 90;
+  document.getElementById('pk-tanggal').value = ''; document.getElementById('pk-jam').value = '';
   document.getElementById('pk-soal-list').innerHTML = '';
   document.getElementById('pk-pilih-panel').innerHTML = '';
   document.getElementById('paket-form-title').textContent = 'Buat Paket Ujian';
